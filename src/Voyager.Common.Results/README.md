@@ -1,11 +1,29 @@
 ﻿# Voyager.Common.Results
 
-Biblioteka implementująca **Result Pattern** (Railway Oriented Programming) dla projektów Voyager.
+[![NuGet](https://img.shields.io/nuget/v/Voyager.Common.Results.svg)](https://www.nuget.org/packages/Voyager.Common.Results/)
+[![NuGet Downloads](https://img.shields.io/nuget/dt/Voyager.Common.Results.svg)](https://www.nuget.org/packages/Voyager.Common.Results/)
+[![Build Status](https://github.com/Voyager-Poland/Voyager.Common.Results/workflows/CI%20Build/badge.svg)](https://github.com/Voyager-Poland/Voyager.Common.Results/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+Biblioteka implementująca **Result Pattern** (Railway Oriented Programming) dla projektów .NET.
+
+Wspiera **.NET Framework 4.8** i **.NET 8** 🎯
 
 ## 📦 Instalacja
 
+### Package Manager Console
+```powershell
+Install-Package Voyager.Common.Results
+```
+
+### .NET CLI
 ```bash
-dotnet add reference ../Voyager.Common.Results/Voyager.Common.Results.csproj
+dotnet add package Voyager.Common.Results
+```
+
+### PackageReference (csproj)
+```xml
+<PackageReference Include="Voyager.Common.Results" Version="1.0.0" />
 ```
 
 ## 🎯 Podstawowe użycie
@@ -270,4 +288,4 @@ Pull requesty mile widziane! Przed dużymi zmianami, otwórz issue aby przedysku
 
 ## 📄 Licencja
 
-Własnościowa - Voyager Poland
+MIT - Voyager Poland

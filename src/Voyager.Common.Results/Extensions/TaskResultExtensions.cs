@@ -1,198 +1,204 @@
-﻿namespace Voyager.Common.Results.Extensions;
+﻿#if NET48
+using System;
+using System.Threading.Tasks;
+#endif
 
-/// <summary>
-/// Extension methods dla async Result operations
-/// </summary>
-public static class TaskResultExtensions
+namespace Voyager.Common.Results.Extensions
 {
-	// ========== MAP ASYNC ==========
-
 	/// <summary>
-	/// Mapuje wynik Task&lt;Result&lt;T&gt;&gt; na inny typ
+	/// Extension methods for async Result operations
 	/// </summary>
-	public static async Task<Result<TOut>> MapAsync<TIn, TOut>(
-		this Task<Result<TIn>> resultTask,
-		Func<TIn, TOut> mapper)
+	public static class TaskResultExtensions
 	{
-		var result = await resultTask.ConfigureAwait(false);
-		return result.Map(mapper);
-	}
+		// ========== MAP ASYNC ==========
 
-	/// <summary>
-	/// Mapuje wynik Result&lt;T&gt; używając async funkcji
-	/// </summary>
-	public static async Task<Result<TOut>> MapAsync<TIn, TOut>(
-		this Result<TIn> result,
-		Func<TIn, Task<TOut>> mapper)
-	{
-		if (result.IsFailure)
-			return Result<TOut>.Failure(result.Error!);
+		/// <summary>
+		/// Maps a Task&lt;Result&lt;TIn&gt;&gt; to another Result type using a synchronous mapper
+		/// </summary>
+		public static async Task<Result<TOut>> MapAsync<TIn, TOut>(
+			this Task<Result<TIn>> resultTask,
+			Func<TIn, TOut> mapper)
+		{
+			var result = await resultTask.ConfigureAwait(false);
+			return result.Map(mapper);
+		}
 
-		var value = await mapper(result.Value!).ConfigureAwait(false);
-		return Result<TOut>.Success(value);
-	}
+		/// <summary>
+		/// Maps a Result&lt;TIn&gt; using an asynchronous mapper function
+		/// </summary>
+		public static async Task<Result<TOut>> MapAsync<TIn, TOut>(
+			this Result<TIn> result,
+			Func<TIn, Task<TOut>> mapper)
+		{
+			if (result.IsFailure)
+				return Result<TOut>.Failure(result.Error!);
 
-	/// <summary>
-	/// Mapuje wynik Task&lt;Result&lt;T&gt;&gt; używając async funkcji
-	/// </summary>
-	public static async Task<Result<TOut>> MapAsync<TIn, TOut>(
-		this Task<Result<TIn>> resultTask,
-		Func<TIn, Task<TOut>> mapper)
-	{
-		var result = await resultTask.ConfigureAwait(false);
-		return await result.MapAsync(mapper).ConfigureAwait(false);
-	}
+			var value = await mapper(result.Value!).ConfigureAwait(false);
+			return Result<TOut>.Success(value);
+		}
 
-	// ========== BIND ASYNC ==========
+		/// <summary>
+		/// Maps a Task&lt;Result&lt;TIn&gt;&gt; using an asynchronous mapper function
+		/// </summary>
+		public static async Task<Result<TOut>> MapAsync<TIn, TOut>(
+			this Task<Result<TIn>> resultTask,
+			Func<TIn, Task<TOut>> mapper)
+		{
+			var result = await resultTask.ConfigureAwait(false);
+			return await result.MapAsync(mapper).ConfigureAwait(false);
+		}
 
-	/// <summary>
-	/// Bind dla Task&lt;Result&lt;T&gt;&gt; z synchronicznym binder
-	/// </summary>
-	public static async Task<Result<TOut>> BindAsync<TIn, TOut>(
-		this Task<Result<TIn>> resultTask,
-		Func<TIn, Result<TOut>> binder)
-	{
-		var result = await resultTask.ConfigureAwait(false);
-		return result.Bind(binder);
-	}
+		// ========== BIND ASYNC ==========
 
-	/// <summary>
-	/// Bind dla Result&lt;T&gt; z async binder
-	/// </summary>
-	public static async Task<Result<TOut>> BindAsync<TIn, TOut>(
-		this Result<TIn> result,
-		Func<TIn, Task<Result<TOut>>> binder)
-	{
-		if (result.IsFailure)
-			return Result<TOut>.Failure(result.Error!);
+		/// <summary>
+		/// Binds a Task&lt;Result&lt;TIn&gt;&gt; using a synchronous binder
+		/// </summary>
+		public static async Task<Result<TOut>> BindAsync<TIn, TOut>(
+			this Task<Result<TIn>> resultTask,
+			Func<TIn, Result<TOut>> binder)
+		{
+			var result = await resultTask.ConfigureAwait(false);
+			return result.Bind(binder);
+		}
 
-		return await binder(result.Value!).ConfigureAwait(false);
-	}
+		/// <summary>
+		/// Binds a Result&lt;TIn&gt; using an asynchronous binder
+		/// </summary>
+		public static async Task<Result<TOut>> BindAsync<TIn, TOut>(
+			this Result<TIn> result,
+			Func<TIn, Task<Result<TOut>>> binder)
+		{
+			if (result.IsFailure)
+				return Result<TOut>.Failure(result.Error!);
 
-	/// <summary>
-	/// Bind dla Task&lt;Result&lt;T&gt;&gt; z async binder
-	/// </summary>
-	public static async Task<Result<TOut>> BindAsync<TIn, TOut>(
-		this Task<Result<TIn>> resultTask,
-		Func<TIn, Task<Result<TOut>>> binder)
-	{
-		var result = await resultTask.ConfigureAwait(false);
-		return await result.BindAsync(binder).ConfigureAwait(false);
-	}
+			return await binder(result.Value!).ConfigureAwait(false);
+		}
 
-	// ========== TAP ASYNC ==========
+		/// <summary>
+		/// Binds a Task&lt;Result&lt;TIn&gt;&gt; using an asynchronous binder
+		/// </summary>
+		public static async Task<Result<TOut>> BindAsync<TIn, TOut>(
+			this Task<Result<TIn>> resultTask,
+			Func<TIn, Task<Result<TOut>>> binder)
+		{
+			var result = await resultTask.ConfigureAwait(false);
+			return await result.BindAsync(binder).ConfigureAwait(false);
+		}
 
-	/// <summary>
-	/// Tap dla Task&lt;Result&lt;T&gt;&gt; z synchroniczną akcją
-	/// </summary>
-	public static async Task<Result<TValue>> TapAsync<TValue>(
-		this Task<Result<TValue>> resultTask,
-		Action<TValue> action)
-	{
-		var result = await resultTask.ConfigureAwait(false);
-		return result.Tap(action);
-	}
+		// ========== TAP ASYNC ==========
 
-	/// <summary>
-	/// Tap dla Result&lt;T&gt; z async akcją
-	/// </summary>
-	public static async Task<Result<TValue>> TapAsync<TValue>(
-		this Result<TValue> result,
-		Func<TValue, Task> action)
-	{
-		if (result.IsSuccess)
-			await action(result.Value!).ConfigureAwait(false);
-		return result;
-	}
+		/// <summary>
+		/// Tap for Task&lt;Result&lt;TValue&gt;&gt; with a synchronous action
+		/// </summary>
+		public static async Task<Result<TValue>> TapAsync<TValue>(
+			this Task<Result<TValue>> resultTask,
+			Action<TValue> action)
+		{
+			var result = await resultTask.ConfigureAwait(false);
+			return result.Tap(action);
+		}
 
-	/// <summary>
-	/// Tap dla Task&lt;Result&lt;T&gt;&gt; z async akcją
-	/// </summary>
-	public static async Task<Result<TValue>> TapAsync<TValue>(
-		this Task<Result<TValue>> resultTask,
-		Func<TValue, Task> action)
-	{
-		var result = await resultTask.ConfigureAwait(false);
-		return await result.TapAsync(action).ConfigureAwait(false);
-	}
-
-	// ========== MATCH ASYNC ==========
-
-	/// <summary>
-	/// Match dla Task&lt;Result&lt;T&gt;&gt; z synchronicznymi funkcjami
-	/// </summary>
-	public static async Task<TResult> MatchAsync<TValue, TResult>(
-		this Task<Result<TValue>> resultTask,
-		Func<TValue, TResult> onSuccess,
-		Func<Error, TResult> onFailure)
-	{
-		var result = await resultTask.ConfigureAwait(false);
-		return result.Match(onSuccess, onFailure);
-	}
-
-	/// <summary>
-	/// Match dla Result&lt;T&gt; z async funkcjami
-	/// </summary>
-	public static async Task<TResult> MatchAsync<TValue, TResult>(
-		this Result<TValue> result,
-		Func<TValue, Task<TResult>> onSuccess,
-		Func<Error, Task<TResult>> onFailure)
-	{
-		return result.IsSuccess
-			? await onSuccess(result.Value!).ConfigureAwait(false)
-			: await onFailure(result.Error!).ConfigureAwait(false);
-	}
-
-	/// <summary>
-	/// Match dla Task&lt;Result&lt;T&gt;&gt; z async funkcjami
-	/// </summary>
-	public static async Task<TResult> MatchAsync<TValue, TResult>(
-		this Task<Result<TValue>> resultTask,
-		Func<TValue, Task<TResult>> onSuccess,
-		Func<Error, Task<TResult>> onFailure)
-	{
-		var result = await resultTask.ConfigureAwait(false);
-		return await result.MatchAsync(onSuccess, onFailure).ConfigureAwait(false);
-	}
-
-	// ========== ENSURE ASYNC ==========
-
-	/// <summary>
-	/// Ensure dla Task&lt;Result&lt;T&gt;&gt; z synchronicznym predicate
-	/// </summary>
-	public static async Task<Result<TValue>> EnsureAsync<TValue>(
-		this Task<Result<TValue>> resultTask,
-		Func<TValue, bool> predicate,
-		Error error)
-	{
-		var result = await resultTask.ConfigureAwait(false);
-		return result.Ensure(predicate, error);
-	}
-
-	/// <summary>
-	/// Ensure dla Result&lt;T&gt; z async predicate
-	/// </summary>
-	public static async Task<Result<TValue>> EnsureAsync<TValue>(
-		this Result<TValue> result,
-		Func<TValue, Task<bool>> predicate,
-		Error error)
-	{
-		if (result.IsFailure)
+		/// <summary>
+		/// Tap for Result&lt;TValue&gt; with an asynchronous action
+		/// </summary>
+		public static async Task<Result<TValue>> TapAsync<TValue>(
+			this Result<TValue> result,
+			Func<TValue, Task> action)
+		{
+			if (result.IsSuccess)
+				await action(result.Value!).ConfigureAwait(false);
 			return result;
+		}
 
-		var isValid = await predicate(result.Value!).ConfigureAwait(false);
-		return isValid ? result : Result<TValue>.Failure(error);
-	}
+		/// <summary>
+		/// Tap for Task&lt;Result&lt;TValue&gt;&gt; with an asynchronous action
+		/// </summary>
+		public static async Task<Result<TValue>> TapAsync<TValue>(
+			this Task<Result<TValue>> resultTask,
+			Func<TValue, Task> action)
+		{
+			var result = await resultTask.ConfigureAwait(false);
+			return await result.TapAsync(action).ConfigureAwait(false);
+		}
 
-	/// <summary>
-	/// Ensure dla Task&lt;Result&lt;T&gt;&gt; z async predicate
-	/// </summary>
-	public static async Task<Result<TValue>> EnsureAsync<TValue>(
-		this Task<Result<TValue>> resultTask,
-		Func<TValue, Task<bool>> predicate,
-		Error error)
-	{
-		var result = await resultTask.ConfigureAwait(false);
-		return await result.EnsureAsync(predicate, error).ConfigureAwait(false);
+		// ========== MATCH ASYNC ==========
+
+		/// <summary>
+		/// Match for Task&lt;Result&lt;TValue&gt;&gt; with synchronous handlers
+		/// </summary>
+		public static async Task<TResult> MatchAsync<TValue, TResult>(
+			this Task<Result<TValue>> resultTask,
+			Func<TValue, TResult> onSuccess,
+			Func<Error, TResult> onFailure)
+		{
+			var result = await resultTask.ConfigureAwait(false);
+			return result.Match(onSuccess, onFailure);
+		}
+
+		/// <summary>
+		/// Match for Result&lt;TValue&gt; with asynchronous handlers
+		/// </summary>
+		public static async Task<TResult> MatchAsync<TValue, TResult>(
+			this Result<TValue> result,
+			Func<TValue, Task<TResult>> onSuccess,
+			Func<Error, Task<TResult>> onFailure)
+		{
+			return result.IsSuccess
+				? await onSuccess(result.Value!).ConfigureAwait(false)
+				: await onFailure(result.Error!).ConfigureAwait(false);
+		}
+
+		/// <summary>
+		/// Match for Task&lt;Result&lt;TValue&gt;&gt; with asynchronous handlers
+		/// </summary>
+		public static async Task<TResult> MatchAsync<TValue, TResult>(
+			this Task<Result<TValue>> resultTask,
+			Func<TValue, Task<TResult>> onSuccess,
+			Func<Error, Task<TResult>> onFailure)
+		{
+			var result = await resultTask.ConfigureAwait(false);
+			return await result.MatchAsync(onSuccess, onFailure).ConfigureAwait(false);
+		}
+
+		// ========== ENSURE ASYNC ==========
+
+		/// <summary>
+		/// Ensure for Task&lt;Result&lt;TValue&gt;&gt; with a synchronous predicate
+		/// </summary>
+		public static async Task<Result<TValue>> EnsureAsync<TValue>(
+			this Task<Result<TValue>> resultTask,
+			Func<TValue, bool> predicate,
+			Error error)
+		{
+			var result = await resultTask.ConfigureAwait(false);
+			return result.Ensure(predicate, error);
+		}
+
+		/// <summary>
+		/// Ensure for Result&lt;TValue&gt; with an asynchronous predicate
+		/// </summary>
+		public static async Task<Result<TValue>> EnsureAsync<TValue>(
+			this Result<TValue> result,
+			Func<TValue, Task<bool>> predicate,
+			Error error)
+		{
+			if (result.IsFailure)
+				return result;
+
+			var isValid = await predicate(result.Value!).ConfigureAwait(false);
+			return isValid ? result : Result<TValue>.Failure(error);
+		}
+
+		/// <summary>
+		/// Ensure for Task&lt;Result&lt;TValue&gt;&gt; with an asynchronous predicate
+		/// </summary>
+		public static async Task<Result<TValue>> EnsureAsync<TValue>(
+			this Task<Result<TValue>> resultTask,
+			Func<TValue, Task<bool>> predicate,
+			Error error)
+		{
+			var result = await resultTask.ConfigureAwait(false);
+			return await result.EnsureAsync(predicate, error).ConfigureAwait(false);
+		}
 	}
 }

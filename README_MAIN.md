@@ -2,7 +2,7 @@
 
 [![NuGet](https://img.shields.io/nuget/v/Voyager.Common.Results.svg)](https://www.nuget.org/packages/Voyager.Common.Results/)
 [![NuGet Downloads](https://img.shields.io/nuget/dt/Voyager.Common.Results.svg)](https://www.nuget.org/packages/Voyager.Common.Results/)
-[![Build Status](https://github.com/Voyager-Poland/Voyager.Common.Results/workflows/.NET%20push/badge.svg)](https://github.com/Voyager-Poland/Voyager.Common.Results/actions)
+[![Build Status](https://github.com/Voyager-Poland/Voyager.Common.Results/workflows/CI%20Build/badge.svg)](https://github.com/Voyager-Poland/Voyager.Common.Results/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A lightweight, functional **Result Pattern** implementation for .NET that enables **Railway Oriented Programming**. Replace exceptions with explicit error handling, making your code more predictable and easier to test.
@@ -19,7 +19,6 @@ A lightweight, functional **Result Pattern** implementation for .NET that enable
 - 📚 **Comprehensive XML documentation**
 - 🧪 **Fully tested** with high code coverage
 - 🎨 **Implicit conversions** for ergonomic API
-- 🤖 **Automated publishing** via GitHub Actions
 
 ## 📦 Installation
 
@@ -131,55 +130,22 @@ See the [full documentation](./src/Voyager.Common.Results/README.md) for detaile
 
 ## 🏗️ Building and Publishing
 
-See [BUILD.md](./BUILD.md) for comprehensive instructions on:
-- 🤖 **Automatic publishing** with GitHub Actions (recommended)
-- 🔨 Manual building and local testing
-- 📦 Publishing to GitHub Packages and NuGet.org
-- 🧪 Running tests with code coverage
+See [BUILD.md](./BUILD.md) for instructions on building and publishing the NuGet package.
 
 ### Quick Build
 
 ```bash
-# Restore dependencies
-dotnet restore
-
-# Build the solution
-dotnet build -c Release
+# Build the package
+dotnet pack src/Voyager.Common.Results/Voyager.Common.Results.csproj -c Release
 
 # Run tests
-dotnet test -c Release
-
-# Pack the package
-dotnet pack src/Voyager.Common.Results/Voyager.Common.Results.csproj -c Release
-```
-
-### Automatic Publishing
-
-Simply push to `main` branch - GitHub Actions will:
-1. ✅ Automatically bump version
-2. ✅ Build for both .NET 8.0 and .NET Framework 4.8
-3. ✅ Run all tests
-4. ✅ Publish to GitHub Packages
-5. ✅ Publish to NuGet.org (if configured)
-
-```bash
-git add .
-git commit -m "Add new feature"
-git push origin main
+dotnet test
 ```
 
 ## 🧪 Running Tests
 
 ```bash
-# Run all tests
 dotnet test
-
-# Run with code coverage
-dotnet test --collect:"XPlat Code Coverage"
-
-# Generate coverage report (requires reportgenerator)
-dotnet tool install -g dotnet-reportgenerator-globaltool
-reportgenerator -reports:**/coverage.cobertura.xml -targetdir:coverage-report -reporttypes:Html
 ```
 
 ## 🤝 Contributing
@@ -191,14 +157,6 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
-
-### Development Workflow
-
-- Push to `main` triggers automatic version bump and publishing
-- All tests must pass before merging
-- Follow existing code style and conventions
-- Add tests for new features
-- Update documentation as needed
 
 ## 📄 License
 
@@ -214,12 +172,6 @@ Inspired by:
 ## 📝 Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for a list of changes.
-
-## 📚 Additional Resources
-
-- [GitHub Actions Setup Guide](./GITHUB_ACTIONS_SETUP.md) - Detailed GitHub Actions configuration
-- [Build Guide](./BUILD.md) - Building and publishing instructions
-- [API Documentation](./src/Voyager.Common.Results/README.md) - Complete API reference
 
 ---
 

@@ -1,0 +1,102 @@
+name: CI Build
+
+on:
+  push:
+    branches: [ master, main, develop ]
+  pull_request:
+    branches: [ master, main, develop ]
+
+jobs:
+  newversion:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Bump build version
+      id: bump
+      uses: vers-one/dotnet-project-version-updater@v1.6
+      with:
+        file: "src/Voyager.Common.Results/Voyager.Common.Results.csproj"
+        version: bump-build
+
+    - name: Commit version bump
+      run: |
+        git config user.name "GitHub Actions Bot"
+        git config user.email "actions@github.com"   
+        git add .
+        git commit -m "Bump project version to ${{ steps.bump.outputs.newVersion }}"
+        git push 
+
+  build:
+    runs-on: ubuntu-latest
+    needs: newversion
+    permissions:
+      packages: write
+      contents: read
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Pull latest changes
+      run: git pull
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+    
+    - name: Add Voyager Source
+      run: dotnet nuget add source "https://nuget.pkg.github.com/Voyager-Poland/index.json" -n Voyager-Poland -u ${{secrets.VOY_ACTIONLOGIN}} -p ${{secrets.VOY_ACTIONLOGINPASS}} --store-password-in-clear-text
+    
+    - name: Restore dependencies
+      run: dotnet restore
+    
+    - name: Build
+      run: dotnet build --no-restore -c Release
+    
+    - name: Test
+      run: dotnet test --no-build --verbosity normal -c Release --collect:"XPlat Code Coverage"
+    
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      if: success()
+      with:
+        files: '**/coverage.cobertura.xml'
+        fail_ci_if_error: false
+    
+    - name: Pack
+      run: dotnet pack --no-restore --no-build -c Release ${{ github.workspace }}/src/Voyager.Common.Results/Voyager.Common.Results.csproj
+    
+    - name: Upload artifact for deployment job
+      uses: actions/upload-artifact@v4
+      with:
+        name: CommonResults
+        path: ${{ github.workspace }}/src/Voyager.Common.Results/bin/Release/*.nupkg 
+        compression-level: 0	
+        retention-days: 1
+        overwrite: true
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      packages: write
+      contents: read
+    
+    steps:
+      - name: Add Voyager Source
+        run: dotnet nuget add source "https://nuget.pkg.github.com/Voyager-Poland/index.json" -n Voyager-Poland -u ${{secrets.VOY_ACTIONLOGIN}} -p ${{secrets.VOY_ACTIONLOGINPASS}} --store-password-in-clear-text        
+ 
+      - name: Download artifact from build job
+        uses: actions/download-artifact@v4
+        with:
+          name: CommonResults
+      
+      - name: Publish the package to GitHub Packages
+        run: dotnet nuget push ${{ github.workspace }}/*.nupkg -s Voyager-Poland --skip-duplicate
+      
+      - name: Publish the package to NuGet.org
+        if: secrets.VOY_AND_API_KEY != ''
+        run: dotnet nuget push ${{ github.workspace }}/*.nupkg --api-key ${{secrets.VOY_AND_API_KEY}} --source https://api.nuget.org/v3/index.json --skip-duplicate

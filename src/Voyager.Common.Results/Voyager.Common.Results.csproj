@@ -2,8 +2,11 @@
 
   <PropertyGroup>
     <TargetFrameworks>net48;net8.0</TargetFrameworks>
-    <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    
+    <!-- NuGet Package Configuration -->
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <IsPackable>true</IsPackable>
     
     <!-- Package Metadata -->
     <PackageId>Voyager.Common.Results</PackageId>
@@ -12,12 +15,58 @@
     <Company>Voyager Poland</Company>
     <Product>Voyager Common Libraries</Product>
     <Copyright>Copyright © Voyager Poland 2025</Copyright>
-		<Description>A .NET library providing a Result type for functional error handling. Railway Oriented Programming</Description>
-    <PackageTags>result-pattern;functional;error-handling</PackageTags>
+    <Description>A lightweight, functional Result type for .NET implementing Railway Oriented Programming pattern. Supports both .NET Framework 4.8 and .NET 8. Provides error handling without exceptions, method chaining, async operations, and collection utilities.</Description>
+    <PackageTags>result-pattern;railway-oriented-programming;functional;error-handling;either;option;monad;csharp;dotnet;net48;net8</PackageTags>
+    <PackageProjectUrl>https://github.com/Voyager-Poland/Voyager.Common.Results</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/Voyager-Poland/Voyager.Common.Results</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+		<Authors>Andrzej Świstowski</Authors>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReleaseNotes>Initial release with Result Pattern implementation supporting .NET Framework 4.8 and .NET 8.</PackageReleaseNotes>
+    
+    <!-- Include symbols for debugging -->
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    
+    <!-- Source Link for debugging -->
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
     
     <!-- Documentation -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <DocumentationFile>bin\$(Configuration)\$(TargetFramework)\$(AssemblyName).xml</DocumentationFile>
+    
+    <!-- Assembly Info -->
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <InformationalVersion>1.0.0</InformationalVersion>
   </PropertyGroup>
+
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net48'">
+    <LangVersion>9.0</LangVersion>
+  </PropertyGroup>
+
+  <!-- Include README in the package -->
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <!-- Source Link support -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
+    <PackageReference Include="IsExternalInit" Version="1.0.3">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
 
 </Project>

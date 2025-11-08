@@ -1,47 +1,48 @@
-﻿namespace Voyager.Common.Results;
-
-/// <summary>
-/// Error types in the system
-/// </summary>
-public enum ErrorType
+﻿namespace Voyager.Common.Results
 {
     /// <summary>
-    /// No error
+    /// Error types in the system
     /// </summary>
-    None,
+    public enum ErrorType
+    {
+        /// <summary>
+        /// No error
+        /// </summary>
+        None,
 
-    /// <summary>
-    /// Input validation error
-    /// </summary>
-    Validation,
+        /// <summary>
+        /// Input validation error
+        /// </summary>
+        Validation,
 
-    /// <summary>
-    /// Permission/authorization error
-    /// </summary>
-    Permission,
+        /// <summary>
+        /// Permission/authorization error
+        /// </summary>
+        Permission,
 
-    /// <summary>
-    /// Database error
-    /// </summary>
-    Database,
+        /// <summary>
+        /// Database error
+        /// </summary>
+        Database,
 
-    /// <summary>
-    /// Business logic error
-    /// </summary>
-    Business,
+        /// <summary>
+        /// Business logic error
+        /// </summary>
+        Business,
 
-    /// <summary>
-    /// Resource not found
-    /// </summary>
-    NotFound,
+        /// <summary>
+        /// Resource not found
+        /// </summary>
+        NotFound,
 
-    /// <summary>
-    /// Conflict (e.g. duplicate)
-    /// </summary>
-    Conflict,
+        /// <summary>
+        /// Conflict (e.g. duplicate)
+        /// </summary>
+        Conflict,
 
-    /// <summary>
-    /// Unexpected system error
-    /// </summary>
-    Unexpected
+        /// <summary>
+        /// Unexpected system error
+        /// </summary>
+        Unexpected
+    }
 }
