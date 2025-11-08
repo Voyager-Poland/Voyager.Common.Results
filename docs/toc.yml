@@ -2,3 +2,15 @@
   href: introduction.md
 - name: Getting Started
   href: getting-started.md
+- name: Error Types
+  href: error-types.md
+- name: Railway Oriented Programming
+  href: railway-oriented.md
+- name: Async Operations
+  href: async-operations.md
+- name: Collection Operations
+  href: collection-operations.md
+- name: Best Practices
+  href: best-practices.md
+- name: Examples
+  href: examples.md

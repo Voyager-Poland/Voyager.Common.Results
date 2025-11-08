@@ -203,7 +203,7 @@ Result<User> GetUser(int id)
 ### ✅ DO
 
 ```csharp
-// Używaj Result dla operacji, które mogą się nie powieść
+// Używaj Result dla OCZEKIWANYCH błędów biznesowych
 public Result<User> CreateUser(string email)
 {
     if (string.IsNullOrEmpty(email))
@@ -213,79 +213,131 @@ public Result<User> CreateUser(string email)
     return user;
 }
 
-// Łańcuch operacji bez zagnieżdżania
+// Łańcuchuj operacje Result bez zagnieżdżania
 var result = GetUser(id)
     .Bind(user => ValidateUser(user))
     .Bind(user => SaveUser(user))
     .Tap(user => SendWelcomeEmail(user));
+
+// ŁĄCZ Result Pattern z try-catch dla NIEOCZEKIWANYCH wyjątków technicznych
+public Result<User> GetUser(int id)
+{
+    // Oczekiwane błędy biznesowe → Result
+    if (id <= 0)
+        return Error.ValidationError("ID must be positive");
+    
+    try
+    {
+        // Nieoczekiwane błędy techniczne (DB, sieć, itp.) → try-catch
+        var user = _repository.GetUser(id);
+        
+        if (user is null)
+            return Error.NotFoundError($"User {id} not found");
+        
+        return user;
+    }
+    catch (DbException ex)
+    {
+        // Konwertuj nieoczekiwany wyjątek techniczny na Result
+        return Error.DatabaseError("Database connection failed", ex);
+    }
+    catch (Exception ex)
+    {
+        return Error.UnexpectedError("Unexpected error occurred", ex);
+    }
+}
+
+// Obsługuj wyjątki infrastruktury i konwertuj na Result
+public async Task<Result<Order>> PlaceOrderAsync(Order order)
+{
+    // Walidacja biznesowa
+    if (order.Items.Count == 0)
+        return Error.ValidationError("Order must contain at least one item");
+    
+    try
+    {
+        await _orderRepository.SaveAsync(order);
+        await _emailService.SendConfirmationAsync(order);
+        return order;
+    }
+    catch (TimeoutException ex)
+    {
+        return Error.UnexpectedError("Email service timeout", ex);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Error.BusinessError("Cannot place order in current state", ex);
+    }
+}
 ```
 
 ### ❌ DON'T
 
 ```csharp
-// NIE używaj wyjątków do kontroli przepływu gdy masz Result
-public Result<User> GetUser(int id)
-{
-    try
-    {
-        // BAD: Result Pattern ma zastąpić try-catch
-        var user = _repo.GetUser(id);
-        return user;
-    }
-    catch (Exception ex)
-    {
-        return Error.FromException(ex);
-    }
-}
-
-// NIE mieszaj Result z throw
+// NIE używaj throw dla OCZEKIWANYCH błędów biznesowych
 public Result<User> GetUser(int id)
 {
     if (id <= 0)
-        throw new ArgumentException(); // BAD: użyj return Error.ValidationError()
+        throw new ArgumentException("Invalid ID"); // ❌ BAD: użyj return Error.ValidationError()
+    
+    // ...
+}
+
+// NIE ignoruj nieoczekiwanych wyjątków technicznych
+public Result<User> GetUser(int id)
+{
+    // ❌ BAD: brak try-catch - wyjątek DB może "wyskoczyć" i zepsuć Result Pattern
+    var user = _repository.GetUser(id); // może rzucić DbException!
+    
+    if (user is null)
+        return Error.NotFoundError("User not found");
+    
+    return user;
+}
+
+// NIE zwracaj null zamiast Result.Failure
+public Result<User> FindUser(string email)
+{
+    var user = _repository.FindByEmail(email);
+    return user; // ❌ BAD: jeśli user == null, zwróci Result.Success(null)!
+    
+    // ✅ GOOD:
+    // if (user is null)
+    //     return Error.NotFoundError("User not found");
+    // return user;
+}
+
+// NIE używaj try-catch do kontroli przepływu biznesowego
+public Result<decimal> CalculateDiscount(User user)
+{
+    try
+    {
+        if (!user.IsPremium)
+            throw new Exception("Not premium"); // ❌ BAD
+        
+        return user.DiscountPercentage;
+    }
+    catch
+    {
+        return Error.BusinessError("User is not premium");
+    }
+    
+    // ✅ GOOD:
+    // if (!user.IsPremium)
+    //     return Error.BusinessError("User is not premium");
+    // return user.DiscountPercentage;
 }
 ```
 
-## 🧪 Testowanie
+### 🎯 Zasada: Kiedy używać Result vs try-catch?
 
-```csharp
-[Fact]
-public void CreateUser_WithInvalidEmail_ReturnsValidationError()
-{
-    // Arrange
-    var service = new UserService();
-    
-    // Act
-    var result = service.CreateUser("");
-    
-    // Assert
-    Assert.True(result.IsFailure);
-    Assert.Equal(ErrorType.Validation, result.Error!.Type);
-}
+| Sytuacja | Użyj | Przykład |
+|----------|------|----------|
+| **Oczekiwany** błąd biznesowy/walidacyjny | `Result.Failure` | Nieprawidłowy email, brak uprawnień, zasób nie znaleziony |
+| **Nieoczekiwany** błąd techniczny/infrastruktury | `try-catch` → `Error.FromException()` | Błąd DB, timeout sieci, OutOfMemoryException |
+| Operacja może się **normalnie** nie udać | `Result Pattern` | Logowanie użytkownika (złe hasło to normalny scenariusz) |
+| **Bug** w kodzie (null reference, itp.) | `throw` (w dev), `try-catch` (w prod) | NullReferenceException - powinien być naprawiony, nie obsłużony |
 
-[Fact]
-public void CreateUser_WithValidData_ReturnsSuccess()
-{
-    // Arrange
-    var service = new UserService();
-    
-    // Act
-    var result = service.CreateUser("test@example.com");
-    
-    // Assert
-    Assert.True(result.IsSuccess);
-    Assert.NotNull(result.Value);
-}
-```
-
-## 📚 Więcej przykładów
-
-Sprawdź projekt testowy `Voyager.Common.Results.Tests` po więcej przykładów użycia.
-
-## 🤝 Contributing
-
-Pull requesty mile widziane! Przed dużymi zmianami, otwórz issue aby przedyskutować propozycje.
-
-## 📄 Licencja
-
-MIT - Voyager Poland
+**Złota zasada**: 
+- **Expected failures** (część logiki biznesowej) → **Result Pattern**
+- **Unexpected exceptions** (problemy techniczne) → **try-catch + Error.FromException()**

@@ -98,5 +98,4 @@ jobs:
         run: dotnet nuget push ${{ github.workspace }}/*.nupkg -s Voyager-Poland --skip-duplicate
       
       - name: Publish the package to NuGet.org
-        if: secrets.VOY_AND_API_KEY != ''
         run: dotnet nuget push ${{ github.workspace }}/*.nupkg --api-key ${{secrets.VOY_AND_API_KEY}} --source https://api.nuget.org/v3/index.json --skip-duplicate
