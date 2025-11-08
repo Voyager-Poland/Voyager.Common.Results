@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 18
+VisualStudioVersion = 18.0.11201.2 d18.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Voyager.Common.Results", "src\Voyager.Common.Results\Voyager.Common.Results.csproj", "{2266E0C7-F1C0-8F81-3E05-0A32A51880CE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Voyager.Common.Results.Tests", "src\Voyager.Common.Results.Tests\Voyager.Common.Results.Tests.csproj", "{449C708D-B361-C0A8-3AE8-AB359CEE7D55}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{2266E0C7-F1C0-8F81-3E05-0A32A51880CE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2266E0C7-F1C0-8F81-3E05-0A32A51880CE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2266E0C7-F1C0-8F81-3E05-0A32A51880CE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2266E0C7-F1C0-8F81-3E05-0A32A51880CE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{449C708D-B361-C0A8-3AE8-AB359CEE7D55}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{449C708D-B361-C0A8-3AE8-AB359CEE7D55}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{449C708D-B361-C0A8-3AE8-AB359CEE7D55}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{449C708D-B361-C0A8-3AE8-AB359CEE7D55}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {221073A9-C611-45A5-B416-0FD0AC784656}
+	EndGlobalSection
+EndGlobal

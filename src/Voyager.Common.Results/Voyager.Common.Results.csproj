@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net48;net8.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    
+    <!-- Package Metadata -->
+    <PackageId>Voyager.Common.Results</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>Voyager Poland</Authors>
+    <Company>Voyager Poland</Company>
+    <Product>Voyager Common Libraries</Product>
+    <Copyright>Copyright © Voyager Poland 2025</Copyright>
+		<Description>A .NET library providing a Result type for functional error handling. Railway Oriented Programming</Description>
+    <PackageTags>result-pattern;functional;error-handling</PackageTags>
+    
+    <!-- Documentation -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <DocumentationFile>bin\$(Configuration)\$(TargetFramework)\$(AssemblyName).xml</DocumentationFile>
+  </PropertyGroup>
+
+</Project>
