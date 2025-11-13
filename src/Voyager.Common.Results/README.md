@@ -113,6 +113,38 @@ var result = GetAge()
     );
 ```
 
+### OrElse - wartości alternatywne (fallback pattern)
+
+```csharp
+// Próba wielu źródeł danych - zwraca pierwszy sukces
+var user = GetUserFromCache(userId)
+    .OrElse(() => GetUserFromDatabase(userId))
+    .OrElse(() => GetDefaultUser());
+
+// Przykład z async
+var config = await LoadConfigFromFileAsync()
+    .OrElseAsync(() => LoadConfigFromDatabaseAsync())
+    .OrElseAsync(() => GetDefaultConfigAsync());
+```
+
+**Użycie z lazy evaluation:**
+```csharp
+Result<int> GetFromPrimary() => Error.NotFoundError("Not in primary");
+Result<int> GetFromSecondary() => Error.NotFoundError("Not in secondary");  
+Result<int> GetFromFallback() => Result<int>.Success(42);
+
+// Funkcje są wywoływane TYLKO gdy potrzebne (lazy evaluation)
+var result = GetFromPrimary()
+    .OrElse(() => GetFromSecondary())    // Wywołane bo primary failed
+    .OrElse(() => GetFromFallback());     // Wywołane bo secondary failed
+    // Zwraca Result<int>.Success(42)
+```
+
+**Scenariusze użycia:**
+- Cache → Database → Default value
+- Primary API → Fallback API → Cached data
+- User preferences → Team defaults → System defaults
+
 ## ⚡ Operacje asynchroniczne
 
 ```csharp
@@ -133,6 +165,12 @@ var order = await GetUserAsync(123)
 var total = await GetUserAsync(123)
     .BindAsync(user => GetOrderAsync(user.LastOrderId))
     .MapAsync(order => order.TotalAmount);
+
+// OrElse async - fallback pattern
+var data = await GetFromPrimaryCacheAsync(key)
+    .OrElseAsync(() => GetFromDatabaseAsync(key))
+    .OrElseAsync(() => GetFromApiAsync(key))
+    .OrElseAsync(GetDefaultValue());
 ```
 
 ## 📋 Operacje na kolekcjach
@@ -218,6 +256,11 @@ var result = GetUser(id)
     .Bind(user => ValidateUser(user))
     .Bind(user => SaveUser(user))
     .Tap(user => SendWelcomeEmail(user));
+
+// Używaj OrElse dla wartości alternatywnych (fallback)
+var config = LoadFromCache()
+    .OrElse(() => LoadFromDatabase())
+    .OrElse(() => GetDefaultConfig());
 
 // ŁĄCZ Result Pattern z try-catch dla NIEOCZEKIWANYCH wyjątków technicznych
 public Result<User> GetUser(int id)

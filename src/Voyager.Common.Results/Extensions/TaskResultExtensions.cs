@@ -200,5 +200,53 @@ namespace Voyager.Common.Results.Extensions
 			var result = await resultTask.ConfigureAwait(false);
 			return await result.EnsureAsync(predicate, error).ConfigureAwait(false);
 		}
+
+		// ========== ORELSE ASYNC ==========
+
+		/// <summary>
+		/// OrElse for Task&lt;Result&lt;TValue&gt;&gt; with a synchronous alternative result
+		/// </summary>
+		public static async Task<Result<TValue>> OrElseAsync<TValue>(
+			this Task<Result<TValue>> resultTask,
+			Result<TValue> alternative)
+		{
+			var result = await resultTask.ConfigureAwait(false);
+			return result.OrElse(alternative);
+		}
+
+		/// <summary>
+		/// OrElse for Task&lt;Result&lt;TValue&gt;&gt; with a synchronous alternative function
+		/// </summary>
+		public static async Task<Result<TValue>> OrElseAsync<TValue>(
+			this Task<Result<TValue>> resultTask,
+			Func<Result<TValue>> alternativeFunc)
+		{
+			var result = await resultTask.ConfigureAwait(false);
+			return result.OrElse(alternativeFunc);
+		}
+
+		/// <summary>
+		/// OrElse for Result&lt;TValue&gt; with an asynchronous alternative function
+		/// </summary>
+		public static async Task<Result<TValue>> OrElseAsync<TValue>(
+			this Result<TValue> result,
+			Func<Task<Result<TValue>>> alternativeFunc)
+		{
+			if (result.IsSuccess)
+				return result;
+
+			return await alternativeFunc().ConfigureAwait(false);
+		}
+
+		/// <summary>
+		/// OrElse for Task&lt;Result&lt;TValue&gt;&gt; with an asynchronous alternative function
+		/// </summary>
+		public static async Task<Result<TValue>> OrElseAsync<TValue>(
+			this Task<Result<TValue>> resultTask,
+			Func<Task<Result<TValue>>> alternativeFunc)
+		{
+			var result = await resultTask.ConfigureAwait(false);
+			return await result.OrElseAsync(alternativeFunc).ConfigureAwait(false);
+		}
 	}
 }

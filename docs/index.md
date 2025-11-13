@@ -71,6 +71,7 @@ var result = GetUser(123)
 - **[Error Types](error-types.md)** - All available error types
 - **[Railway Oriented Programming](railway-oriented.md)** - Map, Bind, Tap, Ensure
 - **[Async Operations](async-operations.md)** - Working with async/await
+- **[OrElse - Fallback Pattern](orelse-pattern.md)** - Resilient fallback strategies
 - **[Collection Operations](collection-operations.md)** - Combine, Partition, and more
 - **[Best Practices](best-practices.md)** - Patterns and anti-patterns
 - **[Examples](examples.md)** - Real-world usage examples

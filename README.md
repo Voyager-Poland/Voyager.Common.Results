@@ -91,11 +91,37 @@ GetUser(id)
     .Bind(email => SendEmail(email))       // Chain another Result operation
     .Ensure(sent => sent, Error.BusinessError("Email not sent"))
     .Tap(() => _logger.LogInfo("Email sent"))  // Side effect
+    .OrElse(() => GetDefaultUser())        // Fallback if failed
     .Match(
         onSuccess: () => "Success",
         onFailure: error => error.Message
     );
 ```
+
+### OrElse - Fallback Pattern
+
+```csharp
+// Try multiple data sources - returns first success
+var user = GetUserFromCache(userId)
+    .OrElse(() => GetUserFromDatabase(userId))
+    .OrElse(() => GetDefaultUser());
+
+// Async version
+var config = await LoadConfigFromFileAsync()
+    .OrElseAsync(() => LoadConfigFromDatabaseAsync())
+    .OrElseAsync(() => GetDefaultConfigAsync());
+
+// Real-world example: Multi-tier data retrieval
+var data = await GetFromPrimaryCacheAsync(key)
+    .OrElseAsync(() => GetFromDatabaseAsync(key))
+    .OrElseAsync(() => GetFromApiAsync(key))
+    .OrElseAsync(Result<Data>.Success(defaultValue));
+```
+
+**Common use cases:**
+- Cache → Database → Default value
+- Primary API → Fallback API → Cached data  
+- User preferences → Team defaults → System defaults
 
 ### Async Operations
 

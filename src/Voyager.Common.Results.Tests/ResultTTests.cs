@@ -312,4 +312,137 @@ public class ResultTTests
 		Assert.True(result.IsSuccess);
 		Assert.Equal("Value: 10", result.Value);
 	}
+
+	// ========== ORELSE TESTS ==========
+
+	[Fact]
+	public void OrElse_WithAlternativeResult_ReturnsOriginalOnSuccess()
+	{
+		// Arrange
+		var result = Result<int>.Success(42);
+		var alternative = Result<int>.Success(99);
+
+		// Act
+		var finalResult = result.OrElse(alternative);
+
+		// Assert
+		Assert.True(finalResult.IsSuccess);
+		Assert.Equal(42, finalResult.Value);
+	}
+
+	[Fact]
+	public void OrElse_WithAlternativeResult_ReturnsAlternativeOnFailure()
+	{
+		// Arrange
+		var error = Error.ValidationError("First error");
+		var result = Result<int>.Failure(error);
+		var alternative = Result<int>.Success(99);
+
+		// Act
+		var finalResult = result.OrElse(alternative);
+
+		// Assert
+		Assert.True(finalResult.IsSuccess);
+		Assert.Equal(99, finalResult.Value);
+	}
+
+	[Fact]
+	public void OrElse_WithAlternativeFunc_ReturnsOriginalOnSuccess()
+	{
+		// Arrange
+		var result = Result<int>.Success(42);
+		var funcCalled = false;
+
+		// Act
+		var finalResult = result.OrElse(() =>
+		{
+			funcCalled = true;
+			return Result<int>.Success(99);
+		});
+
+		// Assert
+		Assert.True(finalResult.IsSuccess);
+		Assert.Equal(42, finalResult.Value);
+		Assert.False(funcCalled); // Lazy evaluation - should not be called
+	}
+
+	[Fact]
+	public void OrElse_WithAlternativeFunc_ReturnsAlternativeOnFailure()
+	{
+		// Arrange
+		var error = Error.ValidationError("First error");
+		var result = Result<int>.Failure(error);
+		var funcCalled = false;
+
+		// Act
+		var finalResult = result.OrElse(() =>
+		{
+			funcCalled = true;
+			return Result<int>.Success(99);
+		});
+
+		// Assert
+		Assert.True(finalResult.IsSuccess);
+		Assert.Equal(99, finalResult.Value);
+		Assert.True(funcCalled);
+	}
+
+	[Fact]
+	public void OrElse_ChainedAlternatives_ReturnsFirstSuccess()
+	{
+		// Arrange
+		var error1 = Error.NotFoundError("First not found");
+		var error2 = Error.NotFoundError("Second not found");
+		var result = Result<int>.Failure(error1);
+
+		// Act
+		var finalResult = result
+			.OrElse(() => Result<int>.Failure(error2))
+			.OrElse(() => Result<int>.Success(99));
+
+		// Assert
+		Assert.True(finalResult.IsSuccess);
+		Assert.Equal(99, finalResult.Value);
+	}
+
+	[Fact]
+	public void OrElse_AllAlternativesFail_ReturnsLastError()
+	{
+		// Arrange
+		var error1 = Error.NotFoundError("First not found");
+		var error2 = Error.NotFoundError("Second not found");
+		var error3 = Error.NotFoundError("Third not found");
+		var result = Result<int>.Failure(error1);
+
+		// Act
+		var finalResult = result
+			.OrElse(() => Result<int>.Failure(error2))
+			.OrElse(() => Result<int>.Failure(error3));
+
+		// Assert
+		Assert.True(finalResult.IsFailure);
+		Assert.Equal(error3, finalResult.Error);
+	}
+
+	[Fact]
+	public void OrElse_InComplexChain_WorksCorrectly()
+	{
+		// Arrange
+		Result<int> GetFromPrimary() => Error.NotFoundError("Not in primary");
+		Result<int> GetFromSecondary() => Error.NotFoundError("Not in secondary");
+		Result<int> GetFromFallback() => Result<int>.Success(42);
+
+		// Act
+		var result = GetFromPrimary()
+			.OrElse(() => GetFromSecondary())
+			.OrElse(() => GetFromFallback())
+			.Map(x => x * 2)
+			.Bind(x => x > 50
+				? Result<string>.Success($"Large: {x}")
+				: Result<string>.Success($"Small: {x}"));
+
+		// Assert
+		Assert.True(result.IsSuccess);
+		Assert.Equal("Large: 84", result.Value);  // 42 * 2 = 84, which is > 50
+	}
 }

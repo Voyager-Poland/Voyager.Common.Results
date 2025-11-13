@@ -257,6 +257,123 @@ public async Task<Result<User>> UpdateUserEmailAsync(int userId, string newEmail
 }
 ```
 
+### OrElseAsync - Async Fallback Pattern
+
+Provide alternative async Results when the current operation fails. Perfect for implementing multi-tier data retrieval strategies.
+
+**Signatures:**
+```csharp
+// Async result with sync alternative
+Task<Result<T>> OrElseAsync(
+    this Task<Result<T>> resultTask, 
+    Result<T> alternative
+}
+
+// Async result with sync alternative function
+Task<Result<T>> OrElseAsync(
+    this Task<Result<T>> resultTask, 
+    Func<Result<T>> alternativeFunc
+)
+
+// Sync result with async alternative function  
+Task<Result<T>> OrElseAsync(
+    this Result<T> result, 
+    Func<Task<Result<T>>> alternativeFunc
+)
+
+// Async result with async alternative function
+Task<Result<T>> OrElseAsync(
+    this Task<Result<T>> resultTask, 
+    Func<Task<Result<T>>> alternativeFunc
+)
+```
+
+**Examples:**
+
+```csharp
+// Simple fallback
+var user = await GetUserFromCacheAsync(id)
+    .OrElseAsync(GetDefaultUser());
+
+// Lazy evaluation - function called only if needed
+var config = await LoadConfigAsync()
+    .OrElseAsync(() => GetDefaultConfigAsync());
+
+// Chained alternatives - tries each source until success
+var data = await GetFromPrimaryCacheAsync(key)
+    .OrElseAsync(() => GetFromSecondaryCacheAsync(key))
+    .OrElseAsync(() => GetFromDatabaseAsync(key))
+    .OrElseAsync(() => GetFromApiAsync(key));
+```
+
+**Real-world examples:**
+
+```csharp
+// Example 1: Multi-tier data retrieval
+public async Task<Result<UserProfile>> GetUserProfileAsync(int userId)
+{
+    return await GetProfileFromMemoryCacheAsync(userId)
+        .OrElseAsync(() => GetProfileFromRedisCacheAsync(userId))
+        .OrElseAsync(() => GetProfileFromDatabaseAsync(userId))
+        .OrElseAsync(() => BuildDefaultProfileAsync(userId))
+        .TapAsync(profile => CacheProfileAsync(userId, profile));
+}
+
+// Example 2: Resilient API calls
+public async Task<Result<WeatherData>> GetWeatherAsync(string city)
+{
+    return await GetFromPrimaryApiAsync(city)
+        .OrElseAsync(() => GetFromBackupApiAsync(city))
+        .OrElseAsync(() => GetFromCachedDataAsync(city))
+        .OrElseAsync(Error.NotFoundError($"Weather data for {city} unavailable"));
+}
+
+// Example 3: Configuration loading with fallbacks
+public async Task<Result<AppConfig>> LoadConfigurationAsync()
+{
+    return await LoadFromEnvironmentVariablesAsync()
+        .OrElseAsync(() => LoadFromConfigFileAsync())
+        .OrElseAsync(() => LoadFromDatabaseAsync())
+        .OrElseAsync(() => LoadFromDefaultsAsync())
+        .TapAsync(config => ValidateConfigAsync(config));
+}
+
+// Example 4: User authentication with multiple providers
+public async Task<Result<AuthToken>> AuthenticateUserAsync(string username, string password)
+{
+    return await AuthenticateWithPrimaryProviderAsync(username, password)
+        .OrElseAsync(() => AuthenticateWithLdapAsync(username, password))
+        .OrElseAsync(() => AuthenticateWithActiveDirectoryAsync(username, password))
+        .TapAsync(token => LogSuccessfulLoginAsync(username))
+        .TapError(error => LogFailedLoginAsync(username, error));
+}
+```
+
+**Lazy Evaluation:**
+
+```csharp
+// Functions are called ONLY when needed
+var result = await GetFromPrimaryAsync()    // Called first
+    .OrElseAsync(() => GetFromSecondaryAsync())  // Only if primary fails
+    .OrElseAsync(() => GetFromTertiaryAsync());   // Only if both fail
+
+// If primary succeeds, secondary and tertiary are never called!
+```
+
+**Combining with other operators:**
+```csharp
+var processedData = await LoadDataFromSourceAsync(id)
+    .OrElseAsync(() => LoadDataFromBackupAsync(id))
+    .OrElseAsync(() => CreateDefaultDataAsync(id))
+    .EnsureAsync(
+        data => data.IsValid(),
+        Error.ValidationError("Data validation failed")
+    )
+    .BindAsync(data => ProcessDataAsync(data))
+    .TapAsync(result => CacheResultAsync(id, result))
+    .MapAsync(result => result.ToDto());
+```
+
 ## Complete Async Workflows
 
 ### Example 1: User Registration
@@ -359,6 +476,146 @@ public async Task<Result<FileMetadata>> ProcessFileUploadAsync(
         })
         .BindAsync(metadata => SaveFileMetadataAsync(userId, metadata))
         .TapAsync(metadata => _eventBus.PublishAsync(new FileUploadedEvent(metadata)));
+}
+```
+
+### Example 4: Resilient Data Retrieval with Fallbacks
+
+```csharp
+public async Task<Result<Product>> GetProductAsync(string productId)
+{
+    return await GetProductFromMemoryCacheAsync(productId)
+        .OrElseAsync(() => GetProductFromRedisCacheAsync(productId))
+        .OrElseAsync(() => GetProductFromDatabaseAsync(productId))
+        .OrElseAsync(() => GetProductFromExternalApiAsync(productId))
+        .TapAsync(product => CacheProductAsync(productId, product))
+        .TapAsync(product => _logger.LogInformationAsync($"Product {productId} retrieved"))
+        .TapError(error => _logger.LogWarningAsync($"Failed to get product {productId}: {error.Message}"));
+}
+
+private async Task<Result<Product>> GetProductFromMemoryCacheAsync(string productId)
+{
+    var product = _memoryCache.Get<Product>($"product:{productId}");
+    return product is not null
+        ? Result<Product>.Success(product)
+        : Error.NotFoundError("Not in memory cache");
+}
+
+private async Task<Result<Product>> GetProductFromRedisCacheAsync(string productId)
+{
+    try
+    {
+        var product = await _redisCache.GetAsync<Product>($"product:{productId}");
+        return product is not null
+            ? Result<Product>.Success(product)
+            : Error.NotFoundError("Not in Redis cache");
+    }
+    catch (Exception ex)
+    {
+        return Error.UnexpectedError("Redis cache error", ex);
+    }
+}
+
+private async Task<Result<Product>> GetProductFromDatabaseAsync(string productId)
+{
+    try
+    {
+        var product = await _database.Products.FindAsync(productId);
+        return product is not null
+            ? Result<Product>.Success(product)
+            : Error.NotFoundError("Not in database");
+    }
+    catch (DbException ex)
+    {
+        return Error.DatabaseError("Database query failed", ex);
+    }
+}
+
+private async Task<Result<Product>> GetProductFromExternalApiAsync(string productId)
+{
+    try
+    {
+        var product = await _productApiClient.GetProductAsync(productId);
+        return product is not null
+            ? Result<Product>.Success(product)
+            : Error.NotFoundError($"Product {productId} not found");
+    }
+    catch (HttpRequestException ex)
+    {
+        return Error.UnexpectedError("External API error", ex);
+    }
+}
+
+private async Task CacheProductAsync(string productId, Product product)
+{
+    _memoryCache.Set($"product:{productId}", product, TimeSpan.FromMinutes(15));
+    await _redisCache.SetAsync($"product:{productId}", product, TimeSpan.FromHours(1));
+}
+```
+
+### Example 5: Configuration Loading with Multiple Sources
+
+```csharp
+public async Task<Result<AppSettings>> LoadApplicationSettingsAsync()
+{
+    return await LoadSettingsFromEnvironmentAsync()
+        .OrElseAsync(() => LoadSettingsFromAzureAppConfigAsync())
+        .OrElseAsync(() => LoadSettingsFromLocalFileAsync())
+        .OrElseAsync(() => LoadSettingsFromEmbeddedDefaultsAsync())
+        .EnsureAsync(
+            settings => settings.IsValid(),
+            Error.ValidationError("Invalid application settings")
+        )
+        .TapAsync(settings => _logger.LogInformationAsync("Application settings loaded successfully"))
+        .TapAsync(settings => CacheSettingsAsync(settings));
+}
+
+private async Task<Result<AppSettings>> LoadSettingsFromEnvironmentAsync()
+{
+    var settings = AppSettings.FromEnvironmentVariables();
+    return settings.HasRequiredValues()
+        ? Result<AppSettings>.Success(settings)
+        : Error.NotFoundError("Required environment variables not set");
+}
+
+private async Task<Result<AppSettings>> LoadSettingsFromAzureAppConfigAsync()
+{
+    try
+    {
+        var settings = await _azureAppConfig.LoadAsync();
+        return Result<AppSettings>.Success(settings);
+    }
+    catch (Exception ex)
+    {
+        return Error.UnexpectedError("Failed to load from Azure App Configuration", ex);
+    }
+}
+
+private async Task<Result<AppSettings>> LoadSettingsFromLocalFileAsync()
+{
+    try
+    {
+        if (!File.Exists("appsettings.json"))
+            return Error.NotFoundError("Local configuration file not found");
+
+        var json = await File.ReadAllTextAsync("appsettings.json");
+        var settings = JsonSerializer.Deserialize<AppSettings>(json);
+        
+        return settings is not null
+            ? Result<AppSettings>.Success(settings)
+            : Error.ValidationError("Failed to deserialize settings");
+    }
+    catch (Exception ex)
+    {
+        return Error.UnexpectedError("Failed to load local configuration", ex);
+    }
+}
+
+private async Task<Result<AppSettings>> LoadSettingsFromEmbeddedDefaultsAsync()
+{
+    var defaults = AppSettings.CreateDefaults();
+    await Task.CompletedTask; // Simulate async
+    return Result<AppSettings>.Success(defaults);
 }
 ```
 
