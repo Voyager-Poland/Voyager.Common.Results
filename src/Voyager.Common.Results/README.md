@@ -210,11 +210,19 @@ Error.NotFoundError("Użytkownik nie istnieje")
 // Konflikt (duplikat)
 Error.ConflictError("Email już istnieje w systemie")
 
-// Błąd bazy danych
+// Baza danych
 Error.DatabaseError("Błąd podczas zapisu")
 
 // Błąd logiki biznesowej
 Error.BusinessError("Nie można anulować opłaconego zamówienia")
+
+// Czasowa niedostępność (nowy typ!)
+Error.UnavailableError("Serwis jest tymczasowo niedostępny")
+Error.UnavailableError("RateLimit.Exceeded", "Zbyt wiele żądań - spróbuj za 60 sekund")
+
+// Przekrocenie czasu (nowy typ!)
+Error.TimeoutError("Zapytanie do bazy danych przekroczyło 30 sekund")
+Error.TimeoutError("Api.Timeout", "Żądanie API przekroczyło limit czasu")
 
 // Nieoczekiwany błąd
 Error.UnexpectedError("Nieoczekiwany błąd systemowy")

@@ -89,6 +89,54 @@ public class ErrorTests
 	}
 
 	[Fact]
+	public void UnavailableError_CreatesUnavailableError()
+	{
+		// Act
+		var error = Error.UnavailableError("Service temporarily down");
+
+		// Assert
+		Assert.Equal(ErrorType.Unavailable, error.Type);
+		Assert.Equal("Service.Unavailable", error.Code);
+		Assert.Equal("Service temporarily down", error.Message);
+	}
+
+	[Fact]
+	public void UnavailableError_WithCode_CreatesUnavailableError()
+	{
+		// Act
+		var error = Error.UnavailableError("RateLimit.Exceeded", "Too many requests");
+
+		// Assert
+		Assert.Equal(ErrorType.Unavailable, error.Type);
+		Assert.Equal("RateLimit.Exceeded", error.Code);
+		Assert.Equal("Too many requests", error.Message);
+	}
+
+	[Fact]
+	public void TimeoutError_CreatesTimeoutError()
+	{
+		// Act
+		var error = Error.TimeoutError("Operation exceeded time limit");
+
+		// Assert
+		Assert.Equal(ErrorType.Timeout, error.Type);
+		Assert.Equal("Operation.Timeout", error.Code);
+		Assert.Equal("Operation exceeded time limit", error.Message);
+	}
+
+	[Fact]
+	public void TimeoutError_WithCode_CreatesTimeoutError()
+	{
+		// Act
+		var error = Error.TimeoutError("Database.Timeout", "Query timeout after 30 seconds");
+
+		// Assert
+		Assert.Equal(ErrorType.Timeout, error.Type);
+		Assert.Equal("Database.Timeout", error.Code);
+		Assert.Equal("Query timeout after 30 seconds", error.Message);
+	}
+
+	[Fact]
 	public void UnexpectedError_CreatesUnexpectedError()
 	{
 		// Act
