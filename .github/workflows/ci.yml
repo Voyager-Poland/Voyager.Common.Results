@@ -50,7 +50,7 @@ jobs:
     - name: Install Mono for .NET Framework 4.8 tests
       run: |
         sudo apt-get update -qq
-        sudo apt-get install -y -qq mono-complete mono-devel msbuild
+        sudo apt-get install -y -qq mono-complete mono-devel
         mono --version
     
     - name: Add Voyager Source
