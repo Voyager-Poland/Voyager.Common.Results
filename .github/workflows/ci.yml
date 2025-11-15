@@ -47,6 +47,12 @@ jobs:
       with:
         dotnet-version: 8.0.x
     
+    - name: Install Mono for .NET Framework 4.8 tests
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y -qq mono-complete mono-devel msbuild
+        mono --version
+    
     - name: Add Voyager Source
       run: dotnet nuget add source "https://nuget.pkg.github.com/Voyager-Poland/index.json" -n Voyager-Poland -u ${{secrets.VOY_ACTIONLOGIN}} -p ${{secrets.VOY_ACTIONLOGINPASS}} --store-password-in-clear-text
     
