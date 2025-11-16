@@ -66,9 +66,11 @@ jobs:
       run: dotnet test --no-build --verbosity normal -c Release --collect:"XPlat Code Coverage"
     
     - name: Upload coverage reports
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v5
       if: success()
       with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        slug: Voyager-Poland/Voyager.Common.Results
         files: '**/coverage.cobertura.xml'
         fail_ci_if_error: false
     
