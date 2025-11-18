@@ -15,61 +15,55 @@ Workflow wykorzystuje następujące secrets (już skonfigurowane):
 ### Automatyczny Proces Publikacji
 
 Workflow automatycznie:
-1. **Zwiększa wersję build** przy każdym push do `main`
+1. **Oblicza wersję z Git tagów** (MinVer)
 2. **Buduje projekt** (multi-target: .NET 8.0 i .NET Framework 4.8)
 3. **Uruchamia testy**
 4. **Tworzy pakiet NuGet**
-5. **Publikuje** na GitHub Packages i NuGet.org
+5. **Publikuje** na GitHub Packages i NuGet.org (tylko dla push do `main` lub tagów)
 
-## Workflow - Automatyczne Wersjonowanie i Publikacja
+## Workflow - Wersjonowanie MinVer i Publikacja
 
 ### Jak to działa?
 
-#### 1. Push do `main` uruchamia cały proces:
+#### 1. MinVer oblicza wersję z Git tagów
 
-```bash
-git add .
-git commit -m "Add new feature"
-git push origin main
+Projekt używa **MinVer** do automatycznego wersjonowania:
+- **Z tagiem `v1.2.3`** → pakiet `1.2.3`
+- **Bez tagu** → wersja preview, np. `0.1.0-preview.5+abc1234`
+- **Commits po tagu** → wersja preview następnej wersji, np. `1.2.4-preview.3+sha`
+
+MinVer wymaga pełnej historii Git (`fetch-depth: 0`):
+
+```yaml
+- uses: actions/checkout@v4
+  with:
+    fetch-depth: 0  # CRITICAL dla MinVer
 ```
 
-#### 2. Automatyczne zwiększanie wersji
+#### 2. Build, Test, Pack, Deploy
 
-Workflow używa `vers-one/dotnet-project-version-updater` do automatycznego zwiększania numeru build w pliku `.csproj`:
-
-```xml
-<!-- Przed: -->
-<Version>1.0.0</Version>
-
-<!-- Po automatycznym bump: -->
-<Version>1.0.1</Version>
-```
-
-Commit z nową wersją jest automatycznie push'owany przez GitHub Actions.
-
-#### 3. Build, Test, Pack, Deploy
-
-Po zwiększeniu wersji workflow:
+Workflow:
+- Instaluje Mono dla .NET Framework 4.8 na Ubuntu
 - Przywraca zależności (w tym z prywatnego GitHub Packages)
 - Buduje projekt w konfiguracji Release
-- Uruchamia testy
-- Pakuje do `.nupkg`
+- Uruchamia testy z pokryciem kodu
+- Pakuje do `.nupkg` (MinVer automatycznie ustawia wersję)
 - Publikuje na GitHub Packages i NuGet.org
 
 ### Struktura Workflow
 
 ```yaml
 jobs:
-  newversion:    # Zwiększa wersję build automatycznie
-  build:         # Buduje, testuje, pakuje
-  deploy:        # Publikuje pakiety
+  build:         # Buduje, testuje, pakuje (MinVer oblicza wersję z Git)
+  deploy:        # Publikuje pakiety (wymaga build, tylko push do main/master)
+  release:       # Tworzy GitHub Release (wymaga build, tylko dla tagów v*)
 ```
 
 ## Publikacja Nowej Wersji
 
-### Automatyczna (zalecana)
+### Preview Build (bez tagu)
 
-Po prostu push do `main`:
+Po prostu push do `main` - MinVer utworzy wersję preview:
 
 ```bash
 git add .
@@ -78,56 +72,74 @@ git push origin main
 ```
 
 GitHub Actions:
-- ✅ Automatycznie zwiększy wersję build
+- ✅ MinVer obliczy wersję preview (np. `0.1.0-preview.5`)
 - ✅ Zbuduje i przetestuje
-- ✅ Opublikuje nową wersję
+- ✅ Opublikuje pakiet preview na GitHub Packages
 
-### Ręczne zwiększanie wersji (Major/Minor)
+### Release Build (z tagiem)
 
-Jeśli chcesz zmienić wersję Major lub Minor (nie tylko build):
+Dla oficjalnej wersji release użyj Git tagu:
 
-1. Edytuj ręcznie `src/Voyager.Common.Results/Voyager.Common.Results.csproj`:
-
-```xml
-<!-- Zmiana Minor version -->
-<Version>1.1.0</Version>
-
-<!-- Lub Major version -->
-<Version>2.0.0</Version>
-```
-
-2. Zaktualizuj `CHANGELOG.md`:
+1. Zaktualizuj `CHANGELOG.md`:
 
 ```markdown
-## [2.0.0] - 2024-01-15
-
-### Breaking Changes
-- Renamed ResultExtensions to ResultCombineExtensions
+## [1.2.0] - 2025-01-15
 
 ### Added
-- New async methods for Result combination
+- Result.Combine method for collection operations
+
+### Changed
+- Improved error messages
 ```
 
-3. Commit i push:
+2. Commit zmian:
 
 ```bash
 git add .
-git commit -m "Release v2.0.0: Breaking changes and new features"
-git push origin main
+git commit -m "Prepare release v1.2.0"
 ```
 
-**Uwaga**: Build number zostanie nadal automatycznie zwiększony (np. 2.0.0 → 2.0.1), ale rozpocznie się od nowej bazy.
+3. Utwórz i push tag:
+
+```bash
+git tag v1.2.0
+git push origin main
+git push origin v1.2.0
+```
+
+GitHub Actions:
+- ✅ MinVer użyje wersji `1.2.0` z tagu
+- ✅ Zbuduje i przetestuje
+- ✅ Opublikuje pakiet na GitHub Packages i NuGet.org
+- ✅ Utworzy GitHub Release z pakietem
+
+### Konwencje Tagowania
+
+```bash
+# Patch version (bug fixes)
+git tag v1.0.1
+
+# Minor version (new features, backward compatible)
+git tag v1.1.0
+
+# Major version (breaking changes)
+git tag v2.0.0
+
+# Preview/beta releases
+git tag v1.2.0-preview.1
+git tag v1.2.0-beta.2
+```
 
 ## Weryfikacja Publikacji
 
 ### 1. Sprawdź GitHub Actions
 
 1. Przejdź do: https://github.com/Voyager-Poland/Voyager.Common.Results/actions
-2. Znajdź workflow ".NET push"
+2. Znajdź workflow "CI Build"
 3. Sprawdź logi każdego job'a:
-   - **newversion**: Czy wersja została zwiększona?
-   - **build**: Czy testy przeszły?
-   - **deploy**: Czy publikacja się powiodła?
+   - **build**: Czy MinVer obliczył wersję? Czy testy przeszły?
+   - **deploy**: Czy publikacja się powiodła? (tylko dla push do main)
+   - **release**: Czy GitHub Release został utworzony? (tylko dla tagów)
 
 ### 2. Sprawdź GitHub Packages
 
@@ -190,8 +202,9 @@ Error: Response status code does not indicate success: 401 (Unauthorized)
 GitHub Packages/NuGet.org nie pozwalają nadpisać istniejącej wersji.
 
 **Rozwiązanie**: 
-- Workflow automatycznie zwiększa wersję build, więc to nie powinno się zdarzyć
-- Jeśli występuje, upewnij się że workflow `newversion` zakończył się sukcesem
+- Utwórz nowy tag z wyższą wersją: `git tag v1.0.1`
+- MinVer automatycznie użyje nowej wersji
+- Usuń błędny tag jeśli trzeba: `git tag -d v1.0.0 && git push origin :refs/tags/v1.0.0`
 
 ### Workflow nie uruchamia się
 
@@ -219,14 +232,17 @@ dotnet test
 # Actions → Workflow run → build job → Test step
 ```
 
-### Konflikt po automatycznym commit wersji
+### MinVer nie widzi tagów
 
-Może się zdarzyć jeśli push'ujesz jednocześnie z automatycznym commit'em wersji.
+Jeśli MinVer używa domyślnej wersji `0.1.0-preview.X` zamiast wersji z tagu.
 
-**Rozwiązanie**:
-```bash
-git pull --rebase origin main
-git push origin main
+**Przyczyna**: Shallow clone (`fetch-depth: 1`) nie zawiera tagów.
+
+**Rozwiązanie**: Workflow musi mieć `fetch-depth: 0` w checkout step:
+```yaml
+- uses: actions/checkout@v4
+  with:
+    fetch-depth: 0
 ```
 
 ## Konfiguracja dla Nowego Projektu
@@ -290,8 +306,9 @@ Dla nowego repozytorium poza organizacją:
 
 ```yaml
 permissions:
-  contents: write    # Potrzebne do commit'owania wersji
+  contents: write    # Potrzebne do tworzenia GitHub Releases (release job)
   packages: write    # Potrzebne do publikacji na GitHub Packages
+  contents: read     # Potrzebne do checkout kodu (build job)
 ```
 
 ### Cache Dependencies (opcjonalnie)
