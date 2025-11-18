@@ -63,7 +63,7 @@ git push origin v1.2.6
 # ✅ Utworzy GitHub Release
 ```
 
-Ślledź postęp: https://github.com/Voyager-Poland/Voyager.Common.Results/actions
+Śledź postęp: https://github.com/Voyager-Poland/Voyager.Common.Results/actions
 
 ---
 
