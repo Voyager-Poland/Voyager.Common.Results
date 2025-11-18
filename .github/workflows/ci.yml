@@ -17,15 +17,21 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
-        fetch-depth: 0  # CRITICAL: MinVer needs full Git history
+        fetch-depth: 0  
 
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 8.0.x
 
-    - name: Add Voyager NuGet Source
-      run: dotnet nuget add source "https://nuget.pkg.github.com/Voyager-Poland/index.json" -n Voyager-Poland -u ${{secrets.VOYAGER_NUGET_USER}} -p ${{secrets.VOYAGER_NUGET_TOKEN}} --store-password-in-clear-text
+    - name: Install Mono for .NET Framework 4.8 tests
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y -qq mono-complete mono-devel
+        mono --version
+
+    - name: Add Voyager Source
+      run: dotnet nuget add source "https://nuget.pkg.github.com/Voyager-Poland/index.json" -n Voyager-Poland -u ${{secrets.VOY_ACTIONLOGIN}} -p ${{secrets.VOY_ACTIONLOGINPASS}} --store-password-in-clear-text
 
     - name: Restore dependencies
       run: dotnet restore
@@ -37,10 +43,11 @@ jobs:
       run: dotnet test --no-build --verbosity normal -c Release --collect:"XPlat Code Coverage"
 
     - name: Upload coverage reports
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v5
       if: success() && github.event.repository.visibility == 'public'
       with:
         files: '**/coverage.cobertura.xml'
+        slug: Voyager-Poland/Voyager.Common.Results
         fail_ci_if_error: false
 
     - name: Pack
@@ -65,8 +72,8 @@ jobs:
       contents: read
 
     steps:
-      - name: Add Voyager NuGet Source
-        run: dotnet nuget add source "https://nuget.pkg.github.com/Voyager-Poland/index.json" -n Voyager-Poland -u ${{secrets.VOYAGER_NUGET_USER}} -p ${{secrets.VOYAGER_NUGET_TOKEN}} --store-password-in-clear-text
+      - name: Add Voyager Source
+        run: dotnet nuget add source "https://nuget.pkg.github.com/Voyager-Poland/index.json" -n Voyager-Poland -u ${{secrets.VOY_ACTIONLOGIN}} -p ${{secrets.VOY_ACTIONLOGINPASS}} --store-password-in-clear-text
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
@@ -78,7 +85,7 @@ jobs:
 
       - name: Publish to NuGet.org
         if: github.event.repository.visibility == 'public'
-        run: dotnet nuget push **/*.nupkg --api-key ${{secrets.NUGET_API_KEY}} --source https://api.nuget.org/v3/index.json --skip-duplicate
+        run: dotnet nuget push **/*.nupkg --api-key ${{secrets.VOY_AND_API_KEY}} --source https://api.nuget.org/v3/index.json --skip-duplicate
 
   release:
     runs-on: ubuntu-latest
