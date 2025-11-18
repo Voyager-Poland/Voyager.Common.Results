@@ -7,7 +7,6 @@
   <!-- Import build configuration -->
   <Import Project="build/Build.Versioning.props" />
   <Import Project="build/Build.CodeQuality.props" />
-  <Import Project="build/Build.NuGet.props" />
   <Import Project="build/Build.SourceLink.props" />
 
   <PropertyGroup>

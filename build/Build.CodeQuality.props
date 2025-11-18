@@ -1,6 +1,7 @@
 <Project>
   <PropertyGroup>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- Treat warnings as errors, except during NuGet Pack (NU5017 false positive for multi-targeting) -->
+    <TreatWarningsAsErrors Condition="'$(NoBuild)' != 'true'">true</TreatWarningsAsErrors>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>latest</AnalysisLevel>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
