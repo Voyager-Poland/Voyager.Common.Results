@@ -1,0 +1,12 @@
+<Project>
+  <PropertyGroup>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+    <!-- Enforce XML documentation on public APIs -->
+    <NoWarn>$(NoWarn);1591</NoWarn> <!-- Remove this to enforce XML docs warnings -->
+  </PropertyGroup>
+</Project>

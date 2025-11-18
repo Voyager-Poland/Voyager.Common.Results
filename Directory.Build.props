@@ -1,0 +1,45 @@
+<Project>
+  <!--
+    This file applies to ALL projects in this solution.
+    Any .csproj file will automatically inherit these settings.
+  -->
+
+  <!-- Import build configuration -->
+  <Import Project="build/Build.Versioning.props" />
+  <Import Project="build/Build.CodeQuality.props" />
+  <Import Project="build/Build.NuGet.props" />
+  <Import Project="build/Build.SourceLink.props" />
+
+  <PropertyGroup>
+    <!-- Target Frameworks - Always multi-target for .NET 8 and .NET Framework 4.8 -->
+    <TargetFrameworks>net8.0;net48</TargetFrameworks>
+
+
+
+    <!-- Nullable Reference Types - ENABLED -->
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+ <PropertyGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net48'">
+    <LangVersion>10.0</LangVersion>
+  </PropertyGroup>
+  <!-- Package References for ALL projects -->
+  <ItemGroup>
+    <!-- C# 10 records support for .NET Framework 4.8 -->
+    <PackageReference Include="IsExternalInit" Version="1.0.3" Condition="'$(TargetFramework)' == 'net48'">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+
+    <!-- Nullable reference types for .NET Framework 4.8 -->
+    <PackageReference Include="Nullable" Version="1.3.1" Condition="'$(TargetFramework)' == 'net48'">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+</Project>
