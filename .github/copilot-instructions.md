@@ -22,7 +22,7 @@ This is a **Railway Oriented Programming** library implementing the Result Patte
 - **`ResultCollectionExtensions`**: Collection operations (`Combine`, `Partition`, `GetSuccessValues`)
 
 ### Error Types (ErrorType enum)
-`None`, `Validation`, `NotFound`, `Permission`, `Conflict`, `Database`, `Business`, `Unexpected`, `Unavailable`, `Timeout`
+`None`, `Validation`, `Permission`, `Database`, `Business`, `NotFound`, `Conflict`, `Unavailable`, `Timeout`, `Unexpected`
 
 ## Critical Patterns
 
@@ -48,7 +48,21 @@ GetUser(id)
     .OrElse(() => GetDefaultUser())       // Fallback on failure
 ```
 
-### 3. Implicit Conversions
+### 3. OrElse Fallback Pattern
+Chain fallback operations with lazy evaluation for resilient APIs:
+```csharp
+GetFromCache(key)
+    .OrElse(() => GetFromDatabase(key))           // Only called if cache fails
+    .OrElse(() => GetFromRemoteApi(key))         // Only called if DB fails  
+    .OrElse(() => Result<T>.Success(defaultValue)) // Final fallback
+
+// Async version
+await GetFromCacheAsync(key)
+    .OrElseAsync(() => GetFromDatabaseAsync(key))
+    .OrElseAsync(() => GetFromRemoteApiAsync(key))
+```
+
+### 4. Implicit Conversions
 `Result<T>` supports implicit conversions from values and errors:
 ```csharp
 public Result<User> GetUser(int id)
@@ -64,14 +78,14 @@ public Result<User> GetUser(int id)
 }
 ```
 
-### 4. Operator Selection
+### 5. Operator Selection
 - **`Map`**: Transform success value (doesn't return Result)
 - **`Bind`**: Chain operations that return Result<T>
 - **`Tap`/`TapError`**: Side effects without changing Result
 - **`Ensure`**: Validation that may convert success to failure
-- **`OrElse`**: Fallback when result is failure (cache → DB → default)
+- **`OrElse`**: Fallback when result is failure with lazy evaluation (cache → DB → default)
 
-### 5. Async Patterns
+### 6. Async Patterns
 Extension methods handle 4 async combinations:
 ```csharp
 // 1. Task<Result<T>> + sync function
@@ -86,12 +100,14 @@ await resultTask.BindAsync(async x => await SaveAsync(x))
 // 4. ConfigureAwait(false) is used throughout for library code
 ```
 
-### 6. Error Factory Methods
+### 7. Error Factory Methods
 Use specific error types with optional custom codes:
 ```csharp
 Error.ValidationError("Email required")                           // Default code
 Error.NotFoundError($"Order {id} not found")                     // Context in message
 Error.BusinessError("INSUFFICIENT_BALANCE", "Balance too low")   // Custom code
+Error.UnavailableError("Service temporarily unavailable")        // Service down/rate limit
+Error.TimeoutError("Request timed out after 30s")               // Operation timeout
 Error.FromException(exception)                                    // Convert exception
 ```
 
@@ -157,9 +173,10 @@ dotnet test -f net48
 ```
 
 ### Version Management (Automated)
-- **Build number**: Auto-bumped by GitHub Actions on push to `main`/`master`
-- **Major/Minor**: Manual edit in `Voyager.Common.Results.csproj` → `<Version>1.2.0</Version>`
-- Semantic versioning: MAJOR.MINOR.BUILD (e.g., 1.2.6)
+- **All versioning**: Controlled by Git tags via MinVer - no manual version editing needed
+- **Release**: Create Git tag `v1.2.3` → triggers release build with version 1.2.3
+- **Preview**: Commits without tags → auto-preview builds (e.g., `0.1.0-preview.5+abc1234`)
+- **Assembly versioning**: Major.0.0.0 (AssemblyVersion), Major.Minor.Patch.0 (FileVersion)
 
 ### CI/CD Pipeline (GitHub Actions)
 **Workflow file**: `.github/workflows/ci.yml`
@@ -170,13 +187,14 @@ dotnet test -f net48
 - Pull requests → Build and test only
 
 **Pipeline jobs**:
-1. **build** - Multi-target compile, tests, coverage, pack artifacts
-2. **deploy** - Publishes to GitHub Packages + NuGet.org (main branch only)  
-3. **release** - Creates GitHub Release with .nupkg files (tags only)
+1. **build** - Multi-target compile, tests, coverage, pack artifacts, uploads to GitHub artifacts
+2. **deploy** - Downloads artifacts, publishes to GitHub Packages + NuGet.org (main/master push only)  
+3. **release** - Downloads artifacts, creates GitHub Release with .nupkg files (tags `v*` only)
 
 **Critical CI requirements**:
-- `fetch-depth: 0` for MinVer to access Git history
-- Ubuntu + Mono for .NET Framework 4.8 testing
+- `fetch-depth: 0` for MinVer to access full Git history
+- Ubuntu + Mono for .NET Framework 4.8 testing  
+- Codecov integration for coverage reports (public repos only)
 - Secrets: `VOY_ACTIONLOGIN`, `VOY_ACTIONLOGINPASS`, `VOY_AND_API_KEY`
 
 See [BUILD.md](../BUILD.md) for manual publishing steps and troubleshooting.
@@ -298,7 +316,8 @@ Use nullable reference types (enabled in .csproj):
 1. Update core types in `src/Voyager.Common.Results/`
 2. Add extension methods to appropriate `Extensions/*.cs` file
 3. Write tests covering success/failure/edge cases
-4. Update documentation in `docs/`
-5. Add examples to `README.md` if user-facing
+4. Update documentation in `docs/` (especially `error-types.md` for new error types)
+5. Add examples to `README.md` if user-facing  
 6. Verify both .NET 8.0 and 4.8 compilation
-7. Update `CHANGELOG.md` with changes
+7. Update `CHANGELOG.md` with changes under `[Unreleased]` section
+8. For new error types: Add factory methods to `Error.cs`, update `ErrorType.cs` enum, add comprehensive tests

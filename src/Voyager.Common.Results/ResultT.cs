@@ -37,7 +37,7 @@ namespace Voyager.Common.Results
 		/// Creates a failure result
 		/// </summary>
 		/// <param name="error">Error describing the failure.</param>
-		public new static Result<TValue> Failure(Error error) => new(error);
+		public static new Result<TValue> Failure(Error error) => new(error);
 
 		// ========== PATTERN MATCHING ==========
 
