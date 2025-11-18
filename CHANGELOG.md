@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Fixed CI/CD pack command to target only the main project (`src/Voyager.Common.Results/Voyager.Common.Results.csproj`)
+- Fixed IDE0036 code analyzer error: Corrected modifier ordering from `public new static` to `public static new` in `ResultT.cs`
+- Fixed duplicate `IsExternalInit` package reference issue
+
+### Changed
+- Updated GitHub Actions workflow to pack only the library project, not test projects
+- Enhanced MinVer versioning documentation in `docs/QUICK-START-VERSIONING.md`
+- Updated build documentation in `BUILD.md` with improved MinVer guidance
+- Improved AI coding instructions in `.github/copilot-instructions.md` with latest patterns
+
+### Technical
+- Migrated to MinVer-based Git tag versioning system
+- Added ADR-001 documenting MinVer Git-based versioning strategy with Major-only AssemblyVersion approach
+- Updated CI workflow to use artifacts for better package handling between jobs
+
 ## [1.2.0] - 2025-01-15
 
 ### Added
@@ -88,7 +104,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - .NET Framework 4.8
 - .NET 8.0
 
-[Unreleased]: https://github.com/Voyager-Poland/Voyager.Common.Results/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/Voyager-Poland/Voyager.Common.Results/compare/v1.2.7...HEAD
 [1.2.0]: https://github.com/Voyager-Poland/Voyager.Common.Results/releases/tag/v1.2.0
 [1.1.0]: https://github.com/Voyager-Poland/Voyager.Common.Results/releases/tag/v1.1.0
 [1.0.0]: https://github.com/Voyager-Poland/Voyager.Common.Results/releases/tag/v1.0.0
