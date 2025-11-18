@@ -7,6 +7,19 @@
 - Dostęp do GitHub Packages (dla publikacji)
 - Opcjonalnie: Konto NuGet.org (dla publikacji publicznej)
 
+## ✨ Deterministic Builds
+
+Projekt używa **deterministic compilation** aby zapewnić, że identyczny kod źródłowy zawsze produkuje identyczne binaria. To eliminuje ostrzeżenia o niezdeterministycznych bibliotekach DLL w pakietach NuGet.
+
+**Konfiguracja:** Automatycznie włączone w `build/Build.CodeQuality.props`
+
+```xml
+<Deterministic>true</Deterministic>
+<ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+```
+
+**Więcej informacji:** Zobacz [docs/DETERMINISTIC-BUILDS.md](docs/DETERMINISTIC-BUILDS.md)
+
 ## 🤖 Automatyczna Publikacja (Zalecana)
 
 Projekt używa **GitHub Actions** z **MinVer** do automatycznego wersjonowania. MinVer oblicza wersję na podstawie Git tagów.
@@ -238,6 +251,13 @@ dotnet run
 ## 🔄 Wersjonowanie (Semantic Versioning + MinVer)
 
 Projekt używa [MinVer](https://github.com/adamralph/minver) do automatycznego wersjonowania na podstawie Git tagów zgodnie z [Semantic Versioning](https://semver.org/):
+
+### ⚠️ WAŻNE: MinVer wymaga tagów Git!
+
+**Jeśli nie masz tagów Git, wersja będzie `0.0.0.0` zamiast oczekiwanej!**
+
+📖 **Szybki start:** [docs/QUICK-START-VERSIONING.md](docs/QUICK-START-VERSIONING.md) - Jak utworzyć pierwszy tag w 3 krokach  
+📖 **Szczegóły:** [docs/QUICK-START-VERSIONING.md](docs/QUICK-START-VERSIONING.md) - Przewodnik wersjonowania
 
 ### Jak MinVer oblicza wersję?
 

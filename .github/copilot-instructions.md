@@ -97,12 +97,55 @@ Error.FromException(exception)                                    // Convert exc
 
 ## Development Workflow
 
-### Build & Test
+### Build System Architecture
+Project uses **modular MSBuild configuration** in `build/*.props` files:
+- `Build.Versioning.props` - MinVer Git-based versioning (CRITICAL dependency)
+- `Build.CodeQuality.props` - Analyzers, deterministic builds, warnings as errors
+- `Build.NuGet.props` - Package metadata, licensing, publishing settings
+- `Build.SourceLink.props` - Debugging support for published packages
+
+All projects inherit from `Directory.Build.props` which imports these modules.
+
+### Build & Test Commands
 ```powershell
 dotnet restore
 dotnet build -c Release                    # Builds both net8.0 and net48
 dotnet test --collect:"XPlat Code Coverage"
+
+# Fix common build issues
+dotnet clean -c Release                    # If XML documentation errors occur
+dotnet pack src/Voyager.Common.Results/Voyager.Common.Results.csproj -c Release
 ```
+
+**Common Build Issues & Solutions**:
+- **NU5119 XML file error**: `dotnet clean -c Release` then rebuild 
+- **0.0.0.0 version**: Create Git tag (`git tag v1.2.3`) for proper MinVer versioning
+- **Multi-framework issues**: Test both `dotnet build -f net8.0` and `dotnet build -f net48`
+
+### Critical: MinVer Versioning Dependency
+**PROJECT WILL NOT BUILD CORRECTLY WITHOUT GIT TAGS!**
+
+```powershell
+# ❌ WITHOUT Git tags: Version = 0.0.0.0 (WRONG!)
+# ✅ WITH Git tag v1.2.6: Version = 1.0.0.0 (AssemblyVersion), 1.2.6.0 (FileVersion)
+
+# Check current MinVer calculation
+dotnet build -c Release --verbosity normal | findstr MinVer
+
+# Create version tag (triggers proper versioning)
+git tag v1.2.6
+dotnet clean && dotnet build -c Release
+
+# Verify assembly version
+[System.Reflection.Assembly]::LoadFrom("$PWD\src\Voyager.Common.Results\bin\Release\net8.0\Voyager.Common.Results.dll").GetName()
+```
+
+**MinVer Configuration** (in `build/Build.Versioning.props`):
+- `MinVerTagPrefix=v` - Looks for tags like `v1.2.3`
+- `MinVerMinimumMajorMinor=0.1` - Default when no tags exist
+- Auto-preview builds for commits without tags
+
+See [docs/QUICK-START-VERSIONING.md](../docs/QUICK-START-VERSIONING.md).
 
 ### Multi-Framework Verification
 Always test both frameworks when changing core types:
@@ -118,16 +161,25 @@ dotnet test -f net48
 - **Major/Minor**: Manual edit in `Voyager.Common.Results.csproj` → `<Version>1.2.0</Version>`
 - Semantic versioning: MAJOR.MINOR.BUILD (e.g., 1.2.6)
 
-### Publishing (Automated via GitHub Actions)
-Push to `main`/`master` triggers CI pipeline:
-1. Bumps build version
-2. Builds for both frameworks
-3. Runs tests with coverage
-4. Creates NuGet package (.nupkg + symbols .snupkg)
-5. Publishes to GitHub Packages
-6. Publishes to NuGet.org
+### CI/CD Pipeline (GitHub Actions)
+**Workflow file**: `.github/workflows/ci.yml`
 
-See [BUILD.md](../BUILD.md) for manual publishing steps.
+**Triggers**:
+- Push to `main`/`master` → Preview build + publish
+- Git tags `v*` → Release build + GitHub Release
+- Pull requests → Build and test only
+
+**Pipeline jobs**:
+1. **build** - Multi-target compile, tests, coverage, pack artifacts
+2. **deploy** - Publishes to GitHub Packages + NuGet.org (main branch only)  
+3. **release** - Creates GitHub Release with .nupkg files (tags only)
+
+**Critical CI requirements**:
+- `fetch-depth: 0` for MinVer to access Git history
+- Ubuntu + Mono for .NET Framework 4.8 testing
+- Secrets: `VOY_ACTIONLOGIN`, `VOY_ACTIONLOGINPASS`, `VOY_AND_API_KEY`
+
+See [BUILD.md](../BUILD.md) for manual publishing steps and troubleshooting.
 
 ## Testing Conventions
 
@@ -228,11 +280,15 @@ Use nullable reference types (enabled in .csproj):
 5. **Use `ConfigureAwait(false)` in library code** - prevents deadlocks
 6. **Test both .NET 8.0 and 4.8** - framework differences can cause issues
 7. **Don't throw exceptions for business logic** - use `Result.Failure(error)` instead
+8. **MinVer dependency**: Project REQUIRES Git tags for correct versioning - without tags, version becomes 0.0.0.0
+9. **XML documentation build errors**: Use `dotnet clean` before `dotnet pack` if packaging fails with XML file errors
 
 ## Key Files for Understanding Patterns
 
 - `src/Voyager.Common.Results/ResultT.cs`: Core Result<T> implementation with all operators
 - `src/Voyager.Common.Results/Extensions/TaskResultExtensions.cs`: Async pattern reference
+- `build/Build.Versioning.props`: MinVer configuration and assembly versioning strategy
+- `Directory.Build.props`: Global project settings and imports
 - `docs/best-practices.md`: Comprehensive DO/DON'T guide
 - `docs/railway-oriented.md`: Railway Oriented Programming explanation
 - `.github/workflows/ci.yml`: Build, test, and deployment pipeline

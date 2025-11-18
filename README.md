@@ -163,6 +163,8 @@ See [BUILD.md](./BUILD.md) for comprehensive instructions on:
 - 📦 Publishing to GitHub Packages and NuGet.org
 - 🧪 Running tests with code coverage
 
+**New to versioning?** See [Quick Start - Versioning](./docs/QUICK-START-VERSIONING.md) for a 3-step guide to create your first release.
+
 ### Quick Build
 
 ```bash
