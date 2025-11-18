@@ -75,10 +75,13 @@ var message = result.Match(
 ```csharp
 Error.ValidationError("Invalid email format")
 Error.NotFoundError("User not found")
+Error.UnauthorizedError("User not logged in")
 Error.PermissionError("Access denied")
 Error.ConflictError("Email already exists")
 Error.DatabaseError("Connection failed")
 Error.BusinessError("Cannot cancel paid order")
+Error.UnavailableError("Service temporarily unavailable")
+Error.TimeoutError("Request timed out")
 Error.UnexpectedError("Something went wrong")
 Error.FromException(exception)
 ```

@@ -7,7 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- New error type `Unauthorized` for authentication failures (user not logged in)
+- Factory methods for unauthorized errors:
+  - `Error.UnauthorizedError(string message)` - with default code "Unauthorized"
+  - `Error.UnauthorizedError(string code, string message)` - with custom code
+
 ### Fixed
+- Fixed README.md not being included in NuGet package - moved from Build.NuGet.props to project file
 - Fixed CI/CD pack command to target only the main project (`src/Voyager.Common.Results/Voyager.Common.Results.csproj`)
 - Fixed IDE0036 code analyzer error: Corrected modifier ordering from `public new static` to `public static new` in `ResultT.cs`
 - Fixed duplicate `IsExternalInit` package reference issue

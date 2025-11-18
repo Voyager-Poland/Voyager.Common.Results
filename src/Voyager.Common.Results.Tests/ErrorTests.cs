@@ -41,6 +41,30 @@ public class ErrorTests
 	}
 
 	[Fact]
+	public void UnauthorizedError_CreatesUnauthorizedError()
+	{
+		// Act
+		var error = Error.UnauthorizedError("User not logged in");
+
+		// Assert
+		Assert.Equal(ErrorType.Unauthorized, error.Type);
+		Assert.Equal("Unauthorized", error.Code);
+		Assert.Equal("User not logged in", error.Message);
+	}
+
+	[Fact]
+	public void UnauthorizedError_WithCode_CreatesUnauthorizedError()
+	{
+		// Act
+		var error = Error.UnauthorizedError("Auth.TokenExpired", "Session expired");
+
+		// Assert
+		Assert.Equal(ErrorType.Unauthorized, error.Type);
+		Assert.Equal("Auth.TokenExpired", error.Code);
+		Assert.Equal("Session expired", error.Message);
+	}
+
+	[Fact]
 	public void DatabaseError_CreatesDatabaseError()
 	{
 		// Act
