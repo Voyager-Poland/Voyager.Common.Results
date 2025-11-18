@@ -1,52 +1,23 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <!-- NuGet Package Configuration -->
-    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
-    <IsPackable>true</IsPackable>
-    
-    <!-- Suppress false-positive NU5017 warning during multi-targeting pack -->
-    <NoWarn>$(NoWarn);NU5017</NoWarn>
-    <WarningsNotAsErrors>$(WarningsNotAsErrors);NU5017</WarningsNotAsErrors>
-    
-    <!-- Package Metadata -->
-    <PackageId>Voyager.Common.Results</PackageId>
-    <Authors>Andrzej Świstowski</Authors>
-    <Company>Sindbad IT sp. z o.o.</Company>
-    <Copyright>Copyright © Sindbad IT sp. z o.o. $([System.DateTime]::Now.Year)</Copyright>
-    <Description>A lightweight, functional Result type for .NET implementing Railway Oriented Programming pattern. Supports both .NET Framework 4.8 and .NET 8. Provides error handling without exceptions, method chaining, async operations, and collection utilities.</Description>
-    <PackageTags>result-pattern;railway-oriented-programming;functional;error-handling;either;option;monad;csharp;dotnet;net48;net8</PackageTags>
-    <PackageProjectUrl>https://github.com/Voyager-Poland/Voyager.Common.Results</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/Voyager-Poland/Voyager.Common.Results</RepositoryUrl>
-    <RepositoryType>git</RepositoryType>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
-    <PackageReleaseNotes>Initial release with Result Pattern implementation supporting .NET Framework 4.8 and .NET 8.</PackageReleaseNotes>
-    
-    <!-- Include symbols for debugging -->
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-    
-    <!-- Documentation -->
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <DocumentationFile>bin\$(Configuration)\$(TargetFramework)\$(AssemblyName).xml</DocumentationFile>
-  </PropertyGroup>
+	<PropertyGroup>
+		<PackageId>Voyager.Common.Results</PackageId>
+		<Authors>Andrzej Świstowski</Authors>
+		<IsPackable>true</IsPackable>
+		<Description>A lightweight, functional Result type for .NET implementing Railway Oriented
+			Programming pattern. Supports both .NET Framework 4.8 and .NET 8. Provides error handling
+			without exceptions, method chaining, async operations, and collection utilities.</Description>
+		<PackageTags>
+			result-pattern;railway-oriented-programming;functional;error-handling;either;option;monad;csharp;dotnet;net48;net8</PackageTags>
+		<PackageProjectUrl>https://github.com/Voyager-Poland/Voyager.Common.Results</PackageProjectUrl>
+		<RepositoryUrl>https://github.com/Voyager-Poland/Voyager.Common.Results</RepositoryUrl>
+		<PackageReleaseNotes>
+			See CHANGELOG.md for release history
+		</PackageReleaseNotes>
+	</PropertyGroup>
 
-  <PropertyGroup Condition="'$(TargetFramework)' == 'net8.0'">
-    <ImplicitUsings>enable</ImplicitUsings>
-  </PropertyGroup>
-
-  <!-- Include README.md in package -->
-  <ItemGroup>
-    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
-  </ItemGroup>
-
-  <!-- Workaround for NU5017 false positive during multi-targeting pack -->
-  <Target Name="DisableWarningsAsErrorsForPack" BeforeTargets="Pack">
-    <PropertyGroup>
-      <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
-    </PropertyGroup>
-  </Target>
+	<PropertyGroup Condition="'$(TargetFramework)' == 'net8.0'">
+		<ImplicitUsings>enable</ImplicitUsings>
+	</PropertyGroup>
 
 </Project>

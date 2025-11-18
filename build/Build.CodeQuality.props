@@ -1,13 +1,14 @@
 <Project>
-  <PropertyGroup>
-    <!-- Treat warnings as errors, except during NuGet Pack (NU5017 false positive for multi-targeting) -->
-    <TreatWarningsAsErrors Condition="'$(NoBuild)' != 'true'">true</TreatWarningsAsErrors>
-    <EnableNETAnalyzers>true</EnableNETAnalyzers>
-    <AnalysisLevel>latest</AnalysisLevel>
-    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+	<PropertyGroup>
+		<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+		<EnableNETAnalyzers>true</EnableNETAnalyzers>
+		<AnalysisLevel>latest</AnalysisLevel>
+		<EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
 
-    <!-- Enforce XML documentation on public APIs -->
-    <NoWarn>$(NoWarn);1591</NoWarn> <!-- Remove this to enforce XML docs warnings -->
-  </PropertyGroup>
+		<Deterministic>true</Deterministic>
+		<ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+
+		<NoWarn>$(NoWarn);1591</NoWarn>
+	</PropertyGroup>
 </Project>
