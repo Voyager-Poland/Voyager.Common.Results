@@ -51,7 +51,7 @@ jobs:
         fail_ci_if_error: false
 
     - name: Pack
-      run: dotnet pack --no-restore --no-build -c Release src/**/*.csproj
+      run: dotnet pack --no-restore --no-build -c Release src/Voyager.Common.Results/Voyager.Common.Results.csproj
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
