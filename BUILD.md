@@ -257,7 +257,7 @@ Projekt używa [MinVer](https://github.com/adamralph/minver) do automatycznego w
 **Jeśli nie masz tagów Git, wersja będzie `0.0.0.0` zamiast oczekiwanej!**
 
 📖 **Szybki start:** [docs/QUICK-START-VERSIONING.md](docs/QUICK-START-VERSIONING.md) - Jak utworzyć pierwszy tag w 3 krokach  
-📖 **Szczegóły:** [docs/QUICK-START-VERSIONING.md](docs/QUICK-START-VERSIONING.md) - Przewodnik wersjonowania
+📖 **Szczegóły:** [requirements/VERSIONING-GUIDE.md](requirements/VERSIONING-GUIDE.md) - Przewodnik wersjonowania
 
 ### Jak MinVer oblicza wersję?
 
