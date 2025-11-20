@@ -86,6 +86,42 @@ namespace Voyager.Common.Results
             return IsSuccess ? onSuccess() : onFailure(Error!);
         }
 
+        // ========== FUNCTIONAL METHODS ==========
+
+        /// <summary>
+        /// Bind - chains void operations returning Result (monad bind for void operations)
+        /// </summary>
+        /// <example>
+        /// <code>
+        /// var result = ValidateInput()
+        ///     .Bind(() => SaveToDatabase())
+        ///     .Bind(() => SendNotification());
+        /// </code>
+        /// </example>
+        /// <param name="binder">Function returning next Result in chain.</param>
+        /// <returns>Result from binder if current is success, otherwise propagates failure.</returns>
+        public Result Bind(Func<Result> binder)
+        {
+            return IsSuccess ? binder() : this;
+        }
+
+        /// <summary>
+        /// Bind - chains void operation to an operation that returns a value
+        /// </summary>
+        /// <example>
+        /// <code>
+        /// var result = ValidateInput()
+        ///     .Bind(() => GetUser(userId)); // Result → Result&lt;User&gt;
+        /// </code>
+        /// </example>
+        /// <param name="binder">Function returning Result&lt;TValue&gt;.</param>
+        /// <typeparam name="TValue">Type of value in the resulting Result.</typeparam>
+        /// <returns>Result&lt;TValue&gt; from binder if current is success, otherwise propagates failure.</returns>
+        public Result<TValue> Bind<TValue>(Func<Result<TValue>> binder)
+        {
+            return IsSuccess ? binder() : Result<TValue>.Failure(Error);
+        }
+
         // ========== IMPLICIT CONVERSIONS ==========
         /// <summary>
         /// Implicit conversion from Error to Result (creates a failure result)

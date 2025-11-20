@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `Bind` methods for `Result` (non-generic) class for complete Railway Oriented Programming support:
+  - `Result.Bind(Func<Result>)` - Chain void operations (Result → Result)
+  - `Result.Bind<TValue>(Func<Result<TValue>>)` - Transform void operation to value operation (Result → Result<TValue>)
+- 10 new unit tests for `Result.Bind` methods covering:
+  - Success and failure propagation
+  - Operation chaining with early termination
+  - Void-to-value transformations
+  - Mixed operation chains
+- Documentation for `Bind` pattern in README.md with practical examples
+
 ### Fixed
 - Fixed CI/CD pack command to target only the main project (`src/Voyager.Common.Results/Voyager.Common.Results.csproj`)
 - Fixed IDE0036 code analyzer error: Corrected modifier ordering from `public new static` to `public static new` in `ResultT.cs`
@@ -22,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Migrated to MinVer-based Git tag versioning system
 - Added ADR-001 documenting MinVer Git-based versioning strategy with Major-only AssemblyVersion approach
 - Updated CI workflow to use artifacts for better package handling between jobs
+- Refactored build configuration into modular props files (`build/Build.*.props`)
 
 ## [1.2.0] - 2025-01-15
 
