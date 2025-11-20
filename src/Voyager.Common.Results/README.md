@@ -103,6 +103,31 @@ var emailResult = GetUser(id)
 - ✅ Proste transformacje bez ryzyka błędu
 - ❌ NIE używaj dla operacji zwracających Result (użyj `Bind`)
 
+### MapError - transformacja błędów
+
+Transformuj błędy bez wpływu na sukces:
+
+```csharp
+// Dodaj kontekst do błędów
+var result = Operation()
+    .MapError(error => Error.DatabaseError("DB_" + error.Code, error.Message));
+
+// Konwertuj typy błędów
+var result = ValidateUser()
+    .MapError(error => Error.BusinessError("USER_" + error.Code, error.Message));
+
+// Łańcuchuj transformacje
+var result = GetData()
+    .MapError(e => Error.UnavailableError("Serwis niedostępny: " + e.Message))
+    .TapError(e => _logger.LogError(e.Message));
+```
+
+**Kiedy używać MapError:**
+- ✅ Dodawanie prefiksów lub kontekstu do kodów/komunikatów błędów
+- ✅ Konwersja typów błędów między warstwami (API → Domain → Infrastructure)
+- ✅ Wzbogacanie błędów o dodatkowe informacje
+- ✅ Standaryzacja formatów błędów
+
 ### Bind - łańcuchowanie operacji zwracających Result
 
 ```csharp

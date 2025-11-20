@@ -243,6 +243,55 @@ public class ResultTests
 		Assert.True(result.IsSuccess);
 	}
 
+	// ========== MAPERROR TESTS ==========
+
+	[Fact]
+	public void MapError_WithSuccess_DoesNotTransformError()
+	{
+		// Arrange
+		var result = Result.Success();
+
+		// Act
+		var mapped = result.MapError(e => Error.DatabaseError("Transformed"));
+
+		// Assert
+		Assert.True(mapped.IsSuccess);
+	}
+
+	[Fact]
+	public void MapError_WithFailure_TransformsError()
+	{
+		// Arrange
+		var originalError = Error.ValidationError("VAL_001", "Original");
+		var result = Result.Failure(originalError);
+
+		// Act
+		var mapped = result.MapError(e => Error.DatabaseError("DB_" + e.Code, "Transformed: " + e.Message));
+
+		// Assert
+		Assert.True(mapped.IsFailure);
+		Assert.Equal(ErrorType.Database, mapped.Error.Type);
+		Assert.Equal("DB_VAL_001", mapped.Error.Code);
+		Assert.Equal("Transformed: Original", mapped.Error.Message);
+	}
+
+	[Fact]
+	public void MapError_ChainWithOtherOperations()
+	{
+		// Arrange
+		var result = Result.Failure(Error.NotFoundError("NF_001", "User not found"));
+
+		// Act
+		var mapped = result
+			.MapError(e => Error.BusinessError("USER_" + e.Code, e.Message))
+			.TapError(e => { /* log error */ });
+
+		// Assert
+		Assert.True(mapped.IsFailure);
+		Assert.Equal(ErrorType.Business, mapped.Error.Type);
+		Assert.Equal("USER_NF_001", mapped.Error.Code);
+	}
+
 	// ========== BIND TESTS ==========
 
 	[Fact]

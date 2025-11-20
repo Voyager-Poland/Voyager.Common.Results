@@ -233,6 +233,24 @@ namespace Voyager.Common.Results
         }
 
         /// <summary>
+        /// MapError - transforms the error without affecting success
+        /// </summary>
+        /// <example>
+        /// <code>
+        /// var result = Operation()
+        ///     .MapError(error => Error.DatabaseError("DB_" + error.Code, error.Message));
+        /// </code>
+        /// </example>
+        /// <param name="mapper">Function to transform the error.</param>
+        /// <returns>Transformed failure or original success.</returns>
+        public Result MapError(Func<Error, Error> mapper)
+        {
+            return IsFailure
+                ? Failure(mapper(Error))
+                : this;
+        }
+
+        /// <summary>
         /// Executes an action regardless of whether the result is success or failure (like finally block)
         /// </summary>
         /// <example>

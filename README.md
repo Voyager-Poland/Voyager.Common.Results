@@ -191,6 +191,31 @@ var result = GetUser(id)
 - ✅ Simple, non-failing transformations
 - ❌ Don't use for operations that return Result (use `Bind` instead)
 
+### MapError - Error Transformation
+
+Transform errors without affecting success:
+
+```csharp
+// Add context to errors
+var result = Operation()
+    .MapError(error => Error.DatabaseError("DB_" + error.Code, error.Message));
+
+// Convert error types
+var result = ValidateUser()
+    .MapError(error => Error.BusinessError("USER_" + error.Code, error.Message));
+
+// Chain transformations
+var result = GetData()
+    .MapError(e => Error.UnavailableError("Service unavailable: " + e.Message))
+    .TapError(e => _logger.LogError(e.Message));
+```
+
+**When to use MapError:**
+- ✅ Add prefixes or context to error codes/messages
+- ✅ Convert error types for different layers (API → Domain → Infrastructure)
+- ✅ Enrich errors with additional information
+- ✅ Standardize error formats
+
 ### Bind - Chaining Operations
 
 The `Bind` method is available on both `Result` and `Result<T>` for seamless operation chaining:

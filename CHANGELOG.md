@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   var result = SaveToDatabase(data)
       .TapError(error => _logger.LogError(error.Message));
   ```
+- **`Result.MapError` method**: Transforms error without affecting success
+  ```csharp
+  var result = Operation()
+      .MapError(error => Error.DatabaseError("DB_" + error.Code, error.Message));
+  ```
 - **`Result.Finally` method**: Executes action regardless of success/failure (like finally block)
   ```csharp
   var result = SaveToDatabase(data)
@@ -73,6 +78,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 5 new unit tests for `Result.Tap` and `Result.TapError` methods covering:
   - Tap: execution on success/failure
   - TapError: execution on success/failure
+  - Chaining with other operations
+- 3 new unit tests for `Result.MapError` method covering:
+  - MapError: error transformation on success/failure
   - Chaining with other operations
 - 7 new unit tests for `Result.Finally` and `Result<T>.Finally` methods covering:
   - Finally: execution on success and failure

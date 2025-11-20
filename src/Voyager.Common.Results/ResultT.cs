@@ -218,7 +218,7 @@ namespace Voyager.Common.Results
 		/// </summary>
 		/// <param name="mapper">Function to transform the error.</param>
 		/// <returns>Transformed failure or original success.</returns>
-		public Result<TValue> MapError(Func<Error, Error> mapper)
+		public new Result<TValue> MapError(Func<Error, Error> mapper)
 		{
 			return IsFailure
 					? Failure(mapper(Error!))
