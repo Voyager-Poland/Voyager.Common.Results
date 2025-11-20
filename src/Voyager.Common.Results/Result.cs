@@ -89,6 +89,25 @@ namespace Voyager.Common.Results
         // ========== FUNCTIONAL METHODS ==========
 
         /// <summary>
+        /// Map - transforms void result into a Result with a value (functor map)
+        /// </summary>
+        /// <example>
+        /// <code>
+        /// var result = ValidateInput()
+        ///     .Map(() => DateTime.UtcNow); // Result → Result&lt;DateTime&gt;
+        /// </code>
+        /// </example>
+        /// <param name="mapper">Function producing a value from success.</param>
+        /// <typeparam name="TValue">Type of value to produce.</typeparam>
+        /// <returns>Result&lt;TValue&gt; with mapped value or propagates failure.</returns>
+        public Result<TValue> Map<TValue>(Func<TValue> mapper)
+        {
+            return IsSuccess
+                ? Result<TValue>.Success(mapper())
+                : Result<TValue>.Failure(Error);
+        }
+
+        /// <summary>
         /// Bind - chains void operations returning Result (monad bind for void operations)
         /// </summary>
         /// <example>

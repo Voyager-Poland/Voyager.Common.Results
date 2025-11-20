@@ -13,7 +13,7 @@ public class ResultTests
 		// Assert
 		Assert.True(result.IsSuccess);
 		Assert.False(result.IsFailure);
-		Assert.True (result.Error.Type == ErrorType.None);
+		Assert.True(result.Error.Type == ErrorType.None);
 	}
 
 	[Fact]
@@ -80,8 +80,37 @@ public class ResultTests
 		Result result = error;
 
 		// Assert
-		Assert.True(result.IsFailure);
+		Assert.False(result.IsSuccess);
 		Assert.Equal(error, result.Error);
+	}
+
+	[Fact]
+	public void Map_WithSuccess_TransformsToResultWithValue()
+	{
+		// Arrange
+		var result = Result.Success();
+
+		// Act
+		var mapped = result.Map(() => 42);
+
+		// Assert
+		Assert.True(mapped.IsSuccess);
+		Assert.Equal(42, mapped.Value);
+	}
+
+	[Fact]
+	public void Map_WithFailure_PropagatesError()
+	{
+		// Arrange
+		var error = Error.ValidationError("Test error");
+		var result = Result.Failure(error);
+
+		// Act
+		var mapped = result.Map(() => 42);
+
+		// Assert
+		Assert.False(mapped.IsSuccess);
+		Assert.Equal(error, mapped.Error);
 	}
 
 	// ========== BIND TESTS ==========

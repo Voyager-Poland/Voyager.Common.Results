@@ -8,17 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `Map` method for `Result` (non-generic) class to transform void operations into value operations:
+  - `Result.Map<TValue>(Func<TValue>)` - Transform Result → Result<TValue> (produces value from success)
 - `Bind` methods for `Result` (non-generic) class for complete Railway Oriented Programming support:
   - `Result.Bind(Func<Result>)` - Chain void operations (Result → Result)
   - `Result.Bind<TValue>(Func<Result<TValue>>)` - Transform void operation to value operation (Result → Result<TValue>)
-- 10 new unit tests for `Result.Bind` methods covering:
-  - Success and failure propagation
+- 12 new unit tests for `Result.Map` and `Result.Bind` methods covering:
+  - Map: success transformation and failure propagation
+  - Bind: success and failure propagation
   - Operation chaining with early termination
   - Void-to-value transformations
   - Mixed operation chains
-- Documentation for `Bind` pattern in README.md with practical examples
-
-### Added
+- Documentation for `Map` and `Bind` patterns in README.md with practical examples
 - New error type `Unauthorized` for authentication failures (user not logged in)
 - Factory methods for unauthorized errors:
   - `Error.UnauthorizedError(string message)` - with default code "Unauthorized"
