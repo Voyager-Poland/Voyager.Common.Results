@@ -62,6 +62,18 @@ var message = result.Match(
 );
 ```
 
+## 🧪 Testing
+
+The library includes **464 comprehensive tests** ensuring correctness:
+
+- **Monad Laws** (13 tests) - Verifies mathematical properties of Result<T>
+- **Invariants** (34 tests) - XOR property, null safety, immutability
+- **Error Propagation** (48 tests) - Correct error flow through all operators
+- **Composition** (60 tests) - Operator chaining and combination behavior
+- **Unit Tests** (309 tests) - Core functionality, extensions, edge cases
+
+All tests pass on both **.NET 8.0** and **.NET Framework 4.8**.
+
 ## 📖 Documentation
 
 ### Core Types

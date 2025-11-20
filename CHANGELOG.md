@@ -86,6 +86,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Finally: execution on success and failure
   - Resource cleanup simulation
   - Chaining with other operations
+- **Comprehensive test suite** ensuring library correctness:
+  - **MonadLawsTests.cs** (13 tests) - Verifies Result<T> satisfies Monad Laws:
+    - Left Identity: `return a >>= f ≡ f a`
+    - Right Identity: `m >>= return ≡ m`
+    - Associativity: `(m >>= f) >>= g ≡ m >>= (\x -> f x >>= g)`
+    - Functor Laws: Map preserves composition and identity
+  - **InvariantTests.cs** (34 tests) - Verifies critical invariants:
+    - XOR Property: `IsSuccess XOR IsFailure` always true
+    - Error Invariants: Success has Error.None, Failure has non-None error
+    - Null Safety: Proper handling of nullable types and default values
+    - Immutability: Operations don't mutate original Result
+    - Match Invariants: Exactly one branch executes in Match/Switch
+  - **ErrorPropagationTests.cs** (48 tests) - Verifies error propagation:
+    - Map/Bind/Tap/Ensure preserve errors correctly
+    - OrElse recovery and fallback error handling
+    - MapError transformation behavior
+    - Try exception wrapping
+    - Finally cleanup with error propagation
+    - Complex error propagation chains
+  - **CompositionTests.cs** (60 tests) - Verifies operator composition:
+    - Map/Bind/Tap/Ensure composition and chaining
+    - Operation ordering and short-circuiting
+    - OrElse fallback chains
+    - Complex multi-operator scenarios
+    - Non-generic Result composition
+  - **Total: 464 tests** (was 298) ensuring comprehensive coverage of Railway Oriented Programming patterns
 - Documentation for `Map` and `Bind` patterns in README.md with practical examples
 - New error type `Unauthorized` for authentication failures (user not logged in)
 - Factory methods for unauthorized errors:
