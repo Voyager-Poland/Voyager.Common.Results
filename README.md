@@ -101,6 +101,69 @@ GetUser(id)
     );
 ```
 
+### Try - Exception Handling
+
+Safely convert exception-throwing code into Result pattern:
+
+```csharp
+// Basic: wraps exceptions with Error.FromException
+var result = Result<int>.Try(() => int.Parse(userInput));
+
+// Custom error mapping
+var result = Result<int>.Try(
+    () => int.Parse(userInput),
+    ex => ex is FormatException 
+        ? Error.ValidationError("Invalid number format")
+        : Error.FromException(ex));
+
+// Void operations
+var result = Result.Try(() => File.Delete(path));
+
+// With custom error handling
+var result = Result.Try(
+    () => File.Delete(path),
+    ex => ex is UnauthorizedAccessException
+        ? Error.PermissionError("Access denied")
+        : Error.FromException(ex));
+
+// Chain with other operations
+var userData = Result<string>.Try(() => File.ReadAllText(path))
+    .Bind(json => ParseJson(json))
+    .Map(data => data.UserId);
+```
+
+**When to use Try:**
+- ✅ Wrapping third-party APIs that throw exceptions
+- ✅ File I/O, parsing, network calls
+- ✅ Converting legacy exception-based code to Result pattern
+- ✅ Custom exception-to-error mapping
+
+### Map - Value Transformations
+
+Transform success values or convert void operations to value operations:
+
+```csharp
+// Transform Result<T> values
+var emailResult = GetUser(id)
+    .Map(user => user.Email);              // Result<User> → Result<string>
+
+// Convert Result (void) to Result<T> (value)
+var numberResult = ValidateInput()
+    .Map(() => 42);                         // Result → Result<int>
+
+// Chain transformations
+var result = GetUser(id)
+    .Map(user => user.Email)
+    .Map(email => email.ToLower())
+    .Map(email => email.Trim());
+```
+
+**When to use Map:**
+- ✅ Transform success value to another type
+- ✅ Convert void success to value success
+- ✅ Simple, non-failing transformations
+- ❌ Don't use for operations that return Result (use `Bind` instead)
+
 ### Bind - Chaining Operations
 
 The `Bind` method is available on both `Result` and `Result<T>` for seamless operation chaining:

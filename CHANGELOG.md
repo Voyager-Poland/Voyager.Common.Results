@@ -8,6 +8,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`Result.Try` methods**: Safe exception-to-Result conversion with optional custom error mapping
+  - `Result.Try(Action action)` - Wraps exceptions with `Error.FromException`
+  - `Result.Try(Action action, Func<Exception, Error> errorMapper)` - Custom exception mapping
+  ```csharp
+  // Basic: wraps exception with Error.FromException
+  var result = Result.Try(() => File.Delete(path));
+  
+  // Custom: maps exceptions to specific error types
+  var result = Result.Try(
+      () => File.Delete(path),
+      ex => ex is UnauthorizedAccessException 
+          ? Error.PermissionError("Access denied")
+          : Error.FromException(ex));
+  ```
+- **`Result<T>.Try` methods**: Safe exception-to-Result conversion for value-returning operations
+  - `Result<T>.Try(Func<T> func)` - Wraps exceptions with `Error.FromException`
+  - `Result<T>.Try(Func<T> func, Func<Exception, Error> errorMapper)` - Custom exception mapping
+  ```csharp
+  // Basic: wraps exception with Error.FromException
+  var result = Result<int>.Try(() => int.Parse(input));
+  
+  // Custom: map FormatException to validation error
+  var result = Result<int>.Try(
+      () => int.Parse(input),
+      ex => ex is FormatException 
+          ? Error.ValidationError("Invalid number format")
+          : Error.FromException(ex));
+  ```
 - `Map` method for `Result` (non-generic) class to transform void operations into value operations:
   - `Result.Map<TValue>(Func<TValue>)` - Transform Result → Result<TValue> (produces value from success)
 - `Bind` methods for `Result` (non-generic) class for complete Railway Oriented Programming support:
@@ -19,6 +47,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Operation chaining with early termination
   - Void-to-value transformations
   - Mixed operation chains
+- 7 new unit tests for `Result.Try` and `Result<T>.Try` methods covering:
+  - Try: successful operations, exception wrapping, custom error mapping
+  - Real-world scenarios: JSON parsing, file operations
 - Documentation for `Map` and `Bind` patterns in README.md with practical examples
 - New error type `Unauthorized` for authentication failures (user not logged in)
 - Factory methods for unauthorized errors:

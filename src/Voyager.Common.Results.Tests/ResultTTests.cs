@@ -33,6 +33,63 @@ public class ResultTTests
 		Assert.Equal(error, result.Error);
 	}
 
+	// ========== TRY TESTS ==========
+
+	[Fact]
+	public void Try_WithSuccessfulFunc_ReturnsSuccessWithValue()
+	{
+		// Act
+		var result = Result<int>.Try(() => 42);
+
+		// Assert
+		Assert.True(result.IsSuccess);
+		Assert.Equal(42, result.Value);
+	}
+
+	[Fact]
+	public void Try_WithExceptionThrowingFunc_ReturnsFailure()
+	{
+		// Act
+		var result = Result<int>.Try(() => throw new InvalidOperationException("Test exception"));
+
+		// Assert
+		Assert.False(result.IsSuccess);
+		Assert.Equal(ErrorType.Unexpected, result.Error.Type);
+		Assert.Equal("Exception", result.Error.Code);
+		Assert.Equal("Test exception", result.Error.Message);
+	}
+
+	[Fact]
+	public void Try_WithCustomErrorMapper_MapsException()
+	{
+		// Act
+		var result = Result<int>.Try(
+			() => int.Parse("invalid"),
+			ex => ex is FormatException
+				? Error.ValidationError("Invalid number format")
+				: Error.UnexpectedError(ex.Message));
+
+		// Assert
+		Assert.False(result.IsSuccess);
+		Assert.Equal(ErrorType.Validation, result.Error.Type);
+		Assert.Equal("Invalid number format", result.Error.Message);
+	}
+
+	[Fact]
+	public void Try_RealWorldExample_SafeOperation()
+	{
+		// Act - safer operation that doesn't require System.Text.Json in .NET 4.8
+		var result = Result<string>.Try(
+			() => "test",
+			ex => Error.ValidationError("Operation failed"));
+
+		// Assert
+		Assert.True(result.IsSuccess);
+		Assert.Equal("test", result.Value);
+	}
+
+	// ========== MATCH TESTS ==========
+
 	[Fact]
 	public void Match_WithSuccess_CallsOnSuccessWithValue()
 	{
@@ -102,9 +159,9 @@ public class ResultTTests
 		var result = Result<int>.Success(5);
 
 		// Act
-		var bound = result.Bind(x => 
-			x > 0 
-				? Result<string>.Success(x.ToString()) 
+		var bound = result.Bind(x =>
+			x > 0
+				? Result<string>.Success(x.ToString())
 				: Result<string>.Failure(Error.ValidationError("Must be positive"))
 		);
 
@@ -136,9 +193,9 @@ public class ResultTTests
 		var binderError = Error.ValidationError("Must be positive");
 
 		// Act
-		var bound = result.Bind(x => 
-			x > 0 
-				? Result<string>.Success(x.ToString()) 
+		var bound = result.Bind(x =>
+			x > 0
+				? Result<string>.Success(x.ToString())
 				: Result<string>.Failure(binderError)
 		);
 

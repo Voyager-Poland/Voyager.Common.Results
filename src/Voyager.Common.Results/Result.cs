@@ -57,6 +57,57 @@ namespace Voyager.Common.Results
         /// <returns>A failed Result instance containing the specified error.</returns>
         public static Result Failure(Error error) => new(false, error);
 
+        /// <summary>
+        /// Executes an action and wraps any exceptions in a Result
+        /// </summary>
+        /// <example>
+        /// <code>
+        /// var result = Result.Try(() => File.WriteAllText("log.txt", message));
+        /// </code>
+        /// </example>
+        /// <param name="action">Action to execute.</param>
+        /// <returns>Success if action completes without exception, otherwise Failure with error from exception.</returns>
+        public static Result Try(Action action)
+        {
+            try
+            {
+                action();
+                return Success();
+            }
+            catch (Exception ex)
+            {
+                return Failure(Error.FromException(ex));
+            }
+        }
+
+        /// <summary>
+        /// Executes an action and wraps any exceptions in a Result with custom error mapping
+        /// </summary>
+        /// <example>
+        /// <code>
+        /// var result = Result.Try(
+        ///     () => File.WriteAllText("log.txt", message),
+        ///     ex => ex is IOException 
+        ///         ? Error.UnavailableError("File system unavailable")
+        ///         : Error.UnexpectedError(ex.Message));
+        /// </code>
+        /// </example>
+        /// <param name="action">Action to execute.</param>
+        /// <param name="errorMapper">Function to convert exception to custom error.</param>
+        /// <returns>Success if action completes without exception, otherwise Failure with mapped error.</returns>
+        public static Result Try(Action action, Func<Exception, Error> errorMapper)
+        {
+            try
+            {
+                action();
+                return Success();
+            }
+            catch (Exception ex)
+            {
+                return Failure(errorMapper(ex));
+            }
+        }
+
         // ========== PATTERN MATCHING ==========
 
         /// <summary>

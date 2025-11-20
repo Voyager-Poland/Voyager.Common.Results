@@ -39,6 +39,56 @@ namespace Voyager.Common.Results
 		/// <param name="error">Error describing the failure.</param>
 		public static new Result<TValue> Failure(Error error) => new(error);
 
+		/// <summary>
+		/// Executes a function and wraps any exceptions in a Result
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// var result = Result&lt;int&gt;.Try(() => int.Parse("123"));
+		/// var config = Result&lt;Config&gt;.Try(() => JsonSerializer.Deserialize&lt;Config&gt;(json));
+		/// </code>
+		/// </example>
+		/// <param name="func">Function to execute.</param>
+		/// <returns>Success with function result if completes without exception, otherwise Failure with error from exception.</returns>
+		public static Result<TValue> Try(Func<TValue> func)
+		{
+			try
+			{
+				return Success(func());
+			}
+			catch (Exception ex)
+			{
+				return Failure(Error.FromException(ex));
+			}
+		}
+
+		/// <summary>
+		/// Executes a function and wraps any exceptions in a Result with custom error mapping
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// var result = Result&lt;Config&gt;.Try(
+		///     () => JsonSerializer.Deserialize&lt;Config&gt;(json),
+		///     ex => ex is JsonException 
+		///         ? Error.ValidationError("Invalid JSON")
+		///         : Error.UnexpectedError(ex.Message));
+		/// </code>
+		/// </example>
+		/// <param name="func">Function to execute.</param>
+		/// <param name="errorMapper">Function to convert exception to custom error.</param>
+		/// <returns>Success with function result if completes without exception, otherwise Failure with mapped error.</returns>
+		public static Result<TValue> Try(Func<TValue> func, Func<Exception, Error> errorMapper)
+		{
+			try
+			{
+				return Success(func());
+			}
+			catch (Exception ex)
+			{
+				return Failure(errorMapper(ex));
+			}
+		}
+
 		// ========== PATTERN MATCHING ==========
 
 		/// <summary>

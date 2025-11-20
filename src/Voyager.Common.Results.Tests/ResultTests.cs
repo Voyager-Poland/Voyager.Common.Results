@@ -113,6 +113,51 @@ public class ResultTests
 		Assert.Equal(error, mapped.Error);
 	}
 
+	// ========== TRY TESTS ==========
+
+	[Fact]
+	public void Try_WithSuccessfulAction_ReturnsSuccess()
+	{
+		// Arrange
+		var executed = false;
+
+		// Act
+		var result = Result.Try(() => executed = true);
+
+		// Assert
+		Assert.True(result.IsSuccess);
+		Assert.True(executed);
+	}
+
+	[Fact]
+	public void Try_WithExceptionThrowingAction_ReturnsFailure()
+	{
+		// Act
+		var result = Result.Try(() => throw new InvalidOperationException("Test exception"));
+
+		// Assert
+		Assert.False(result.IsSuccess);
+		Assert.Equal(ErrorType.Unexpected, result.Error.Type);
+		Assert.Equal("Exception", result.Error.Code);
+		Assert.Equal("Test exception", result.Error.Message);
+	}
+
+	[Fact]
+	public void Try_WithCustomErrorMapper_MapsException()
+	{
+		// Act
+		var result = Result.Try(
+			() => throw new IOException("File not found"),
+			ex => ex is IOException
+				? Error.UnavailableError("File system error")
+				: Error.UnexpectedError(ex.Message));
+
+		// Assert
+		Assert.False(result.IsSuccess);
+		Assert.Equal(ErrorType.Unavailable, result.Error.Type);
+		Assert.Equal("File system error", result.Error.Message);
+	}
+
 	// ========== BIND TESTS ==========
 
 	[Fact]
