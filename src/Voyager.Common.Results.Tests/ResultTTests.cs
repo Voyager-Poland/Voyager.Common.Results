@@ -370,6 +370,74 @@ public class ResultTTests
 		Assert.Equal("Value: 10", result.Value);
 	}
 
+	// ========== FINALLY TESTS ==========
+
+	[Fact]
+	public void Finally_WithSuccess_ExecutesAction()
+	{
+		// Arrange
+		var result = Result<int>.Success(42);
+		var actionExecuted = false;
+
+		// Act
+		var finalResult = result.Finally(() => actionExecuted = true);
+
+		// Assert
+		Assert.True(actionExecuted);
+		Assert.True(finalResult.IsSuccess);
+		Assert.Equal(42, finalResult.Value);
+	}
+
+	[Fact]
+	public void Finally_WithFailure_ExecutesAction()
+	{
+		// Arrange
+		var result = Result<int>.Failure(Error.ValidationError("Test error"));
+		var actionExecuted = false;
+
+		// Act
+		var finalResult = result.Finally(() => actionExecuted = true);
+
+		// Assert
+		Assert.True(actionExecuted);
+		Assert.True(finalResult.IsFailure);
+	}
+
+	[Fact]
+	public void Finally_ChainWithOtherOperations()
+	{
+		// Arrange
+		var cleanupCalled = false;
+		var processCalled = false;
+
+		// Act
+		var result = Result<int>.Success(10)
+			.Map(x => x * 2)
+			.Tap(x => processCalled = true)
+			.Finally(() => cleanupCalled = true);
+
+		// Assert
+		Assert.True(processCalled);
+		Assert.True(cleanupCalled);
+		Assert.True(result.IsSuccess);
+		Assert.Equal(20, result.Value);
+	}
+
+	[Fact]
+	public void Finally_SimulatesResourceCleanup()
+	{
+		// Arrange
+		var resourceClosed = false;
+
+		// Act
+		var result = Result<string>.Success("data")
+			.Finally(() => resourceClosed = true);
+
+		// Assert
+		Assert.True(resourceClosed);
+		Assert.True(result.IsSuccess);
+	}
+
 	// ========== ORELSE TESTS ==========
 
 	[Fact]

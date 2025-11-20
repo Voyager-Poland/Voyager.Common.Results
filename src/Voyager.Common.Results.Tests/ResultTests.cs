@@ -356,4 +356,58 @@ public class ResultTests
 		Assert.True(result.IsSuccess);
 		Assert.Equal("User_123", result.Value);
 	}
+
+	// ========== FINALLY TESTS ==========
+
+	[Fact]
+	public void Finally_WithSuccess_ExecutesAction()
+	{
+		// Arrange
+		var result = Result.Success();
+		var actionExecuted = false;
+
+		// Act
+		var finalResult = result.Finally(() => actionExecuted = true);
+
+		// Assert
+		Assert.True(actionExecuted);
+		Assert.True(finalResult.IsSuccess);
+	}
+
+	[Fact]
+	public void Finally_WithFailure_ExecutesAction()
+	{
+		// Arrange
+		var result = Result.Failure(Error.ValidationError("Test error"));
+		var actionExecuted = false;
+
+		// Act
+		var finalResult = result.Finally(() => actionExecuted = true);
+
+		// Assert
+		Assert.True(actionExecuted);
+		Assert.True(finalResult.IsFailure);
+	}
+
+	[Fact]
+	public void Finally_ChainWithOtherOperations()
+	{
+		// Arrange
+		var cleanupCalled = false;
+		var processCalled = false;
+
+		// Act
+		var result = Result.Success()
+			.Bind(() =>
+			{
+				processCalled = true;
+				return Result.Success();
+			})
+			.Finally(() => cleanupCalled = true);
+
+		// Assert
+		Assert.True(processCalled);
+		Assert.True(cleanupCalled);
+		Assert.True(result.IsSuccess);
+	}
 }

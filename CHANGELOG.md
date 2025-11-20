@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`Result.Finally` method**: Executes action regardless of success/failure (like finally block)
+  ```csharp
+  var result = SaveToDatabase(data)
+      .Finally(() => connection.Close());
+  ```
+- **`Result<T>.Finally` method**: Executes action regardless of success/failure for value operations
+  ```csharp
+  var userData = LoadFromFile(path)
+      .Finally(() => fileStream.Dispose());
+  ```
 - **`Result.Try` methods**: Safe exception-to-Result conversion with optional custom error mapping
   - `Result.Try(Action action)` - Wraps exceptions with `Error.FromException`
   - `Result.Try(Action action, Func<Exception, Error> errorMapper)` - Custom exception mapping
@@ -50,6 +60,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 7 new unit tests for `Result.Try` and `Result<T>.Try` methods covering:
   - Try: successful operations, exception wrapping, custom error mapping
   - Real-world scenarios: JSON parsing, file operations
+- 7 new unit tests for `Result.Finally` and `Result<T>.Finally` methods covering:
+  - Finally: execution on success and failure
+  - Resource cleanup simulation
+  - Chaining with other operations
 - Documentation for `Map` and `Bind` patterns in README.md with practical examples
 - New error type `Unauthorized` for authentication failures (user not logged in)
 - Factory methods for unauthorized errors:

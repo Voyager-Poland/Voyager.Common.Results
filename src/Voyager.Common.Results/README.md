@@ -134,6 +134,32 @@ var result = GetAge()
     );
 ```
 
+### Finally - czyszczenie zasobów
+
+Wykonuje akcję niezależnie od sukcesu czy błędu (jak blok finally):
+
+```csharp
+// Zawsze zamknij połączenie
+var result = SaveToDatabase(data)
+    .Finally(() => connection.Close());
+
+// Zawsze zwolnij zasób
+var userData = LoadFromFile(path)
+    .Finally(() => fileStream.Dispose());
+
+// Łańcuchowanie z innymi operacjami
+var result = GetUser(id)
+    .Map(user => user.Email)
+    .Tap(email => _logger.LogInfo(email))
+    .Finally(() => _metrics.RecordOperation());
+```
+
+**Kiedy używać Finally:**
+- ✅ Czyszczenie zasobów (zamykanie połączeń, dispose strumieni)
+- ✅ Logowanie/metryki niezależnie od wyniku
+- ✅ Zwalnianie locków lub semaforów
+- ✅ Każda operacja cleanup, która musi się wykonać w obu ścieżkach
+
 ### OrElse - wartości alternatywne (fallback pattern)
 
 ```csharp

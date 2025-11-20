@@ -183,6 +183,23 @@ namespace Voyager.Common.Results
 		}
 
 		/// <summary>
+		/// Executes an action regardless of whether the result is success or failure (like finally block)
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// var userData = LoadFromFile(path)
+		///     .Finally(() => fileStream.Dispose());
+		/// </code>
+		/// </example>
+		/// <param name="action">Action to execute always.</param>
+		/// <returns>The original Result&lt;TValue&gt; unchanged.</returns>
+		public new Result<TValue> Finally(Action action)
+		{
+			action();
+			return this;
+		}
+
+		/// <summary>
 		/// Ensure - validates the success value, may convert to Failure
 		/// </summary>
 		/// <param name="predicate">Predicate to validate the success value.</param>

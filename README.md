@@ -94,12 +94,39 @@ GetUser(id)
     .Bind(email => SendEmail(email))       // Chain another Result operation
     .Ensure(sent => sent, Error.BusinessError("Email not sent"))
     .Tap(() => _logger.LogInfo("Email sent"))  // Side effect
+    .Finally(() => connection.Close())     // Cleanup (always executes)
     .OrElse(() => GetDefaultUser())        // Fallback if failed
     .Match(
         onSuccess: () => "Success",
         onFailure: error => error.Message
     );
 ```
+
+### Finally - Resource Cleanup
+
+Executes an action regardless of success or failure (like finally block):
+
+```csharp
+// Always close connection
+var result = SaveToDatabase(data)
+    .Finally(() => connection.Close());
+
+// Always dispose resource
+var userData = LoadFromFile(path)
+    .Finally(() => fileStream.Dispose());
+
+// Chain with other operations
+var result = GetUser(id)
+    .Map(user => user.Email)
+    .Tap(email => _logger.LogInfo(email))
+    .Finally(() => _metrics.RecordOperation());
+```
+
+**When to use Finally:**
+- ✅ Resource cleanup (close connections, dispose streams)
+- ✅ Logging/metrics regardless of outcome
+- ✅ Releasing locks or semaphores
+- ✅ Any cleanup that must happen in both success and failure paths
 
 ### Try - Exception Handling
 

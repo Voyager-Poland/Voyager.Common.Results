@@ -192,6 +192,23 @@ namespace Voyager.Common.Results
             return IsSuccess ? binder() : Result<TValue>.Failure(Error);
         }
 
+        /// <summary>
+        /// Executes an action regardless of whether the result is success or failure (like finally block)
+        /// </summary>
+        /// <example>
+        /// <code>
+        /// var result = SaveToDatabase(data)
+        ///     .Finally(() => connection.Close());
+        /// </code>
+        /// </example>
+        /// <param name="action">Action to execute always.</param>
+        /// <returns>The original Result unchanged.</returns>
+        public Result Finally(Action action)
+        {
+            action();
+            return this;
+        }
+
         // ========== IMPLICIT CONVERSIONS ==========
         /// <summary>
         /// Implicit conversion from Error to Result (creates a failure result)
