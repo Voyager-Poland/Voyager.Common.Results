@@ -192,6 +192,46 @@ namespace Voyager.Common.Results
             return IsSuccess ? binder() : Result<TValue>.Failure(Error);
         }
 
+        // ========== SIDE EFFECTS ==========
+
+        /// <summary>
+        /// Executes a side effect if the result is a success, without modifying the result
+        /// </summary>
+        /// <example>
+        /// <code>
+        /// var result = SaveToDatabase(data)
+        ///     .Tap(() => _logger.LogInfo("Data saved"));
+        /// </code>
+        /// </example>
+        /// <param name="action">Action to execute on success.</param>
+        /// <returns>The original Result unchanged.</returns>
+        public Result Tap(Action action)
+        {
+            if (IsSuccess)
+                action();
+
+            return this;
+        }
+
+        /// <summary>
+        /// Executes a side effect if the result is a failure, without modifying the result
+        /// </summary>
+        /// <example>
+        /// <code>
+        /// var result = SaveToDatabase(data)
+        ///     .TapError(error => _logger.LogError(error.Message));
+        /// </code>
+        /// </example>
+        /// <param name="action">Action to execute on failure.</param>
+        /// <returns>The original Result unchanged.</returns>
+        public Result TapError(Action<Error> action)
+        {
+            if (IsFailure)
+                action(Error);
+
+            return this;
+        }
+
         /// <summary>
         /// Executes an action regardless of whether the result is success or failure (like finally block)
         /// </summary>

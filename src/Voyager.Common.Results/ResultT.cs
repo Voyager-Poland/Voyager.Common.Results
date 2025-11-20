@@ -175,7 +175,7 @@ namespace Voyager.Common.Results
 		/// </summary>
 		/// <param name="action">Action to perform on the error.</param>
 		/// <returns>The same Result instance.</returns>
-		public Result<TValue> TapError(Action<Error> action)
+		public new Result<TValue> TapError(Action<Error> action)
 		{
 			if (IsFailure)
 				action(Error!);

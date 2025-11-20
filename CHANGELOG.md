@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`Result.Tap` method**: Executes side effect on success without modifying result
+  ```csharp
+  var result = SaveToDatabase(data)
+      .Tap(() => _logger.LogInfo("Data saved"));
+  ```
+- **`Result.TapError` method**: Executes side effect on failure without modifying result
+  ```csharp
+  var result = SaveToDatabase(data)
+      .TapError(error => _logger.LogError(error.Message));
+  ```
 - **`Result.Finally` method**: Executes action regardless of success/failure (like finally block)
   ```csharp
   var result = SaveToDatabase(data)
@@ -60,6 +70,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 7 new unit tests for `Result.Try` and `Result<T>.Try` methods covering:
   - Try: successful operations, exception wrapping, custom error mapping
   - Real-world scenarios: JSON parsing, file operations
+- 5 new unit tests for `Result.Tap` and `Result.TapError` methods covering:
+  - Tap: execution on success/failure
+  - TapError: execution on success/failure
+  - Chaining with other operations
 - 7 new unit tests for `Result.Finally` and `Result<T>.Finally` methods covering:
   - Finally: execution on success and failure
   - Resource cleanup simulation

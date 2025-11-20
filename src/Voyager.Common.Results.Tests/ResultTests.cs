@@ -158,6 +158,91 @@ public class ResultTests
 		Assert.Equal("File system error", result.Error.Message);
 	}
 
+	// ========== TAP TESTS ==========
+
+	[Fact]
+	public void Tap_WithSuccess_ExecutesAction()
+	{
+		// Arrange
+		var result = Result.Success();
+		var actionExecuted = false;
+
+		// Act
+		var tapped = result.Tap(() => actionExecuted = true);
+
+		// Assert
+		Assert.True(actionExecuted);
+		Assert.True(tapped.IsSuccess);
+	}
+
+	[Fact]
+	public void Tap_WithFailure_DoesNotExecuteAction()
+	{
+		// Arrange
+		var error = Error.ValidationError("Test error");
+		var result = Result.Failure(error);
+		var actionExecuted = false;
+
+		// Act
+		var tapped = result.Tap(() => actionExecuted = true);
+
+		// Assert
+		Assert.False(actionExecuted);
+		Assert.True(tapped.IsFailure);
+		Assert.Equal(error, tapped.Error);
+	}
+
+	[Fact]
+	public void TapError_WithSuccess_DoesNotExecuteAction()
+	{
+		// Arrange
+		var result = Result.Success();
+		Error? capturedError = null;
+
+		// Act
+		var tapped = result.TapError(e => capturedError = e);
+
+		// Assert
+		Assert.Null(capturedError);
+		Assert.True(tapped.IsSuccess);
+	}
+
+	[Fact]
+	public void TapError_WithFailure_ExecutesAction()
+	{
+		// Arrange
+		var error = Error.ValidationError("Test error");
+		var result = Result.Failure(error);
+		Error? capturedError = null;
+
+		// Act
+		var tapped = result.TapError(e => capturedError = e);
+
+		// Assert
+		Assert.NotNull(capturedError);
+		Assert.Equal(error, capturedError);
+		Assert.True(tapped.IsFailure);
+	}
+
+	[Fact]
+	public void Tap_ChainWithOtherOperations()
+	{
+		// Arrange
+		var tapCalled = false;
+		var tapErrorCalled = false;
+
+		// Act
+		var result = Result.Success()
+			.Tap(() => tapCalled = true)
+			.TapError(e => tapErrorCalled = true)
+			.Bind(() => Result.Success());
+
+		// Assert
+		Assert.True(tapCalled);
+		Assert.False(tapErrorCalled);
+		Assert.True(result.IsSuccess);
+	}
+
 	// ========== BIND TESTS ==========
 
 	[Fact]
