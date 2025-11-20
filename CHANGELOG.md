@@ -63,6 +63,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed duplicate `IsExternalInit` package reference issue
 
 ### Changed
+- **Comprehensive documentation updates** for `Try` and `Map` methods:
+  - Updated `README.md` with Try exception handling section and enhanced Map examples
+  - Enhanced `docs/getting-started.md` with Try alternative to try-catch pattern
+  - Added Try examples to `docs/examples.md` (file parsing, data import scenarios)
+  - Improved `docs/best-practices.md` with Try patterns and Map best practices
+  - Updated `src/Voyager.Common.Results/README.md` (Polish) with full Try and Map documentation
 - Updated GitHub Actions workflow to pack only the library project, not test projects
 - Enhanced MinVer versioning documentation in `docs/QUICK-START-VERSIONING.md`
 - Updated build documentation in `BUILD.md` with improved MinVer guidance

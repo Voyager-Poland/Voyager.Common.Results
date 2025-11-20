@@ -352,6 +352,71 @@ public class FileService
 }
 ```
 
+### Example 2: Parse and Process File (Using Try)
+
+```csharp
+public class DataImportService
+{
+    public async Task<Result<ImportResult>> ImportDataFromFileAsync(string filePath)
+    {
+        // Try method wraps exception-throwing operations
+        return Result<string>.Try(
+                () => File.ReadAllText(filePath),
+                ex => ex is FileNotFoundException
+                    ? Error.NotFoundError($"File not found: {filePath}")
+                    : ex is UnauthorizedAccessException
+                    ? Error.PermissionError("Access denied to file")
+                    : Error.FromException(ex))
+            .Bind(content => ParseJsonContent(content))
+            .Bind(data => ValidateImportData(data))
+            .BindAsync(data => ImportToDatabase(data))
+            .TapAsync(result => _logger.LogInformationAsync($"Imported {result.RecordCount} records"));
+    }
+
+    private Result<ImportData> ParseJsonContent(string content)
+    {
+        return Result<ImportData>.Try(
+            () => JsonSerializer.Deserialize<ImportData>(content)!,
+            ex => ex is JsonException
+                ? Error.ValidationError("Invalid JSON format in file")
+                : Error.FromException(ex));
+    }
+
+    private Result<ImportData> ValidateImportData(ImportData data)
+    {
+        if (data.Records == null || data.Records.Count == 0)
+            return Error.ValidationError("No records found in import file");
+
+        if (data.Records.Count > 10000)
+            return Error.ValidationError("Too many records (max 10,000)");
+
+        return data;
+    }
+
+    public Result DeleteTemporaryFile(string path)
+    {
+        // Try for void operations
+        return Result.Try(
+            () => File.Delete(path),
+            ex => ex is UnauthorizedAccessException
+                ? Error.PermissionError("Cannot delete file - access denied")
+                : Error.FromException(ex));
+    }
+
+    public Result<int> ParseConfiguration(string configValue)
+    {
+        // Try for parsing operations
+        return Result<int>.Try(
+            () => int.Parse(configValue),
+            ex => ex is FormatException
+                ? Error.ValidationError("Invalid number format in configuration")
+                : ex is OverflowException
+                ? Error.ValidationError("Number too large")
+                : Error.FromException(ex));
+    }
+}
+```
+
 ---
 
 ## Payment Processing
