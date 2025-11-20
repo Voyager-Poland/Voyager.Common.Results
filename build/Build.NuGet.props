@@ -1,17 +1,10 @@
 <Project>
-	<!-- Universal NuGet Package Configuration for Voyager Poland -->
-	<!-- These settings apply to all NuGet packages published by Voyager -->
 
 	<PropertyGroup>
-		<!-- Package Generation -->
 		<GeneratePackageOnBuild>false</GeneratePackageOnBuild>
 		<Product>Voyager Common Libraries</Product>
-
 		<RepositoryType>git</RepositoryType>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
-
-		<!-- XML Documentation is handled by Build.CodeQuality.props -->
-		<!-- Custom DocumentationFile path removed - use default naming -->
 	</PropertyGroup>
 
 </Project>
