@@ -10,6 +10,9 @@
 		<RepositoryType>git</RepositoryType>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 
+		<!-- README file to be embedded and referenced by NuGet clients -->
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+
 		<!-- XML Documentation is handled by Build.CodeQuality.props -->
 		<!-- Custom DocumentationFile path removed - use default naming -->
 	</PropertyGroup>
