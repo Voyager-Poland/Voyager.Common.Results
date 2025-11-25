@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2025-01-16
+
 ### Added
 - **`Result.Tap` method**: Executes side effect on success without modifying result
   ```csharp
@@ -223,7 +225,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - .NET Framework 4.8
 - .NET 8.0
 
-[Unreleased]: https://github.com/Voyager-Poland/Voyager.Common.Results/compare/v1.2.7...HEAD
+[Unreleased]: https://github.com/Voyager-Poland/Voyager.Common.Results/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/Voyager-Poland/Voyager.Common.Results/releases/tag/v1.3.0
 [1.2.0]: https://github.com/Voyager-Poland/Voyager.Common.Results/releases/tag/v1.2.0
 [1.1.0]: https://github.com/Voyager-Poland/Voyager.Common.Results/releases/tag/v1.1.0
 [1.0.0]: https://github.com/Voyager-Poland/Voyager.Common.Results/releases/tag/v1.0.0
