@@ -7,18 +7,34 @@
 - Dostęp do GitHub Packages (dla publikacji)
 - Opcjonalnie: Konto NuGet.org (dla publikacji publicznej)
 
+## ✨ Deterministic Builds
+
+Projekt używa **deterministic compilation** aby zapewnić, że identyczny kod źródłowy zawsze produkuje identyczne binaria. To eliminuje ostrzeżenia o niezdeterministycznych bibliotekach DLL w pakietach NuGet.
+
+**Konfiguracja:** Automatycznie włączone w `build/Build.CodeQuality.props`
+
+```xml
+<Deterministic>true</Deterministic>
+<ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+```
+
+**Więcej informacji:** Zobacz [docs/DETERMINISTIC-BUILDS.md](docs/DETERMINISTIC-BUILDS.md)
+
 ## 🤖 Automatyczna Publikacja (Zalecana)
 
-Projekt używa **GitHub Actions** do automatycznego budowania i publikacji. Każdy push do gałęzi `main` lub `master`:
+Projekt używa **GitHub Actions** z **MinVer** do automatycznego wersjonowania. MinVer oblicza wersję na podstawie Git tagów.
 
-1. ✅ **Automatycznie zwiększa wersję build** (np. 1.0.0 → 1.0.1)
-2. ✅ **Buduje projekt** dla .NET 8.0 i .NET Framework 4.8
-3. ✅ **Uruchamia testy** z pokryciem kodu
-4. ✅ **Tworzy pakiet NuGet**
-5. ✅ **Publikuje na GitHub Packages**
-6. ✅ **Publikuje na NuGet.org** (jeśli skonfigurowane)
+### Jak działa MinVer?
+
+MinVer automatycznie:
+- 📌 **Odczytuje Git tagi** w formacie `v1.2.3`
+- 🔢 **Oblicza wersję** na podstawie najnowszego taga
+- 🏷️ **Dodaje sufiks `-preview.X`** dla commitów między tagami
+- 🎯 **Używa `MinVerMinimumMajorMinor`** (0.1) jeśli brak tagów
 
 ### Jak opublikować nową wersję?
+
+**Opcja 1: Wersja preview (automatyczna)**
 
 Po prostu push do `main`:
 
@@ -28,52 +44,41 @@ git commit -m "Add Result.Combine method"
 git push origin main
 ```
 
-GitHub Actions zrobi resztę! 🚀
+MinVer utworzy wersję preview, np. `0.1.0-preview.5+abc1234`
 
-### Ręczne zwiększanie Major/Minor
+**Opcja 2: Wersja release (z tagiem)**
 
-Jeśli chcesz zmienić wersję Major lub Minor (nie tylko build):
-
-1. **Edytuj `src/Voyager.Common.Results/Voyager.Common.Results.csproj`:**
-
-```xml
-<!-- Zmiana Minor version -->
-<Version>1.1.0</Version>
-
-<!-- Lub Major version (breaking changes) -->
-<Version>2.0.0</Version>
-```
-
-2. **Zaktualizuj `PackageReleaseNotes`:**
-
-```xml
-<PackageReleaseNotes>
-  v1.1.0: Added async support for Result operations
-</PackageReleaseNotes>
-```
-
-3. **Zaktualizuj `CHANGELOG.md`:**
-
-```markdown
-## [1.1.0] - 2025-01-15
-
-### Added
-- Async extension methods for Result<T>
-- MapAsync, BindAsync, TapAsync operations
-
-### Changed
-- Improved error messages
-```
-
-4. **Commit i push:**
+1. **Utwórz i push tag:**
 
 ```bash
-git add .
-git commit -m "Release v1.1.0: Add async support"
-git push origin main
+git tag v1.2.3
+git push origin v1.2.3
 ```
 
-**Uwaga**: Build number będzie nadal automatycznie zwiększony przez workflow (np. 1.1.0 → 1.1.1).
+2. **GitHub Actions automatycznie:**
+   - ✅ Buduje projekt dla .NET 8.0 i .NET Framework 4.8
+   - ✅ Uruchamia testy z pokryciem kodu
+   - ✅ Tworzy pakiet NuGet z wersją `1.2.3`
+   - ✅ Publikuje na GitHub Packages
+   - ✅ Publikuje na NuGet.org
+   - ✅ Tworzy GitHub Release z pakietem
+
+### Konwencje tagowania
+
+```bash
+# Patch version (bug fixes)
+git tag v1.0.1
+
+# Minor version (new features, backward compatible)
+git tag v1.1.0
+
+# Major version (breaking changes)
+git tag v2.0.0
+
+# Preview/beta releases
+git tag v1.2.0-preview.1
+git tag v1.2.0-beta.2
+```
 
 ## 🔨 Budowanie Pakietu Lokalnie
 
@@ -243,37 +248,85 @@ dotnet add package Voyager.Common.Results
 dotnet run
 ```
 
-## 🔄 Wersjonowanie (Semantic Versioning)
+## 🔄 Wersjonowanie (Semantic Versioning + MinVer)
 
-Projekt używa [Semantic Versioning](https://semver.org/):
+Projekt używa [MinVer](https://github.com/adamralph/minver) do automatycznego wersjonowania na podstawie Git tagów zgodnie z [Semantic Versioning](https://semver.org/):
 
-- **MAJOR.MINOR.BUILD** (np. `1.2.3`)
+### ⚠️ WAŻNE: MinVer wymaga tagów Git!
+
+**Jeśli nie masz tagów Git, wersja będzie `0.0.0.0` zamiast oczekiwanej!**
+
+📖 **Szybki start:** [docs/QUICK-START-VERSIONING.md](docs/QUICK-START-VERSIONING.md) - Jak utworzyć pierwszy tag w 3 krokach  
+📖 **Szczegóły:** [requirements/VERSIONING-GUIDE.md](requirements/VERSIONING-GUIDE.md) - Przewodnik wersjonowania
+
+### Jak MinVer oblicza wersję?
+
+1. **Z tagiem:** `v1.2.3` → pakiet `1.2.3`
+2. **Bez tagu (commits po tagu):** `v1.2.3` + 5 commitów → `1.2.4-preview.5+sha`
+3. **Brak tagów:** używa `MinVerMinimumMajorMinor` (0.1) → `0.1.0-preview.X`
+
+### Semantic Versioning
+
+- **MAJOR.MINOR.PATCH** (np. `1.2.3`)
 - **MAJOR** (1.x.x) - Breaking changes (niezgodne wstecz)
 - **MINOR** (x.1.x) - Nowe funkcjonalności (backward compatible)
-- **BUILD** (x.x.1) - Bug fixes i małe zmiany (automatycznie zwiększane)
+- **PATCH** (x.x.1) - Bug fixes
 
-### Przykłady zmian wersji
+### Przykłady wersjonowania
 
-| Zmiana | Poprzednia | Nowa | Typ |
-|--------|-----------|------|-----|
-| Fix błędu | 1.0.0 | 1.0.1 | AUTO (GitHub Actions) |
-| Nowa metoda (compatible) | 1.0.5 | 1.1.0 | MANUAL (edytuj .csproj) |
-| Zmiana API (breaking) | 1.5.3 | 2.0.0 | MANUAL (edytuj .csproj) |
+| Sytuacja | Git Tag | Wersja Pakietu | Typ |
+|----------|---------|----------------|-----|
+| Release | `v1.0.0` | `1.0.0` | Release |
+| Patch fix | `v1.0.1` | `1.0.1` | Release |
+| New feature | `v1.1.0` | `1.1.0` | Release |
+| Breaking change | `v2.0.0` | `2.0.0` | Release |
+| Preview | `v1.2.0-preview.1` | `1.2.0-preview.1` | Preview |
+| Bez tagu (5 commits) | - | `0.1.0-preview.5+abc1234` | Auto Preview |
+| Po tagu (3 commits) | `v1.0.0` | `1.0.1-preview.3+def5678` | Auto Preview |
 
-## 📋 Checklist przed ręczną publikacją
+### Konfiguracja MinVer
 
-Jeśli publikujesz ręcznie (bez GitHub Actions):
+W `build/Build.Versioning.props`:
 
-- [ ] Zwiększ wersję w `.csproj`
-- [ ] Zaktualizuj `PackageReleaseNotes`
-- [ ] Zaktualizuj `CHANGELOG.md`
+```xml
+<MinVerTagPrefix>v</MinVerTagPrefix>              <!-- Tagi: v1.0.0 -->
+<MinVerMinimumMajorMinor>0.1</MinVerMinimumMajorMinor>  <!-- Default bez tagów -->
+<MinVerDefaultPreReleaseIdentifiers>preview</MinVerDefaultPreReleaseIdentifiers>
+```
+
+### Workflow tagowania
+
+```bash
+# 1. Zaktualizuj CHANGELOG.md
+# 2. Commit zmian
+git add .
+git commit -m "Prepare release v1.2.0"
+
+# 3. Utwórz tag
+git tag v1.2.0
+
+# 4. Push (tag triggers release workflow)
+git push origin main
+git push origin v1.2.0
+
+# 5. GitHub Actions automatycznie:
+#    - Buduje z wersją 1.2.0
+#    - Publikuje pakiet
+#    - Tworzy GitHub Release
+```
+
+## 📋 Checklist przed publikacją release
+
+Jeśli publikujesz wersję release (z tagiem):
+
+- [ ] Zaktualizuj `CHANGELOG.md` z listą zmian
+- [ ] Zaktualizuj `PackageReleaseNotes` w `.csproj` (opcjonalnie)
 - [ ] Uruchom: `dotnet test` (wszystkie testy przechodzą)
 - [ ] Uruchom: `dotnet build -c Release` (bez błędów)
-- [ ] Uruchom: `dotnet pack -c Release` (pakiet utworzony)
-- [ ] Przetestuj pakiet lokalnie (oba frameworki)
-- [ ] Commituj zmiany: `git commit -am "Release v1.x.x"`
-- [ ] Publikuj pakiet
-- [ ] Push do Git: `git push origin main`
+- [ ] Commituj zmiany: `git commit -am "Prepare release v1.x.x"`
+- [ ] Utwórz tag: `git tag v1.x.x`
+- [ ] Push: `git push origin main && git push origin v1.x.x`
+- [ ] GitHub Actions automatycznie zbuduje i opublikuje pakiet
 
 ## 🔍 Sprawdzenie pokrycia kodu
 
@@ -313,8 +366,9 @@ git push origin main
 GitHub Packages i NuGet.org nie pozwalają nadpisać wersji.
 
 **Rozwiązanie:** 
-- Workflow automatycznie zwiększa build number, więc to nie powinno się zdarzyć
-- Jeśli publikujesz ręcznie, zwiększ wersję ręcznie
+- Utwórz nowy tag z wyższą wersją: `git tag v1.0.1`
+- MinVer automatycznie użyje nowej wersji
+- Usuń błędny tag jeśli trzeba: `git tag -d v1.0.0 && git push origin :refs/tags/v1.0.0`
 
 ### Błąd: "401 Unauthorized" przy publikacji
 
@@ -359,9 +413,19 @@ https://dotnet.microsoft.com/download/dotnet-framework/net48
 
 ```yaml
 jobs:
-  newversion:    # Automatycznie zwiększa wersję build
-  build:         # Buduje, testuje, pakuje (wymaga newversion)
-  deploy:        # Publikuje pakiety (wymaga build)
+  build:         # Buduje, testuje, pakuje (MinVer oblicza wersję z Git)
+  deploy:        # Publikuje pakiety (wymaga build, tylko na push do main/master)
+  release:       # Tworzy GitHub Release (wymaga build, tylko dla tagów v*)
+```
+
+### MinVer w GitHub Actions
+
+Workflow **musi** mieć `fetch-depth: 0` aby MinVer miał dostęp do pełnej historii Git:
+
+```yaml
+- uses: actions/checkout@v4
+  with:
+    fetch-depth: 0  # CRITICAL: MinVer needs full Git history
 ```
 
 ### Używane Secrets

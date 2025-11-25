@@ -98,6 +98,35 @@ GetUser(id)
     );
 ```
 
+### Bind - Chaining Operations
+
+The `Bind` method is available on both `Result` and `Result<T>` for seamless operation chaining:
+
+```csharp
+// Chain void operations (Result → Result)
+var result = ValidateInput()
+    .Bind(() => AuthorizeUser())
+    .Bind(() => SaveToDatabase())
+    .Bind(() => SendNotification());
+
+// Transform void operation to value operation (Result → Result<T>)
+var userResult = ValidateRequest()
+    .Bind(() => GetUser(userId))
+    .Map(user => user.Email);
+
+// Mix void and value operations
+var orderResult = AuthenticateUser()      // Result
+    .Bind(() => GetShoppingCart(userId))  // Result → Result<Cart>
+    .Bind(cart => ProcessOrder(cart))     // Result<Cart> → Result<Order>
+    .Map(order => order.Id);              // Result<Order> → Result<int>
+```
+
+**When to use Bind:**
+- ✅ Chain operations that return `Result<T>`
+- ✅ Transform `Result` (void) to `Result<T>` (value)
+- ✅ Maintain railway oriented flow
+- ❌ Don't use for simple value transformations (use `Map` instead)
+
 ### OrElse - Fallback Pattern
 
 ```csharp
@@ -162,6 +191,8 @@ See [BUILD.md](./BUILD.md) for comprehensive instructions on:
 - 🔨 Manual building and local testing
 - 📦 Publishing to GitHub Packages and NuGet.org
 - 🧪 Running tests with code coverage
+
+**New to versioning?** See [Quick Start - Versioning](./docs/QUICK-START-VERSIONING.md) for a 3-step guide to create your first release.
 
 ### Quick Build
 

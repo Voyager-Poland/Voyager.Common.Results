@@ -1,0 +1,26 @@
+<Project>
+	<!-- Universal NuGet Package Configuration for Voyager Poland -->
+	<!-- These settings apply to all NuGet packages published by Voyager -->
+
+	<PropertyGroup>
+		<!-- Package Generation -->
+		<GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+		<Product>Voyager Common Libraries</Product>
+
+		<RepositoryType>git</RepositoryType>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+
+		<!-- README file to be embedded and referenced by NuGet clients -->
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+
+		<!-- XML Documentation is handled by Build.CodeQuality.props -->
+		<!-- Custom DocumentationFile path removed - use default naming -->
+	</PropertyGroup>
+
+	<!-- Include README in all packages -->
+	<ItemGroup>
+		<None Include="$(MSBuildThisFileDirectory)..\README.md" Pack="true" PackagePath="\"
+			Condition="Exists('$(MSBuildThisFileDirectory)..\README.md')" />
+	</ItemGroup>
+
+</Project>
