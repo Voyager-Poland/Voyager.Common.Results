@@ -21,13 +21,16 @@
 		Permission,
 
 		/// <summary>
-		/// Database error
+		/// User not authenticated (not logged in)
 		/// </summary>
-		Database,
+		Unauthorized,
 
 		/// <summary>
-		/// Business logic error
+		/// Database error
 		/// </summary>
+		Database,       /// <summary>
+						/// Business logic error
+						/// </summary>
 		Business,
 
 		/// <summary>

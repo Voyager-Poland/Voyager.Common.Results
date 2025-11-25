@@ -5,7 +5,7 @@
 		<Authors>Andrzej Świstowski</Authors>
 		<IsPackable>true</IsPackable>
 		<Description>A lightweight, functional Result type for .NET implementing Railway Oriented
-			Programming pattern. Supports both .NET Framework 4.8 and .NET 8. Provides error handling
+			Programming pattern. Supports both .NET Framework 4.8 and .NET 8. Provides error ang
 			without exceptions, method chaining, async operations, and collection utilities.</Description>
 		<PackageTags>
 			result-pattern;railway-oriented-programming;functional;error-handling;either;option;monad;csharp;dotnet;net48;net8</PackageTags>
@@ -14,6 +14,7 @@
 		<PackageReleaseNotes>
 			See CHANGELOG.md for release history
 		</PackageReleaseNotes>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(TargetFramework)' == 'net8.0'">
@@ -25,5 +26,10 @@
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
+	</ItemGroup>
+
+	<!-- Include README in package -->
+	<ItemGroup>
+		<None Include="$(MSBuildThisFileDirectory)..\..\README.md" Pack="true" PackagePath="\" />
 	</ItemGroup>
 </Project>
