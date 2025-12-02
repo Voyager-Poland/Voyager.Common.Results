@@ -10,6 +10,113 @@ namespace Voyager.Common.Results.Extensions
 	/// </summary>
 	public static class TaskResultExtensions
 	{
+		// ========== TRY ASYNC ==========
+
+		/// <summary>
+		/// Executes an asynchronous action and wraps any exceptions in a Result
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// var result = await Result.TryAsync(async () => await File.WriteAllTextAsync("log.txt", message));
+		/// </code>
+		/// </example>
+		/// <param name="action">Asynchronous action to execute.</param>
+		/// <returns>Success if action completes without exception, otherwise Failure with error from exception.</returns>
+		public static async Task<Result> TryAsync(Func<Task> action)
+		{
+			try
+			{
+				await action().ConfigureAwait(false);
+				return Result.Success();
+			}
+			catch (Exception ex)
+			{
+				return Result.Failure(Error.FromException(ex));
+			}
+		}
+
+		/// <summary>
+		/// Executes an asynchronous action and wraps any exceptions in a Result with custom error mapping
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// var result = await Result.TryAsync(
+		///     async () => await File.WriteAllTextAsync("log.txt", message),
+		///     ex => ex is IOException 
+		///         ? Error.UnavailableError("File system unavailable")
+		///         : Error.UnexpectedError(ex.Message));
+		/// </code>
+		/// </example>
+		/// <param name="action">Asynchronous action to execute.</param>
+		/// <param name="errorMapper">Function to convert exception to custom error.</param>
+		/// <returns>Success if action completes without exception, otherwise Failure with mapped error.</returns>
+		public static async Task<Result> TryAsync(Func<Task> action, Func<Exception, Error> errorMapper)
+		{
+			try
+			{
+				await action().ConfigureAwait(false);
+				return Result.Success();
+			}
+			catch (Exception ex)
+			{
+				return Result.Failure(errorMapper(ex));
+			}
+		}
+
+		/// <summary>
+		/// Executes an asynchronous function and wraps any exceptions in a Result
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// var result = await Result.TryAsync(async () => await LoadDataAsync());
+		/// var config = await Result.TryAsync(async () => await JsonSerializer.DeserializeAsync&lt;Config&gt;(stream));
+		/// </code>
+		/// </example>
+		/// <param name="func">Asynchronous function to execute.</param>
+		/// <typeparam name="TValue">Type of value returned by the function.</typeparam>
+		/// <returns>Success with function result if completes without exception, otherwise Failure with error from exception.</returns>
+		public static async Task<Result<TValue>> TryAsync<TValue>(Func<Task<TValue>> func)
+		{
+			try
+			{
+				var value = await func().ConfigureAwait(false);
+				return Result<TValue>.Success(value);
+			}
+			catch (Exception ex)
+			{
+				return Result<TValue>.Failure(Error.FromException(ex));
+			}
+		}
+
+		/// <summary>
+		/// Executes an asynchronous function and wraps any exceptions in a Result with custom error mapping
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// var result = await Result.TryAsync(
+		///     async () => await JsonSerializer.DeserializeAsync&lt;Config&gt;(stream),
+		///     ex => ex is JsonException 
+		///         ? Error.ValidationError("Invalid JSON")
+		///         : Error.UnexpectedError(ex.Message));
+		/// </code>
+		/// </example>
+		/// <param name="func">Asynchronous function to execute.</param>
+		/// <param name="errorMapper">Function to convert exception to custom error.</param>
+		/// <typeparam name="TValue">Type of value returned by the function.</typeparam>
+		/// <returns>Success with function result if completes without exception, otherwise Failure with mapped error.</returns>
+		public static async Task<Result<TValue>> TryAsync<TValue>(Func<Task<TValue>> func, Func<Exception, Error> errorMapper)
+		{
+			try
+			{
+				var value = await func().ConfigureAwait(false);
+				return Result<TValue>.Success(value);
+			}
+			catch (Exception ex)
+			{
+				return Result<TValue>.Failure(errorMapper(ex));
+			}
+		}
+
 		// ========== MAP ASYNC ==========
 
 		/// <summary>

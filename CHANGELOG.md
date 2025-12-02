@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`TryAsync` methods**: Safe async exception-to-Result conversion with optional custom error mapping
+  - `TryAsync(Func<Task> action)` - Wraps async action exceptions with `Error.FromException`
+  - `TryAsync(Func<Task> action, Func<Exception, Error> errorMapper)` - Custom exception mapping for async actions
+  - `TryAsync<TValue>(Func<Task<TValue>> func)` - Wraps async function exceptions with `Error.FromException`
+  - `TryAsync<TValue>(Func<Task<TValue>> func, Func<Exception, Error> errorMapper)` - Custom exception mapping for async functions
+  ```csharp
+  // Basic: wraps exception with Error.FromException
+  var result = await TaskResultExtensions.TryAsync(async () => 
+      await File.WriteAllTextAsync(path, content));
+  
+  // Custom: maps exceptions to specific error types
+  var result = await TaskResultExtensions.TryAsync(
+      async () => await File.WriteAllTextAsync(path, content),
+      ex => ex is IOException 
+          ? Error.UnavailableError("File system unavailable")
+          : Error.UnexpectedError(ex.Message));
+  
+  // Async functions returning values
+  var config = await TaskResultExtensions.TryAsync(async () => 
+      await JsonSerializer.DeserializeAsync<Config>(stream));
+  
+  // Custom error mapping for async functions
+  var config = await TaskResultExtensions.TryAsync(
+      async () => await JsonSerializer.DeserializeAsync<Config>(stream),
+      ex => ex is JsonException 
+          ? Error.ValidationError("Invalid JSON")
+          : Error.UnexpectedError(ex.Message));
+  ```
+- 14 new unit tests for `TryAsync` methods covering:
+  - Async action execution success and exception wrapping
+  - Custom error mapping for various exception types (InvalidOperationException, IOException, FormatException)
+  - Async functions returning values with success and exception scenarios
+  - Complex object handling in async functions
+  - Chaining with `MapAsync` and `BindAsync`
+  - Error propagation through async chains
+  - Cancellation token support and handling
+
 ## [1.3.0] - 2025-01-16
 
 ### Added

@@ -177,6 +177,47 @@ var userData = Result<string>.Try(() => File.ReadAllText(path))
 - ✅ Converting legacy exception-based code to Result pattern
 - ✅ Custom exception-to-error mapping
 
+### TryAsync - Async Exception Handling
+
+Safely convert async exception-throwing code into Result pattern:
+
+```csharp
+// Basic: wraps exceptions with Error.FromException
+var result = await TaskResultExtensions.TryAsync(async () => 
+    await File.WriteAllTextAsync("log.txt", message));
+
+// Custom error mapping
+var result = await TaskResultExtensions.TryAsync(
+    async () => await File.WriteAllTextAsync("log.txt", message),
+    ex => ex is IOException 
+        ? Error.UnavailableError("File system unavailable")
+        : Error.UnexpectedError(ex.Message));
+
+// Async functions returning values
+var result = await TaskResultExtensions.TryAsync(async () => 
+    await JsonSerializer.DeserializeAsync<Config>(stream));
+
+// With custom error handling
+var result = await TaskResultExtensions.TryAsync(
+    async () => await JsonSerializer.DeserializeAsync<Config>(stream),
+    ex => ex is JsonException 
+        ? Error.ValidationError("Invalid JSON")
+        : Error.UnexpectedError(ex.Message));
+
+// Chain with other async operations
+var userData = await TaskResultExtensions.TryAsync(async () => 
+        await File.ReadAllTextAsync(path))
+    .BindAsync(json => ParseJsonAsync(json))
+    .MapAsync(data => data.UserId);
+```
+
+**When to use TryAsync:**
+- ✅ Async file I/O, database operations
+- ✅ HTTP/API calls
+- ✅ Async parsing and serialization
+- ✅ Converting async exception-based code to Result pattern
+- ✅ Custom exception-to-error mapping for async operations
+
 ### Map - Value Transformations
 
 Transform success values or convert void operations to value operations:

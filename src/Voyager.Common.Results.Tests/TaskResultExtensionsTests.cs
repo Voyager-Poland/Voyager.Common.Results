@@ -5,6 +5,290 @@ namespace Voyager.Common.Results.Tests;
 
 public class TaskResultExtensionsTests
 {
+	// ========== TRY ASYNC TESTS ==========
+
+	[Fact]
+	public async Task TryAsync_AsyncAction_ReturnsSuccessWhenNoException()
+	{
+		// Arrange
+		var actionExecuted = false;
+
+		// Act
+		var result = await TaskResultExtensions.TryAsync(async () =>
+		{
+			await Task.Delay(10);
+			actionExecuted = true;
+		});
+
+		// Assert
+		Assert.True(result.IsSuccess);
+		Assert.True(actionExecuted);
+	}
+
+	[Fact]
+	public async Task TryAsync_AsyncAction_ReturnsFailureOnException()
+	{
+		// Arrange
+		var exceptionMessage = "Test exception";
+
+		// Act
+		var result = await TaskResultExtensions.TryAsync(async () =>
+		{
+			await Task.Delay(10);
+			throw new InvalidOperationException(exceptionMessage);
+		});
+
+		// Assert
+		Assert.True(result.IsFailure);
+		Assert.Equal(ErrorType.Unexpected, result.Error.Type);
+		Assert.Contains(exceptionMessage, result.Error.Message);
+	}
+
+	[Fact]
+	public async Task TryAsync_AsyncActionWithErrorMapper_UsesCustomErrorMapping()
+	{
+		// Arrange
+		var exceptionMessage = "Test exception";
+		var customError = Error.ValidationError("Custom validation error");
+
+		// Act
+		var result = await TaskResultExtensions.TryAsync(
+			async () =>
+			{
+				await Task.Delay(10);
+				throw new InvalidOperationException(exceptionMessage);
+			},
+			ex => ex is InvalidOperationException
+				? customError
+				: Error.UnexpectedError(ex.Message)
+		);
+
+		// Assert
+		Assert.True(result.IsFailure);
+		Assert.Equal(customError, result.Error);
+		Assert.Equal(ErrorType.Validation, result.Error.Type);
+	}
+
+	[Fact]
+	public async Task TryAsync_AsyncActionWithErrorMapper_MapsIOExceptionCorrectly()
+	{
+		// Arrange
+		var ioError = Error.UnavailableError("File system unavailable");
+
+		// Act
+		var result = await TaskResultExtensions.TryAsync(
+			async () =>
+			{
+				await Task.Delay(10);
+				throw new IOException("Cannot access file");
+			},
+			ex => ex is IOException
+				? ioError
+				: Error.UnexpectedError(ex.Message)
+		);
+
+		// Assert
+		Assert.True(result.IsFailure);
+		Assert.Equal(ioError, result.Error);
+		Assert.Equal(ErrorType.Unavailable, result.Error.Type);
+	}
+
+	[Fact]
+	public async Task TryAsync_AsyncFunc_ReturnsSuccessWithValue()
+	{
+		// Arrange
+		var expectedValue = 42;
+
+		// Act
+		var result = await TaskResultExtensions.TryAsync(async () =>
+		{
+			await Task.Delay(10);
+			return expectedValue;
+		});
+
+		// Assert
+		Assert.True(result.IsSuccess);
+		Assert.Equal(expectedValue, result.Value);
+	}
+
+	[Fact]
+	public async Task TryAsync_AsyncFunc_ReturnsFailureOnException()
+	{
+		// Arrange
+		var exceptionMessage = "Test exception";
+
+		// Act
+		var result = await TaskResultExtensions.TryAsync<int>(async () =>
+		{
+			await Task.Delay(10);
+			throw new InvalidOperationException(exceptionMessage);
+		});
+
+		// Assert
+		Assert.True(result.IsFailure);
+		Assert.Equal(ErrorType.Unexpected, result.Error.Type);
+		Assert.Contains(exceptionMessage, result.Error.Message);
+	}
+
+	[Fact]
+	public async Task TryAsync_AsyncFuncWithErrorMapper_ReturnsSuccessWithValue()
+	{
+		// Arrange
+		var expectedValue = "test result";
+
+		// Act
+		var result = await TaskResultExtensions.TryAsync(
+			async () =>
+			{
+				await Task.Delay(10);
+				return expectedValue;
+			},
+			ex => Error.UnexpectedError(ex.Message)
+		);
+
+		// Assert
+		Assert.True(result.IsSuccess);
+		Assert.Equal(expectedValue, result.Value);
+	}
+
+	[Fact]
+	public async Task TryAsync_AsyncFuncWithErrorMapper_UsesCustomErrorMapping()
+	{
+		// Arrange
+		var customError = Error.ValidationError("Invalid format");
+
+		// Act
+		var result = await TaskResultExtensions.TryAsync(
+			async () =>
+			{
+				await Task.Delay(10);
+				throw new FormatException("Invalid format");
+			},
+			ex => ex is FormatException
+				? customError
+				: Error.UnexpectedError(ex.Message)
+		);
+
+		// Assert
+		Assert.True(result.IsFailure);
+		Assert.Equal(customError, result.Error);
+		Assert.Equal(ErrorType.Validation, result.Error.Type);
+	}
+
+	[Fact]
+	public async Task TryAsync_AsyncFuncWithComplexObject_HandlesCorrectly()
+	{
+		// Arrange
+		var expectedData = new { Id = 1, Name = "Test" };
+
+		// Act
+		var result = await TaskResultExtensions.TryAsync(async () =>
+		{
+			await Task.Delay(10);
+			return expectedData;
+		});
+
+		// Assert
+		Assert.True(result.IsSuccess);
+		Assert.Equal(expectedData.Id, result.Value!.Id);
+		Assert.Equal(expectedData.Name, result.Value!.Name);
+	}
+
+	[Fact]
+	public async Task TryAsync_ChainedWithMapAsync_WorksCorrectly()
+	{
+		// Act
+		var result = await TaskResultExtensions.TryAsync(async () =>
+		{
+			await Task.Delay(10);
+			return 42;
+		})
+		.MapAsync(x => x * 2);
+
+		// Assert
+		Assert.True(result.IsSuccess);
+		Assert.Equal(84, result.Value);
+	}
+
+	[Fact]
+	public async Task TryAsync_ChainedWithBindAsync_WorksCorrectly()
+	{
+		// Act
+		var result = await TaskResultExtensions.TryAsync(async () =>
+		{
+			await Task.Delay(10);
+			return 10;
+		})
+		.BindAsync(async x =>
+		{
+			await Task.Delay(10);
+			return x > 5
+				? Result<string>.Success($"Value: {x}")
+				: Result<string>.Failure(Error.ValidationError("Too small"));
+		});
+
+		// Assert
+		Assert.True(result.IsSuccess);
+		Assert.Equal("Value: 10", result.Value);
+	}
+
+	[Fact]
+	public async Task TryAsync_PropagatesErrorThroughChain()
+	{
+		// Arrange
+		var exceptionMessage = "Initial error";
+
+		// Act
+		var result = await TaskResultExtensions.TryAsync<int>(async () =>
+		{
+			await Task.Delay(10);
+			throw new InvalidOperationException(exceptionMessage);
+		})
+		.MapAsync(x => x * 2)
+		.BindAsync(x => Result<string>.Success(x.ToString()));
+
+		// Assert
+		Assert.True(result.IsFailure);
+		Assert.Contains(exceptionMessage, result.Error.Message);
+	}
+
+	[Fact]
+	public async Task TryAsync_AsyncActionWithCancellation_StillWorksCorrectly()
+	{
+		// Arrange
+		var actionExecuted = false;
+		using var cts = new CancellationTokenSource();
+
+		// Act
+		var result = await TaskResultExtensions.TryAsync(async () =>
+		{
+			await Task.Delay(10, cts.Token);
+			actionExecuted = true;
+		});
+
+		// Assert
+		Assert.True(result.IsSuccess);
+		Assert.True(actionExecuted);
+	}
+
+	[Fact]
+	public async Task TryAsync_AsyncActionWithCancelledException_ReturnsFailure()
+	{
+		// Arrange
+		using var cts = new CancellationTokenSource();
+		cts.Cancel();
+
+		// Act
+		var result = await TaskResultExtensions.TryAsync(async () =>
+		{
+			await Task.Delay(100, cts.Token);
+		});
+
+		// Assert
+		Assert.True(result.IsFailure);
+		Assert.Equal(ErrorType.Unexpected, result.Error.Type);
+	}
+
 	// ========== MAP ASYNC TESTS ==========
 
 	[Fact]
