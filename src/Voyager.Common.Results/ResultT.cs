@@ -1,5 +1,7 @@
 ﻿#if NET48
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 #endif
 
 namespace Voyager.Common.Results
@@ -88,6 +90,66 @@ namespace Voyager.Common.Results
 				return Failure(errorMapper(ex));
 			}
 		}
+
+		// ========== TRY ASYNC (PROXY METHODS) ==========
+
+		/// <summary>
+		/// Executes an asynchronous function and wraps any exceptions in a Result
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// var result = await Result&lt;Config&gt;.TryAsync(async () => 
+		///     await JsonSerializer.DeserializeAsync&lt;Config&gt;(stream));
+		/// </code>
+		/// </example>
+		/// <param name="func">Asynchronous function to execute.</param>
+		/// <returns>Success with function result if completes without exception, otherwise Failure with error from exception.</returns>
+		public static Task<Result<TValue>> TryAsync(Func<Task<TValue>> func) =>
+			Extensions.TaskResultExtensions.TryAsync(func);
+
+		/// <summary>
+		/// Executes an asynchronous function and wraps any exceptions in a Result with custom error mapping
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// var result = await Result&lt;Config&gt;.TryAsync(
+		///     async () => await JsonSerializer.DeserializeAsync&lt;Config&gt;(stream),
+		///     ex => ex is JsonException 
+		///         ? Error.ValidationError("Invalid JSON")
+		///         : Error.UnexpectedError(ex.Message));
+		/// </code>
+		/// </example>
+		/// <param name="func">Asynchronous function to execute.</param>
+		/// <param name="errorMapper">Function to convert exception to custom error.</param>
+		/// <returns>Success with function result if completes without exception, otherwise Failure with mapped error.</returns>
+		public static Task<Result<TValue>> TryAsync(Func<Task<TValue>> func, Func<Exception, Error> errorMapper) =>
+			Extensions.TaskResultExtensions.TryAsync(func, errorMapper);
+
+		/// <summary>
+		/// Executes an asynchronous function with cancellation support
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// var result = await Result&lt;string&gt;.TryAsync(
+		///     async ct => await httpClient.GetStringAsync(url, ct),
+		///     cancellationToken);
+		/// </code>
+		/// </example>
+		/// <param name="func">Asynchronous function that accepts a CancellationToken.</param>
+		/// <param name="cancellationToken">Token to cancel the operation.</param>
+		/// <returns>Success with value if completes, Failure with CancelledError if cancelled, or error from exception.</returns>
+		public static Task<Result<TValue>> TryAsync(Func<CancellationToken, Task<TValue>> func, CancellationToken cancellationToken) =>
+			Extensions.TaskResultExtensions.TryAsync(func, cancellationToken);
+
+		/// <summary>
+		/// Executes an asynchronous function with cancellation support and custom error mapping
+		/// </summary>
+		/// <param name="func">Asynchronous function that accepts a CancellationToken.</param>
+		/// <param name="cancellationToken">Token to cancel the operation.</param>
+		/// <param name="errorMapper">Function to convert exception to custom error.</param>
+		/// <returns>Success with value if completes, Failure with CancelledError if cancelled, or mapped error from exception.</returns>
+		public static Task<Result<TValue>> TryAsync(Func<CancellationToken, Task<TValue>> func, CancellationToken cancellationToken, Func<Exception, Error> errorMapper) =>
+			Extensions.TaskResultExtensions.TryAsync(func, cancellationToken, errorMapper);
 
 		// ========== PATTERN MATCHING ==========
 

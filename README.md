@@ -94,6 +94,7 @@ Error.DatabaseError("Connection failed")
 Error.BusinessError("Cannot cancel paid order")
 Error.UnavailableError("Service temporarily unavailable")
 Error.TimeoutError("Request timed out")
+Error.CancelledError("Operation was cancelled")
 Error.UnexpectedError("Something went wrong")
 Error.FromException(exception)
 ```
@@ -182,30 +183,32 @@ var userData = Result<string>.Try(() => File.ReadAllText(path))
 Safely convert async exception-throwing code into Result pattern:
 
 ```csharp
-// Basic: wraps exceptions with Error.FromException
-var result = await TaskResultExtensions.TryAsync(async () => 
-    await File.WriteAllTextAsync("log.txt", message));
-
-// Custom error mapping
-var result = await TaskResultExtensions.TryAsync(
-    async () => await File.WriteAllTextAsync("log.txt", message),
-    ex => ex is IOException 
-        ? Error.UnavailableError("File system unavailable")
-        : Error.UnexpectedError(ex.Message));
-
-// Async functions returning values
-var result = await TaskResultExtensions.TryAsync(async () => 
+// Preferred: Use Result<T>.TryAsync proxy for cleaner syntax
+var result = await Result<Config>.TryAsync(async () => 
     await JsonSerializer.DeserializeAsync<Config>(stream));
 
-// With custom error handling
-var result = await TaskResultExtensions.TryAsync(
+// With CancellationToken support (returns ErrorType.Cancelled if cancelled)
+var result = await Result<string>.TryAsync(
+    async ct => await httpClient.GetStringAsync(url, ct),
+    cancellationToken);
+
+// Custom error mapping
+var result = await Result<Config>.TryAsync(
     async () => await JsonSerializer.DeserializeAsync<Config>(stream),
     ex => ex is JsonException 
         ? Error.ValidationError("Invalid JSON")
         : Error.UnexpectedError(ex.Message));
 
+// With CancellationToken and custom error mapping
+var result = await Result<string>.TryAsync(
+    async ct => await httpClient.GetStringAsync(url, ct),
+    cancellationToken,
+    ex => ex is HttpRequestException 
+        ? Error.UnavailableError("Service unavailable")
+        : Error.UnexpectedError(ex.Message));
+
 // Chain with other async operations
-var userData = await TaskResultExtensions.TryAsync(async () => 
+var userData = await Result<string>.TryAsync(async () => 
         await File.ReadAllTextAsync(path))
     .BindAsync(json => ParseJsonAsync(json))
     .MapAsync(data => data.UserId);
@@ -213,10 +216,10 @@ var userData = await TaskResultExtensions.TryAsync(async () =>
 
 **When to use TryAsync:**
 - ✅ Async file I/O, database operations
-- ✅ HTTP/API calls
+- ✅ HTTP/API calls with cancellation support
 - ✅ Async parsing and serialization
 - ✅ Converting async exception-based code to Result pattern
-- ✅ Custom exception-to-error mapping for async operations
+- ✅ Operations that need proper cancellation handling
 
 ### Map - Value Transformations
 

@@ -21,18 +21,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `TryAsync<TValue>(Func<Task<TValue>> func, Func<Exception, Error> errorMapper)` - Custom exception mapping for async functions
   - `TryAsync<TValue>(Func<CancellationToken, Task<TValue>> func, CancellationToken)` - Async function with cancellation support
   - `TryAsync<TValue>(Func<CancellationToken, Task<TValue>> func, CancellationToken, Func<Exception, Error>)` - Async function with cancellation and custom mapping
+- **`Result<T>.TryAsync` proxy methods**: Convenience static methods on `Result<T>` for cleaner syntax
   ```csharp
-  // Basic: wraps exception with Error.FromException
-  var result = await TaskResultExtensions.TryAsync(async () => 
-      await File.WriteAllTextAsync(path, content));
+  // Proxy syntax (cleaner):
+  var result = await Result<Config>.TryAsync(async () => 
+      await JsonSerializer.DeserializeAsync<Config>(stream));
   
-  // With CancellationToken: returns ErrorType.Cancelled on cancellation
-  var result = await TaskResultExtensions.TryAsync(
+  // With CancellationToken:
+  var result = await Result<string>.TryAsync(
       async ct => await httpClient.GetStringAsync(url, ct),
       cancellationToken);
   
-  // Custom error mapping for async functions
-  var config = await TaskResultExtensions.TryAsync(
+  // Custom error mapping:
+  var config = await Result<Config>.TryAsync(
       async () => await JsonSerializer.DeserializeAsync<Config>(stream),
       ex => ex is JsonException 
           ? Error.ValidationError("Invalid JSON")

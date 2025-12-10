@@ -382,22 +382,21 @@ Metoda `TryAsync` konwertuje asynchroniczny kod rzucający wyjątki na Result Pa
 ### Podstawowe użycie
 
 ```csharp
-using Voyager.Common.Results.Extensions;
-
-// TryAsync dla operacji async zwracających wartość
-var result = await TaskResultExtensions.TryAsync(async () => 
+// Preferowane: użyj Result<T>.TryAsync dla czystszej składni
+var result = await Result<Config>.TryAsync(async () => 
     await JsonSerializer.DeserializeAsync<Config>(stream));
 
-// TryAsync dla operacji async void
-var result = await TaskResultExtensions.TryAsync(async () => 
-    await File.WriteAllTextAsync(path, content));
+// Z CancellationToken (zwraca ErrorType.Cancelled przy anulowaniu)
+var result = await Result<string>.TryAsync(
+    async ct => await httpClient.GetStringAsync(url, ct),
+    cancellationToken);
 ```
 
 ### Niestandardowe mapowanie błędów
 
 ```csharp
 // Mapuj wyjątki async na konkretne typy błędów
-var config = await TaskResultExtensions.TryAsync(
+var config = await Result<Config>.TryAsync(
     async () => await JsonSerializer.DeserializeAsync<Config>(stream),
     ex => ex is JsonException
         ? Error.ValidationError("Nieprawidłowy format JSON")
@@ -405,13 +404,12 @@ var config = await TaskResultExtensions.TryAsync(
         ? Error.UnavailableError("Błąd odczytu pliku")
         : Error.FromException(ex));
 
-// TryAsync z operacjami HTTP
-var response = await TaskResultExtensions.TryAsync(
-    async () => await httpClient.GetStringAsync(url),
+// TryAsync z operacjami HTTP i CancellationToken
+var response = await Result<string>.TryAsync(
+    async ct => await httpClient.GetStringAsync(url, ct),
+    cancellationToken,
     ex => ex is HttpRequestException
         ? Error.UnavailableError("Serwis niedostępny")
-        : ex is TaskCanceledException
-        ? Error.TimeoutError("Przekroczono limit czasu")
         : Error.FromException(ex));
 ```
 
@@ -419,22 +417,24 @@ var response = await TaskResultExtensions.TryAsync(
 
 ```csharp
 // TryAsync + BindAsync + MapAsync
-var userData = await TaskResultExtensions.TryAsync(
-        async () => await File.ReadAllTextAsync(path))
+var userData = await Result<string>.TryAsync(
+        async ct => await File.ReadAllTextAsync(path, ct),
+        cancellationToken)
     .BindAsync(json => ParseJsonAsync(json))
     .BindAsync(data => ValidateDataAsync(data))
     .MapAsync(data => data.UserId);
 
-// TryAsync z obsługą wielu źródeł async
-var config = await TaskResultExtensions.TryAsync(
+// TryAsync z obsługą wielu źródeł async (fallback pattern)
+var config = await Result<Config>.TryAsync(
         async () => await LoadFromFileAsync(primaryPath))
-    .OrElseAsync(() => TaskResultExtensions.TryAsync(
+    .OrElseAsync(() => Result<Config>.TryAsync(
         async () => await LoadFromFileAsync(backupPath)))
     .OrElseAsync(() => GetDefaultConfigAsync());
 
 // TryAsync z operacjami bazy danych
-var user = await TaskResultExtensions.TryAsync(
-    async () => await dbContext.Users.FindAsync(userId),
+var user = await Result<User>.TryAsync(
+    async ct => await dbContext.Users.FindAsync(new object[] { userId }, ct),
+    cancellationToken,
     ex => ex is DbUpdateException
         ? Error.DatabaseError("Błąd zapisu do bazy danych")
         : ex is TimeoutException
@@ -453,38 +453,37 @@ var user = await TaskResultExtensions.TryAsync(
 ### Przykłady z praktyki
 
 ```csharp
-// API call z retry i timeout handling
-var apiData = await TaskResultExtensions.TryAsync(
-    async () => await httpClient.GetFromJsonAsync<Data>(url),
+// API call z CancellationToken i error handling
+var apiData = await Result<Data>.TryAsync(
+    async ct => await httpClient.GetFromJsonAsync<Data>(url, ct),
+    cancellationToken,
     ex => ex switch
     {
         HttpRequestException => Error.UnavailableError("API niedostępne"),
-        TaskCanceledException => Error.TimeoutError("Timeout żądania API"),
+        TaskCanceledException => Error.CancelledError("Żądanie anulowane"),
         JsonException => Error.ValidationError("Nieprawidłowa odpowiedź API"),
         _ => Error.FromException(ex)
     });
 
 // Database operations z transaction
-var saveResult = await TaskResultExtensions.TryAsync(
-    async () =>
+var saveResult = await Result.TryAsync(
+    async ct =>
     {
-        using var transaction = await dbContext.Database.BeginTransactionAsync();
-        await dbContext.Users.AddAsync(newUser);
-        await dbContext.SaveChangesAsync();
-        await transaction.CommitAsync();
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(ct);
+        await dbContext.Users.AddAsync(newUser, ct);
+        await dbContext.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
     },
+    cancellationToken,
     ex => ex switch
     {
         DbUpdateException => Error.ConflictError("Użytkownik już istnieje"),
-        TimeoutException => Error.TimeoutError("Zapis do bazy przekroczył limit czasu"),
+        OperationCanceledException => Error.CancelledError("Operacja anulowana"),
         _ => Error.DatabaseError("Błąd zapisu", ex)
     });
 
-// File upload with cancellation support
-var uploadResult = await TaskResultExtensions.TryAsync(
-    async () => await UploadFileAsync(file, cancellationToken),
-    ex => ex is OperationCanceledException
-        ? Error.BusinessError("Upload został anulowany")
-        : ex is IOException
-        ? Error.UnavailableError("Błąd podczas uploadu pliku")
-        : Error.FromException(ex));
+// File upload with cancellation support  
+var uploadResult = await Result<string>.TryAsync(
+    async ct => await UploadFileAsync(file, ct),
+    cancellationToken);
+// Automatycznie zwraca ErrorType.Cancelled przy anulowaniu

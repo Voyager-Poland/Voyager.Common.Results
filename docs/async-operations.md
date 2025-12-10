@@ -8,6 +8,72 @@ Voyager.Common.Results provides full async/await support through extension metho
 using Voyager.Common.Results.Extensions;
 ```
 
+## TryAsync - Safe Async Exception Handling
+
+Convert exception-throwing async code into Result pattern. Use `Result<T>.TryAsync` proxy for cleaner syntax.
+
+**Signatures:**
+```csharp
+// Basic - wraps exceptions with Error.FromException
+Result<T>.TryAsync(Func<Task<T>> func)
+
+// With custom error mapping
+Result<T>.TryAsync(Func<Task<T>> func, Func<Exception, Error> errorMapper)
+
+// With CancellationToken - returns ErrorType.Cancelled if cancelled
+Result<T>.TryAsync(Func<CancellationToken, Task<T>> func, CancellationToken ct)
+
+// With CancellationToken and custom error mapping
+Result<T>.TryAsync(Func<CancellationToken, Task<T>> func, CancellationToken ct, Func<Exception, Error> errorMapper)
+```
+
+**Examples:**
+
+```csharp
+// Basic usage
+var config = await Result<Config>.TryAsync(async () => 
+    await JsonSerializer.DeserializeAsync<Config>(stream));
+
+// With CancellationToken (recommended for HTTP calls)
+var response = await Result<string>.TryAsync(
+    async ct => await httpClient.GetStringAsync(url, ct),
+    cancellationToken);
+
+// If cancelled: result.Error.Type == ErrorType.Cancelled
+
+// Custom error mapping
+var config = await Result<Config>.TryAsync(
+    async () => await LoadConfigAsync(),
+    ex => ex is FileNotFoundException 
+        ? Error.NotFoundError("Config file not found")
+        : ex is JsonException
+        ? Error.ValidationError("Invalid config format")
+        : Error.FromException(ex));
+
+// Chain with other operations
+var userData = await Result<string>.TryAsync(
+        async ct => await File.ReadAllTextAsync(path, ct),
+        cancellationToken)
+    .BindAsync(json => ParseUserAsync(json))
+    .MapAsync(user => user.Email);
+```
+
+**Real-world example - HTTP with retry fallback:**
+```csharp
+public async Task<Result<WeatherData>> GetWeatherAsync(
+    string city, 
+    CancellationToken ct)
+{
+    return await Result<WeatherData>.TryAsync(
+            async token => await _primaryApi.GetWeatherAsync(city, token),
+            ct)
+        .OrElseAsync(() => Result<WeatherData>.TryAsync(
+            async token => await _fallbackApi.GetWeatherAsync(city, token),
+            ct))
+        .TapAsync(data => _cache.SetAsync($"weather:{city}", data, ct));
+}
+```
+
 ## Core Async Operators
 
 ### MapAsync - Transform Async Results
