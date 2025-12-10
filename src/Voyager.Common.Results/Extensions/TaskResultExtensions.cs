@@ -419,6 +419,61 @@ namespace Voyager.Common.Results.Extensions
 			return await result.EnsureAsync(predicate, error).ConfigureAwait(false);
 		}
 
+		/// <summary>
+		/// Ensure for Task&lt;Result&lt;TValue&gt;&gt; with contextual error factory
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// var result = await GetUserAsync(id)
+		///     .EnsureAsync(
+		///         user => user.Age >= 18,
+		///         user => Error.ValidationError($"User {user.Name} is {user.Age}, must be 18+"));
+		/// </code>
+		/// </example>
+		public static async Task<Result<TValue>> EnsureAsync<TValue>(
+			this Task<Result<TValue>> resultTask,
+			Func<TValue, bool> predicate,
+			Func<TValue, Error> errorFactory)
+		{
+			var result = await resultTask.ConfigureAwait(false);
+			return result.Ensure(predicate, errorFactory);
+		}
+
+		/// <summary>
+		/// Ensure for Result&lt;TValue&gt; with async predicate and contextual error factory
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// var result = await GetUser(id)
+		///     .EnsureAsync(
+		///         async user => await _repo.IsActiveAsync(user.Id),
+		///         user => Error.ValidationError($"User {user.Name} is inactive"));
+		/// </code>
+		/// </example>
+		public static async Task<Result<TValue>> EnsureAsync<TValue>(
+			this Result<TValue> result,
+			Func<TValue, Task<bool>> predicate,
+			Func<TValue, Error> errorFactory)
+		{
+			if (result.IsFailure)
+				return result;
+
+			var isValid = await predicate(result.Value!).ConfigureAwait(false);
+			return isValid ? result : Result<TValue>.Failure(errorFactory(result.Value!));
+		}
+
+		/// <summary>
+		/// Ensure for Task&lt;Result&lt;TValue&gt;&gt; with async predicate and contextual error factory
+		/// </summary>
+		public static async Task<Result<TValue>> EnsureAsync<TValue>(
+			this Task<Result<TValue>> resultTask,
+			Func<TValue, Task<bool>> predicate,
+			Func<TValue, Error> errorFactory)
+		{
+			var result = await resultTask.ConfigureAwait(false);
+			return await result.EnsureAsync(predicate, errorFactory).ConfigureAwait(false);
+		}
+
 		// ========== ORELSE ASYNC ==========
 
 		/// <summary>

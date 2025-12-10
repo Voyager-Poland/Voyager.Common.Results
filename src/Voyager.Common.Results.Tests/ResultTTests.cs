@@ -282,6 +282,261 @@ public class ResultTTests
 	}
 
 	[Fact]
+	public void Ensure_WithErrorFactory_ValidPredicate_ReturnsSuccess()
+	{
+		// Arrange
+		var result = Result<int>.Success(10);
+
+		// Act
+		var ensured = result.Ensure(
+			x => x > 5,
+			x => Error.ValidationError($"Value {x} must be > 5"));
+
+		// Assert
+		Assert.True(ensured.IsSuccess);
+		Assert.Equal(10, ensured.Value);
+	}
+
+	[Fact]
+	public void Ensure_WithErrorFactory_InvalidPredicate_ReturnsContextualError()
+	{
+		// Arrange
+		var result = Result<int>.Success(3);
+
+		// Act
+		var ensured = result.Ensure(
+			x => x > 5,
+			x => Error.ValidationError($"Value {x} must be > 5"));
+
+		// Assert
+		Assert.True(ensured.IsFailure);
+		Assert.Equal("Value 3 must be > 5", ensured.Error.Message);
+	}
+
+	[Fact]
+	public void Ensure_WithErrorFactory_OnFailure_PropagatesOriginalError()
+	{
+		// Arrange
+		var originalError = Error.NotFoundError("Not found");
+		var result = Result<int>.Failure(originalError);
+
+		// Act
+		var ensured = result.Ensure(
+			x => x > 5,
+			x => Error.ValidationError($"Value {x} must be > 5"));
+
+		// Assert
+		Assert.True(ensured.IsFailure);
+		Assert.Equal(originalError, ensured.Error);
+	}
+
+	[Fact]
+	public void Ensure_WithErrorFactory_ComplexObject_CreatesContextualError()
+	{
+		// Arrange
+		var user = new TestUser { Name = "John", Age = 16 };
+		var result = Result<TestUser>.Success(user);
+
+		// Act
+		var ensured = result.Ensure(
+			u => u.Age >= 18,
+			u => Error.ValidationError($"User {u.Name} is {u.Age} years old, must be 18+"));
+
+		// Assert
+		Assert.True(ensured.IsFailure);
+		Assert.Equal("User John is 16 years old, must be 18+", ensured.Error.Message);
+	}
+
+	private class TestUser
+	{
+		public string Name { get; set; } = string.Empty;
+		public int Age { get; set; }
+	}
+
+	// ========== ENSURE ASYNC PROXY TESTS ==========
+
+	[Fact]
+	public async Task EnsureAsync_Proxy_WithAsyncPredicate_PassesValidation()
+	{
+		// Arrange
+		var result = Result<int>.Success(10);
+
+		// Act - using instance method (proxy), no need to import Extensions
+		var ensured = await result.EnsureAsync(
+			async x =>
+			{
+				await Task.Delay(1);
+				return x > 5;
+			},
+			Error.ValidationError("Must be > 5"));
+
+		// Assert
+		Assert.True(ensured.IsSuccess);
+		Assert.Equal(10, ensured.Value);
+	}
+
+	[Fact]
+	public async Task EnsureAsync_Proxy_WithAsyncPredicate_FailsValidation()
+	{
+		// Arrange
+		var result = Result<int>.Success(3);
+
+		// Act
+		var ensured = await result.EnsureAsync(
+			async x =>
+			{
+				await Task.Delay(1);
+				return x > 5;
+			},
+			Error.ValidationError("Must be > 5"));
+
+		// Assert
+		Assert.True(ensured.IsFailure);
+		Assert.Equal("Must be > 5", ensured.Error.Message);
+	}
+
+	[Fact]
+	public async Task EnsureAsync_Proxy_WithErrorFactory_FailsWithContextualError()
+	{
+		// Arrange
+		var result = Result<int>.Success(3);
+
+		// Act
+		var ensured = await result.EnsureAsync(
+			async x =>
+			{
+				await Task.Delay(1);
+				return x > 5;
+			},
+			x => Error.ValidationError($"Value {x} must be > 5"));
+
+		// Assert
+		Assert.True(ensured.IsFailure);
+		Assert.Equal("Value 3 must be > 5", ensured.Error.Message);
+	}
+
+	[Fact]
+	public async Task EnsureAsync_Proxy_OnFailure_PropagatesOriginalError()
+	{
+		// Arrange
+		var originalError = Error.NotFoundError("Not found");
+		var result = Result<int>.Failure(originalError);
+
+		// Act
+		var ensured = await result.EnsureAsync(
+			async x =>
+			{
+				await Task.Delay(1);
+				return x > 5;
+			},
+			x => Error.ValidationError($"Value {x} must be > 5"));
+
+		// Assert
+		Assert.True(ensured.IsFailure);
+		Assert.Equal(originalError, ensured.Error);
+	}
+
+	// ========== TAP ASYNC PROXY TESTS ==========
+
+	[Fact]
+	public async Task TapAsync_Proxy_OnSuccess_ExecutesAction()
+	{
+		// Arrange
+		var result = Result<int>.Success(42);
+		var actionExecuted = false;
+
+		// Act
+		var tapped = await result.TapAsync(async x =>
+		{
+			await Task.Delay(1);
+			actionExecuted = true;
+		});
+
+		// Assert
+		Assert.True(tapped.IsSuccess);
+		Assert.Equal(42, tapped.Value);
+		Assert.True(actionExecuted);
+	}
+
+	[Fact]
+	public async Task TapAsync_Proxy_OnFailure_DoesNotExecuteAction()
+	{
+		// Arrange
+		var error = Error.NotFoundError("Not found");
+		var result = Result<int>.Failure(error);
+		var actionExecuted = false;
+
+		// Act
+		var tapped = await result.TapAsync(async x =>
+		{
+			await Task.Delay(1);
+			actionExecuted = true;
+		});
+
+		// Assert
+		Assert.True(tapped.IsFailure);
+		Assert.Equal(error, tapped.Error);
+		Assert.False(actionExecuted);
+	}
+
+	// ========== ORELSE ASYNC PROXY TESTS ==========
+
+	[Fact]
+	public async Task OrElseAsync_Proxy_OnSuccess_ReturnsOriginal()
+	{
+		// Arrange
+		var result = Result<int>.Success(42);
+
+		// Act
+		var orElse = await result.OrElseAsync(async () =>
+		{
+			await Task.Delay(1);
+			return Result<int>.Success(100);
+		});
+
+		// Assert
+		Assert.True(orElse.IsSuccess);
+		Assert.Equal(42, orElse.Value);
+	}
+
+	[Fact]
+	public async Task OrElseAsync_Proxy_OnFailure_ReturnsAlternative()
+	{
+		// Arrange
+		var result = Result<int>.Failure(Error.NotFoundError("Not found"));
+
+		// Act
+		var orElse = await result.OrElseAsync(async () =>
+		{
+			await Task.Delay(1);
+			return Result<int>.Success(100);
+		});
+
+		// Assert
+		Assert.True(orElse.IsSuccess);
+		Assert.Equal(100, orElse.Value);
+	}
+
+	[Fact]
+	public async Task OrElseAsync_Proxy_OnFailure_AlternativeAlsoFails_ReturnsFallbackError()
+	{
+		// Arrange
+		var result = Result<int>.Failure(Error.NotFoundError("Primary error"));
+		var fallbackError = Error.UnavailableError("Fallback also failed");
+
+		// Act
+		var orElse = await result.OrElseAsync(async () =>
+		{
+			await Task.Delay(1);
+			return Result<int>.Failure(fallbackError);
+		});
+
+		// Assert
+		Assert.True(orElse.IsFailure);
+		Assert.Equal(fallbackError, orElse.Error);
+	}
+
+	[Fact]
 	public void GetValueOrDefault_WithSuccess_ReturnsValue()
 	{
 		// Arrange

@@ -1016,6 +1016,117 @@ public class TaskResultExtensionsTests
 		Assert.Equal(error, ensured.Error);
 	}
 
+	// ========== ENSURE ASYNC WITH ERROR FACTORY TESTS ==========
+
+	[Fact]
+	public async Task EnsureAsync_TaskResultWithErrorFactory_PassesValidation()
+	{
+		// Arrange
+		var resultTask = Task.FromResult(Result<int>.Success(10));
+
+		// Act
+		var ensured = await resultTask.EnsureAsync(
+			x => x > 5,
+			x => Error.ValidationError($"Value {x} must be > 5"));
+
+		// Assert
+		Assert.True(ensured.IsSuccess);
+		Assert.Equal(10, ensured.Value);
+	}
+
+	[Fact]
+	public async Task EnsureAsync_TaskResultWithErrorFactory_FailsWithContextualError()
+	{
+		// Arrange
+		var resultTask = Task.FromResult(Result<int>.Success(3));
+
+		// Act
+		var ensured = await resultTask.EnsureAsync(
+			x => x > 5,
+			x => Error.ValidationError($"Value {x} must be > 5"));
+
+		// Assert
+		Assert.True(ensured.IsFailure);
+		Assert.Equal("Value 3 must be > 5", ensured.Error.Message);
+	}
+
+	[Fact]
+	public async Task EnsureAsync_ResultWithAsyncPredicateAndErrorFactory_PassesValidation()
+	{
+		// Arrange
+		var result = Result<int>.Success(10);
+
+		// Act
+		var ensured = await result.EnsureAsync(
+			async x =>
+			{
+				await Task.Delay(1);
+				return x > 5;
+			},
+			x => Error.ValidationError($"Value {x} must be > 5"));
+
+		// Assert
+		Assert.True(ensured.IsSuccess);
+		Assert.Equal(10, ensured.Value);
+	}
+
+	[Fact]
+	public async Task EnsureAsync_ResultWithAsyncPredicateAndErrorFactory_FailsWithContextualError()
+	{
+		// Arrange
+		var result = Result<int>.Success(3);
+
+		// Act
+		var ensured = await result.EnsureAsync(
+			async x =>
+			{
+				await Task.Delay(1);
+				return x > 5;
+			},
+			x => Error.ValidationError($"Value {x} must be > 5"));
+
+		// Assert
+		Assert.True(ensured.IsFailure);
+		Assert.Equal("Value 3 must be > 5", ensured.Error.Message);
+	}
+
+	[Fact]
+	public async Task EnsureAsync_TaskResultWithAsyncPredicateAndErrorFactory_FailsWithContextualError()
+	{
+		// Arrange
+		var resultTask = Task.FromResult(Result<int>.Success(3));
+
+		// Act
+		var ensured = await resultTask.EnsureAsync(
+			async x =>
+			{
+				await Task.Delay(1);
+				return x > 5;
+			},
+			x => Error.ValidationError($"Value {x} must be > 5"));
+
+		// Assert
+		Assert.True(ensured.IsFailure);
+		Assert.Equal("Value 3 must be > 5", ensured.Error.Message);
+	}
+
+	[Fact]
+	public async Task EnsureAsync_WithErrorFactory_OnFailure_PropagatesOriginalError()
+	{
+		// Arrange
+		var originalError = Error.NotFoundError("Not found");
+		var resultTask = Task.FromResult(Result<int>.Failure(originalError));
+
+		// Act
+		var ensured = await resultTask.EnsureAsync(
+			x => x > 5,
+			x => Error.ValidationError($"Value {x} must be > 5"));
+
+		// Assert
+		Assert.True(ensured.IsFailure);
+		Assert.Equal(originalError, ensured.Error);
+	}
+
 	// ========== ORELSE ASYNC TESTS ==========
 
 	[Fact]

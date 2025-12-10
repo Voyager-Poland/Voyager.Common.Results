@@ -259,29 +259,50 @@ Validate with async predicates.
 
 **Signatures:**
 ```csharp
-// Async predicate on async result
-Task<Result<T>> EnsureAsync(
-    this Task<Result<T>> resultTask, 
-    Func<T, Task<bool>> asyncPredicate, 
-    Error error
-)
-
-// Sync predicate on async result
+// Sync predicate on async result - static error
 Task<Result<T>> EnsureAsync(
     this Task<Result<T>> resultTask, 
     Func<T, bool> predicate, 
     Error error
 )
 
-// Async predicate on sync result
+// Sync predicate on async result - contextual error
+Task<Result<T>> EnsureAsync(
+    this Task<Result<T>> resultTask, 
+    Func<T, bool> predicate, 
+    Func<T, Error> errorFactory
+)
+
+// Async predicate on sync result - static error
 Task<Result<T>> EnsureAsync(
     this Result<T> result, 
     Func<T, Task<bool>> asyncPredicate, 
     Error error
 )
+
+// Async predicate on sync result - contextual error
+Task<Result<T>> EnsureAsync(
+    this Result<T> result, 
+    Func<T, Task<bool>> asyncPredicate, 
+    Func<T, Error> errorFactory
+)
+
+// Async predicate on async result - static error
+Task<Result<T>> EnsureAsync(
+    this Task<Result<T>> resultTask, 
+    Func<T, Task<bool>> asyncPredicate, 
+    Error error
+)
+
+// Async predicate on async result - contextual error
+Task<Result<T>> EnsureAsync(
+    this Task<Result<T>> resultTask, 
+    Func<T, Task<bool>> asyncPredicate, 
+    Func<T, Error> errorFactory
+)
 ```
 
-**Examples:**
+**Examples with static error:**
 
 ```csharp
 async Task<bool> IsEmailUniqueAsync(string email)
@@ -298,6 +319,18 @@ var result = await GetUserAsync(123)
         user => IsEmailUniqueAsync(user.Email),  // Async check
         Error.ConflictError("Email already exists")
     );
+```
+
+**Examples with contextual error (recommended for better messages):**
+
+```csharp
+var result = await GetUserAsync(123)
+    .EnsureAsync(
+        user => user.IsActive,
+        user => Error.BusinessError($"User {user.Name} (ID: {user.Id}) is inactive"))
+    .EnsureAsync(
+        async user => await IsEmailUniqueAsync(user.Email),
+        user => Error.ConflictError($"Email {user.Email} is already in use"));
 ```
 
 **Real-world example:**

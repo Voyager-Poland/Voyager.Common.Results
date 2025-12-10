@@ -276,6 +276,90 @@ namespace Voyager.Common.Results
 		}
 
 		/// <summary>
+		/// Ensure - validates the success value with contextual error, may convert to Failure
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// var result = GetUser(id)
+		///     .Ensure(
+		///         user => user.Age >= 18,
+		///         user => Error.ValidationError($"User {user.Name} is {user.Age} years old, must be 18+"));
+		/// </code>
+		/// </example>
+		/// <param name="predicate">Predicate to validate the success value.</param>
+		/// <param name="errorFactory">Function to create error from the value if predicate fails.</param>
+		/// <returns>Original result if predicate passes, otherwise a Failure result with contextual error.</returns>
+		public Result<TValue> Ensure(Func<TValue, bool> predicate, Func<TValue, Error> errorFactory)
+		{
+			if (IsFailure)
+				return this;
+
+			return predicate(Value!) ? this : Failure(errorFactory(Value!));
+		}
+
+		/// <summary>
+		/// EnsureAsync - validates the success value with an async predicate
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// var result = await GetUser(id)
+		///     .EnsureAsync(
+		///         async user => await _repo.IsActiveAsync(user.Id),
+		///         Error.ValidationError("User is inactive"));
+		/// </code>
+		/// </example>
+		/// <param name="predicate">Async predicate to validate the success value.</param>
+		/// <param name="error">Error to return if predicate fails.</param>
+		/// <returns>Original result if predicate passes, otherwise a Failure result.</returns>
+		public Task<Result<TValue>> EnsureAsync(Func<TValue, Task<bool>> predicate, Error error) =>
+			Extensions.TaskResultExtensions.EnsureAsync(this, predicate, error);
+
+		/// <summary>
+		/// EnsureAsync - validates the success value with an async predicate and contextual error
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// var result = await GetUser(id)
+		///     .EnsureAsync(
+		///         async user => await _repo.IsActiveAsync(user.Id),
+		///         user => Error.ValidationError($"User {user.Name} is inactive"));
+		/// </code>
+		/// </example>
+		/// <param name="predicate">Async predicate to validate the success value.</param>
+		/// <param name="errorFactory">Function to create error from the value if predicate fails.</param>
+		/// <returns>Original result if predicate passes, otherwise a Failure result with contextual error.</returns>
+		public Task<Result<TValue>> EnsureAsync(Func<TValue, Task<bool>> predicate, Func<TValue, Error> errorFactory) =>
+			Extensions.TaskResultExtensions.EnsureAsync(this, predicate, errorFactory);
+
+		/// <summary>
+		/// TapAsync - executes an async side effect if the result is a success
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// var result = await GetUser(id)
+		///     .TapAsync(async user => await _auditLog.LogAsync($"User {user.Name} accessed"));
+		/// </code>
+		/// </example>
+		/// <param name="action">Async action to execute on success value.</param>
+		/// <returns>Original result unchanged.</returns>
+		public Task<Result<TValue>> TapAsync(Func<TValue, Task> action) =>
+			Extensions.TaskResultExtensions.TapAsync(this, action);
+
+		/// <summary>
+		/// OrElseAsync - provides an async fallback if the result is a failure
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// var result = await GetUserFromCache(id)
+		///     .OrElseAsync(async () => await GetUserFromDatabaseAsync(id));
+		/// </code>
+		/// </example>
+		/// <param name="alternativeFunc">Async function returning alternative result.</param>
+		/// <returns>Original result if success, otherwise the alternative result.</returns>
+		public Task<Result<TValue>> OrElseAsync(Func<Task<Result<TValue>>> alternativeFunc) =>
+			Extensions.TaskResultExtensions.OrElseAsync(this, alternativeFunc);
+
+		/// <summary>
 		/// MapError - transforms the error
 		/// </summary>
 		/// <param name="mapper">Function to transform the error.</param>

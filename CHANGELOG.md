@@ -8,6 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`Ensure` with contextual error factory**: New overload that receives the value to create context-aware error messages
+  ```csharp
+  result.Ensure(
+      user => user.Age >= 18,
+      user => Error.ValidationError($"User {user.Name} is {user.Age} years old, must be 18+"));
+  ```
+- **`EnsureAsync` with contextual error factory**: 3 new async overloads with `Func<TValue, Error>` for contextual errors
+  - `Task<Result<T>>.EnsureAsync(predicate, errorFactory)` - sync predicate
+  - `Result<T>.EnsureAsync(asyncPredicate, errorFactory)` - async predicate on sync result
+  - `Task<Result<T>>.EnsureAsync(asyncPredicate, errorFactory)` - async predicate on async result
+- **Instance method proxies in `Result<T>`**: No need to import `Extensions` namespace
+  - `EnsureAsync(asyncPredicate, error)` - async validation
+  - `EnsureAsync(asyncPredicate, errorFactory)` - async validation with contextual error
+  - `TapAsync(asyncAction)` - async side effects
+  - `OrElseAsync(asyncAlternativeFunc)` - async fallback
 - **`ErrorType.Cancelled`**: New error type for cancelled async operations
   - `Error.CancelledError(string message)` - Creates cancelled error with default code
   - `Error.CancelledError(string code, string message)` - Creates cancelled error with custom code
