@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`ErrorType.Cancelled`**: New error type for cancelled async operations
+  - `Error.CancelledError(string message)` - Creates cancelled error with default code
+  - `Error.CancelledError(string code, string message)` - Creates cancelled error with custom code
+  - Enables proper handling of `OperationCanceledException` in async workflows
 - **`TryAsync` methods**: Safe async exception-to-Result conversion with optional custom error mapping
   - `TryAsync(Func<Task> action)` - Wraps async action exceptions with `Error.FromException`
   - `TryAsync(Func<Task> action, Func<Exception, Error> errorMapper)` - Custom exception mapping for async actions
