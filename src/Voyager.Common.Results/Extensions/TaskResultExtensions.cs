@@ -1,5 +1,6 @@
 ﻿#if NET48
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 #endif
 
@@ -64,6 +65,60 @@ namespace Voyager.Common.Results.Extensions
 		}
 
 		/// <summary>
+		/// Executes an asynchronous action with cancellation support
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// var result = await TaskResultExtensions.TryAsync(
+		///     async ct => await httpClient.GetAsync(url, ct),
+		///     cancellationToken);
+		/// </code>
+		/// </example>
+		/// <param name="action">Asynchronous action that accepts a CancellationToken.</param>
+		/// <param name="cancellationToken">Token to cancel the operation.</param>
+		/// <returns>Success if completes, Failure with CancelledError if cancelled, or error from exception.</returns>
+		public static async Task<Result> TryAsync(Func<CancellationToken, Task> action, CancellationToken cancellationToken)
+		{
+			try
+			{
+				await action(cancellationToken).ConfigureAwait(false);
+				return Result.Success();
+			}
+			catch (OperationCanceledException)
+			{
+				return Result.Failure(Error.CancelledError("Operation was cancelled"));
+			}
+			catch (Exception ex)
+			{
+				return Result.Failure(Error.FromException(ex));
+			}
+		}
+
+		/// <summary>
+		/// Executes an asynchronous action with cancellation support and custom error mapping
+		/// </summary>
+		/// <param name="action">Asynchronous action that accepts a CancellationToken.</param>
+		/// <param name="cancellationToken">Token to cancel the operation.</param>
+		/// <param name="errorMapper">Function to convert exception to custom error.</param>
+		/// <returns>Success if completes, Failure with CancelledError if cancelled, or mapped error from exception.</returns>
+		public static async Task<Result> TryAsync(Func<CancellationToken, Task> action, CancellationToken cancellationToken, Func<Exception, Error> errorMapper)
+		{
+			try
+			{
+				await action(cancellationToken).ConfigureAwait(false);
+				return Result.Success();
+			}
+			catch (OperationCanceledException)
+			{
+				return Result.Failure(Error.CancelledError("Operation was cancelled"));
+			}
+			catch (Exception ex)
+			{
+				return Result.Failure(errorMapper(ex));
+			}
+		}
+
+		/// <summary>
 		/// Executes an asynchronous function and wraps any exceptions in a Result
 		/// </summary>
 		/// <example>
@@ -110,6 +165,62 @@ namespace Voyager.Common.Results.Extensions
 			{
 				var value = await func().ConfigureAwait(false);
 				return Result<TValue>.Success(value);
+			}
+			catch (Exception ex)
+			{
+				return Result<TValue>.Failure(errorMapper(ex));
+			}
+		}
+
+		/// <summary>
+		/// Executes an asynchronous function with cancellation support
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// var result = await TaskResultExtensions.TryAsync(
+		///     async ct => await httpClient.GetStringAsync(url, ct),
+		///     cancellationToken);
+		/// </code>
+		/// </example>
+		/// <param name="func">Asynchronous function that accepts a CancellationToken.</param>
+		/// <param name="cancellationToken">Token to cancel the operation.</param>
+		/// <typeparam name="TValue">Type of value returned by the function.</typeparam>
+		/// <returns>Success with value if completes, Failure with CancelledError if cancelled, or error from exception.</returns>
+		public static async Task<Result<TValue>> TryAsync<TValue>(Func<CancellationToken, Task<TValue>> func, CancellationToken cancellationToken)
+		{
+			try
+			{
+				var value = await func(cancellationToken).ConfigureAwait(false);
+				return Result<TValue>.Success(value);
+			}
+			catch (OperationCanceledException)
+			{
+				return Result<TValue>.Failure(Error.CancelledError("Operation was cancelled"));
+			}
+			catch (Exception ex)
+			{
+				return Result<TValue>.Failure(Error.FromException(ex));
+			}
+		}
+
+		/// <summary>
+		/// Executes an asynchronous function with cancellation support and custom error mapping
+		/// </summary>
+		/// <param name="func">Asynchronous function that accepts a CancellationToken.</param>
+		/// <param name="cancellationToken">Token to cancel the operation.</param>
+		/// <param name="errorMapper">Function to convert exception to custom error.</param>
+		/// <typeparam name="TValue">Type of value returned by the function.</typeparam>
+		/// <returns>Success with value if completes, Failure with CancelledError if cancelled, or mapped error from exception.</returns>
+		public static async Task<Result<TValue>> TryAsync<TValue>(Func<CancellationToken, Task<TValue>> func, CancellationToken cancellationToken, Func<Exception, Error> errorMapper)
+		{
+			try
+			{
+				var value = await func(cancellationToken).ConfigureAwait(false);
+				return Result<TValue>.Success(value);
+			}
+			catch (OperationCanceledException)
+			{
+				return Result<TValue>.Failure(Error.CancelledError("Operation was cancelled"));
 			}
 			catch (Exception ex)
 			{
