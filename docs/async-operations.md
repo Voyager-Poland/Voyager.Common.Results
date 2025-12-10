@@ -838,17 +838,243 @@ result.BindAsync(user => SaveUserAsync(user));  // ✅
 
 ## Performance Considerations
 
-### ConfigureAwait
+### ConfigureAwait - Library Behavior
 
-When building libraries, use `ConfigureAwait(false)`:
+**All async methods in Voyager.Common.Results internally use `ConfigureAwait(false)`.**
+
+This means:
+- ✅ **No deadlocks** - Safe to use in WinForms, WPF, legacy ASP.NET
+- ✅ **Better performance** - No unnecessary thread context switches
+- ✅ **You don't need to add `ConfigureAwait(false)`** when calling this library
+
+**If you need UI thread context after calling library methods:**
+
+```csharp
+// Library internally handles ConfigureAwait(false)
+var result = await Result<string>.TryAsync(
+    async ct => await httpClient.GetStringAsync(url, ct),
+    cancellationToken);
+
+// Return to UI thread for UI updates
+await UpdateUIAsync(result).ConfigureAwait(true);
+
+// Or use synchronization context explicitly
+await Task.Run(() => { }).ConfigureAwait(true);  // Back to UI thread
+lblStatus.Text = result.Match(
+    onSuccess: data => $"Loaded: {data.Length} bytes",
+    onFailure: error => $"Error: {error.Message}");
+```
+
+### ASP.NET 4.8 - Preserving HttpContext
+
+In legacy ASP.NET (.NET Framework 4.8), `HttpContext.Current` flows through `SynchronizationContext`. Since library methods use `ConfigureAwait(false)`, you must capture HttpContext **before** the await:
+
+```csharp
+// ❌ WRONG - HttpContext.Current is null after await
+public async Task<ActionResult> GetUserAsync(int id)
+{
+    var result = await Result<User>.TryAsync(
+        async ct => await _userService.GetByIdAsync(id, ct),
+        HttpContext.RequestAborted);
+    
+    // HttpContext.Current is NULL here!
+    var userName = HttpContext.Current.User.Identity.Name;  // NullReferenceException!
+    
+    return Json(result);
+}
+
+// ✅ CORRECT - Capture HttpContext BEFORE await
+public async Task<ActionResult> GetUserAsync(int id)
+{
+    // Capture context before any await
+    var httpContext = HttpContext.Current;
+    var currentUser = httpContext.User.Identity.Name;
+    var requestAborted = httpContext.Response.ClientDisconnectedToken;
+    
+    var result = await Result<User>.TryAsync(
+        async ct => await _userService.GetByIdAsync(id, ct),
+        requestAborted);
+    
+    // Use captured values - safe!
+    _logger.Log($"User {currentUser} requested user {id}");
+    
+    return Json(result.Match(
+        onSuccess: user => new { success = true, data = user },
+        onFailure: error => new { success = false, message = error.Message }));
+}
+
+// ✅ ALTERNATIVE - Extract all needed values into local variables
+public async Task<ActionResult> ProcessOrderAsync(OrderRequest request)
+{
+    // Extract everything you need from HttpContext upfront
+    var context = HttpContext.Current;
+    var userId = context.User.Identity.Name;
+    var sessionId = context.Session?.SessionID;
+    var clientIp = context.Request.UserHostAddress;
+    var cancellationToken = context.Response.ClientDisconnectedToken;
+    
+    var result = await GetUser(userId)
+        .BindAsync(user => ValidateOrder(request, user))
+        .BindAsync(order => ProcessPaymentAsync(order, cancellationToken))
+        .TapAsync(order => LogOrderAsync(order, clientIp, sessionId));
+    
+    return Json(result);
+}
+```
+
+**Best practice for ASP.NET 4.8 controllers:**
+
+```csharp
+public abstract class BaseApiController : ApiController
+{
+    // Capture in property - available throughout request
+    protected string CurrentUserId => HttpContext.Current?.User?.Identity?.Name;
+    protected string ClientIp => HttpContext.Current?.Request?.UserHostAddress;
+    
+    // Or capture once in action and pass to methods
+    protected RequestContext CaptureContext()
+    {
+        var ctx = HttpContext.Current;
+        return new RequestContext
+        {
+            UserId = ctx?.User?.Identity?.Name,
+            SessionId = ctx?.Session?.SessionID,
+            ClientIp = ctx?.Request?.UserHostAddress,
+            CancellationToken = ctx?.Response?.ClientDisconnectedToken ?? CancellationToken.None
+        };
+    }
+}
+
+public class OrderController : BaseApiController
+{
+    public async Task<ActionResult> CreateAsync(OrderDto dto)
+    {
+        var ctx = CaptureContext();  // Capture BEFORE any await
+        
+        var result = await Result<Order>.TryAsync(
+                async ct => await _orderService.CreateAsync(dto, ctx.UserId, ct),
+                ctx.CancellationToken)
+            .TapAsync(order => _auditLog.LogAsync(
+                $"Order {order.Id} created by {ctx.UserId} from {ctx.ClientIp}"));
+        
+        return Json(result);
+    }
+}
+
+public record RequestContext
+{
+    public string UserId { get; init; }
+    public string SessionId { get; init; }
+    public string ClientIp { get; init; }
+    public CancellationToken CancellationToken { get; init; }
+}
+```
+
+> ⚠️ **Note:** This issue does NOT affect ASP.NET Core. In ASP.NET Core, `HttpContext` is injected via `IHttpContextAccessor` and doesn't rely on `SynchronizationContext`.
+
+### AsyncLocal&lt;T&gt; - Context That Flows Through Async
+
+`AsyncLocal<T>` preserves values across async/await boundaries regardless of `ConfigureAwait`. It's ideal for cross-cutting concerns like correlation IDs, user context, or request tracing.
+
+```csharp
+// Define ambient context that flows through async calls
+public static class AmbientContext
+{
+    private static readonly AsyncLocal<RequestContext> _current = new();
+    
+    public static RequestContext Current
+    {
+        get => _current.Value;
+        set => _current.Value = value;
+    }
+}
+
+public record RequestContext
+{
+    public string UserId { get; init; }
+    public string CorrelationId { get; init; }
+    public string ClientIp { get; init; }
+    public CancellationToken CancellationToken { get; init; }
+}
+
+// Set once at request start (e.g., in Global.asax or ActionFilter)
+public class ContextInitializerAttribute : ActionFilterAttribute
+{
+    public override void OnActionExecuting(ActionExecutingContext filterContext)
+    {
+        var httpContext = HttpContext.Current;
+        AmbientContext.Current = new RequestContext
+        {
+            UserId = httpContext.User?.Identity?.Name,
+            CorrelationId = httpContext.Request.Headers["X-Correlation-ID"] 
+                            ?? Guid.NewGuid().ToString(),
+            ClientIp = httpContext.Request.UserHostAddress,
+            CancellationToken = httpContext.Response.ClientDisconnectedToken
+        };
+    }
+}
+
+// Use anywhere - even after ConfigureAwait(false)!
+[ContextInitializer]
+public class OrderController : ApiController
+{
+    public async Task<ActionResult> CreateAsync(OrderDto dto)
+    {
+        // AmbientContext.Current is available throughout the async flow
+        var result = await Result<Order>.TryAsync(
+                async ct => await _orderService.CreateAsync(dto, ct),
+                AmbientContext.Current.CancellationToken)
+            .TapAsync(order => LogOrderCreatedAsync(order));
+        
+        return Json(result);
+    }
+    
+    private async Task LogOrderCreatedAsync(Order order)
+    {
+        // Still works! AsyncLocal flows through ConfigureAwait(false)
+        var ctx = AmbientContext.Current;
+        await _auditLog.WriteAsync(
+            $"[{ctx.CorrelationId}] User {ctx.UserId} from {ctx.ClientIp} " +
+            $"created order {order.Id}");
+    }
+}
+
+// Works in any layer - services, repositories, etc.
+public class OrderService
+{
+    public async Task<Order> CreateAsync(OrderDto dto, CancellationToken ct)
+    {
+        var userId = AmbientContext.Current.UserId;  // ✅ Available!
+        var correlationId = AmbientContext.Current.CorrelationId;
+        
+        _logger.LogInformation("[{CorrelationId}] Creating order for {UserId}", 
+            correlationId, userId);
+        
+        // ... implementation
+    }
+}
+```
+
+**When to use each approach:**
+
+| Approach | Best For |
+|----------|----------|
+| **Local variables** | Simple cases, single controller action |
+| **Parameter passing** | Explicit dependencies, easy to test |
+| **AsyncLocal&lt;T&gt;** | Cross-cutting concerns (logging, tracing, audit), deep call stacks |
+
+**When building your own libraries on top of Voyager.Common.Results:**
 
 ```csharp
 public async Task<Result<User>> GetUserAsync(int id)
 {
+    // Your code should also use ConfigureAwait(false)
     var user = await _database.Users.FindAsync(id).ConfigureAwait(false);
     // ...
 }
 ```
+
+> 📖 See [ADR-0001](adr/ADR-0001-no-configureawait-parameter-in-tryasync.md) for the architectural decision behind this behavior.
 
 ### Avoid Async When Not Needed
 

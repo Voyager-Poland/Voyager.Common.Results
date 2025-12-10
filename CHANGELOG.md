@@ -48,6 +48,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Error propagation through async chains
   - Cancellation token support and handling
 
+### Documentation
+- **Enhanced `ConfigureAwait` documentation** in [docs/async-operations.md](docs/async-operations.md):
+  - Explained library's internal `ConfigureAwait(false)` behavior and deadlock prevention
+  - Added ASP.NET 4.8 `HttpContext` preservation patterns with examples
+  - Added `AsyncLocal<T>` pattern for context flowing through async boundaries
+  - Comparison table: local variables vs parameter passing vs `AsyncLocal<T>`
+- **Updated AI coding instructions** in [.github/copilot-instructions.md](.github/copilot-instructions.md):
+  - Added `ConfigureAwait(false)` requirements for new async methods
+  - Referenced [ADR-0001](docs/adr/ADR-0001-no-configureawait-parameter-in-tryasync.md) architectural decision
+
 ## [1.3.0] - 2025-01-16
 
 ### Added
