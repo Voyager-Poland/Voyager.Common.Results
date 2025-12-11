@@ -7,6 +7,143 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2025-01-16
+
+### Added
+- **`Result.Tap` method**: Executes side effect on success without modifying result
+  ```csharp
+  var result = SaveToDatabase(data)
+      .Tap(() => _logger.LogInfo("Data saved"));
+  ```
+- **`Result.TapError` method**: Executes side effect on failure without modifying result
+  ```csharp
+  var result = SaveToDatabase(data)
+      .TapError(error => _logger.LogError(error.Message));
+  ```
+- **`Result.MapError` method**: Transforms error without affecting success
+  ```csharp
+  var result = Operation()
+      .MapError(error => Error.DatabaseError("DB_" + error.Code, error.Message));
+  ```
+- **`Result.Finally` method**: Executes action regardless of success/failure (like finally block)
+  ```csharp
+  var result = SaveToDatabase(data)
+      .Finally(() => connection.Close());
+  ```
+- **`Result<T>.Finally` method**: Executes action regardless of success/failure for value operations
+  ```csharp
+  var userData = LoadFromFile(path)
+      .Finally(() => fileStream.Dispose());
+  ```
+- **`Result.Try` methods**: Safe exception-to-Result conversion with optional custom error mapping
+  - `Result.Try(Action action)` - Wraps exceptions with `Error.FromException`
+  - `Result.Try(Action action, Func<Exception, Error> errorMapper)` - Custom exception mapping
+  ```csharp
+  // Basic: wraps exception with Error.FromException
+  var result = Result.Try(() => File.Delete(path));
+  
+  // Custom: maps exceptions to specific error types
+  var result = Result.Try(
+      () => File.Delete(path),
+      ex => ex is UnauthorizedAccessException 
+          ? Error.PermissionError("Access denied")
+          : Error.FromException(ex));
+  ```
+- **`Result<T>.Try` methods**: Safe exception-to-Result conversion for value-returning operations
+  - `Result<T>.Try(Func<T> func)` - Wraps exceptions with `Error.FromException`
+  - `Result<T>.Try(Func<T> func, Func<Exception, Error> errorMapper)` - Custom exception mapping
+  ```csharp
+  // Basic: wraps exception with Error.FromException
+  var result = Result<int>.Try(() => int.Parse(input));
+  
+  // Custom: map FormatException to validation error
+  var result = Result<int>.Try(
+      () => int.Parse(input),
+      ex => ex is FormatException 
+          ? Error.ValidationError("Invalid number format")
+          : Error.FromException(ex));
+  ```
+- `Map` method for `Result` (non-generic) class to transform void operations into value operations:
+  - `Result.Map<TValue>(Func<TValue>)` - Transform Result → Result<TValue> (produces value from success)
+- `Bind` methods for `Result` (non-generic) class for complete Railway Oriented Programming support:
+  - `Result.Bind(Func<Result>)` - Chain void operations (Result → Result)
+  - `Result.Bind<TValue>(Func<Result<TValue>>)` - Transform void operation to value operation (Result → Result<TValue>)
+- 12 new unit tests for `Result.Map` and `Result.Bind` methods covering:
+  - Map: success transformation and failure propagation
+  - Bind: success and failure propagation
+  - Operation chaining with early termination
+  - Void-to-value transformations
+  - Mixed operation chains
+- 7 new unit tests for `Result.Try` and `Result<T>.Try` methods covering:
+  - Try: successful operations, exception wrapping, custom error mapping
+  - Real-world scenarios: JSON parsing, file operations
+- 5 new unit tests for `Result.Tap` and `Result.TapError` methods covering:
+  - Tap: execution on success/failure
+  - TapError: execution on success/failure
+  - Chaining with other operations
+- 3 new unit tests for `Result.MapError` method covering:
+  - MapError: error transformation on success/failure
+  - Chaining with other operations
+- 7 new unit tests for `Result.Finally` and `Result<T>.Finally` methods covering:
+  - Finally: execution on success and failure
+  - Resource cleanup simulation
+  - Chaining with other operations
+- **Comprehensive test suite** ensuring library correctness:
+  - **MonadLawsTests.cs** (13 tests) - Verifies Result<T> satisfies Monad Laws:
+    - Left Identity: `return a >>= f ≡ f a`
+    - Right Identity: `m >>= return ≡ m`
+    - Associativity: `(m >>= f) >>= g ≡ m >>= (\x -> f x >>= g)`
+    - Functor Laws: Map preserves composition and identity
+  - **InvariantTests.cs** (34 tests) - Verifies critical invariants:
+    - XOR Property: `IsSuccess XOR IsFailure` always true
+    - Error Invariants: Success has Error.None, Failure has non-None error
+    - Null Safety: Proper handling of nullable types and default values
+    - Immutability: Operations don't mutate original Result
+    - Match Invariants: Exactly one branch executes in Match/Switch
+  - **ErrorPropagationTests.cs** (48 tests) - Verifies error propagation:
+    - Map/Bind/Tap/Ensure preserve errors correctly
+    - OrElse recovery and fallback error handling
+    - MapError transformation behavior
+    - Try exception wrapping
+    - Finally cleanup with error propagation
+    - Complex error propagation chains
+  - **CompositionTests.cs** (60 tests) - Verifies operator composition:
+    - Map/Bind/Tap/Ensure composition and chaining
+    - Operation ordering and short-circuiting
+    - OrElse fallback chains
+    - Complex multi-operator scenarios
+    - Non-generic Result composition
+  - **Total: 464 tests** (was 298) ensuring comprehensive coverage of Railway Oriented Programming patterns
+- Documentation for `Map` and `Bind` patterns in README.md with practical examples
+- New error type `Unauthorized` for authentication failures (user not logged in)
+- Factory methods for unauthorized errors:
+  - `Error.UnauthorizedError(string message)` - with default code "Unauthorized"
+  - `Error.UnauthorizedError(string code, string message)` - with custom code
+
+### Fixed
+- Fixed README.md not being included in NuGet package - moved from Build.NuGet.props to project file
+- Fixed CI/CD pack command to target only the main project (`src/Voyager.Common.Results/Voyager.Common.Results.csproj`)
+- Fixed IDE0036 code analyzer error: Corrected modifier ordering from `public new static` to `public static new` in `ResultT.cs`
+- Fixed duplicate `IsExternalInit` package reference issue
+
+### Changed
+- **Comprehensive documentation updates** for `Try` and `Map` methods:
+  - Updated `README.md` with Try exception handling section and enhanced Map examples
+  - Enhanced `docs/getting-started.md` with Try alternative to try-catch pattern
+  - Added Try examples to `docs/examples.md` (file parsing, data import scenarios)
+  - Improved `docs/best-practices.md` with Try patterns and Map best practices
+  - Updated `src/Voyager.Common.Results/README.md` (Polish) with full Try and Map documentation
+- Updated GitHub Actions workflow to pack only the library project, not test projects
+- Enhanced MinVer versioning documentation in `docs/QUICK-START-VERSIONING.md`
+- Updated build documentation in `BUILD.md` with improved MinVer guidance
+- Improved AI coding instructions in `.github/copilot-instructions.md` with latest patterns
+
+### Technical
+- Migrated to MinVer-based Git tag versioning system
+- Added ADR-001 documenting MinVer Git-based versioning strategy with Major-only AssemblyVersion approach
+- Updated CI workflow to use artifacts for better package handling between jobs
+- Refactored build configuration into modular props files (`build/Build.*.props`)
+
 ## [1.2.0] - 2025-01-15
 
 ### Added
@@ -88,7 +225,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - .NET Framework 4.8
 - .NET 8.0
 
-[Unreleased]: https://github.com/Voyager-Poland/Voyager.Common.Results/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/Voyager-Poland/Voyager.Common.Results/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/Voyager-Poland/Voyager.Common.Results/releases/tag/v1.3.0
 [1.2.0]: https://github.com/Voyager-Poland/Voyager.Common.Results/releases/tag/v1.2.0
 [1.1.0]: https://github.com/Voyager-Poland/Voyager.Common.Results/releases/tag/v1.1.0
 [1.0.0]: https://github.com/Voyager-Poland/Voyager.Common.Results/releases/tag/v1.0.0

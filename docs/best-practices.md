@@ -45,6 +45,30 @@ public Result<User> GetUser(int id)
 }
 ```
 
+**Alternative: Using Try for simpler cases**
+
+```csharp
+// ✅ GOOD: Try for simple exception wrapping
+public Result<Config> LoadConfig(string path)
+{
+    return Result<Config>.Try(
+        () => JsonSerializer.Deserialize<Config>(File.ReadAllText(path))!,
+        ex => ex is FileNotFoundException
+            ? Error.NotFoundError("Config file not found")
+            : ex is JsonException
+            ? Error.ValidationError("Invalid JSON format")
+            : Error.FromException(ex));
+}
+
+// ✅ GOOD: Try with validation
+public Result<Config> LoadAndValidateConfig(string path)
+{
+    return Result<Config>.Try(() => LoadConfigFile(path))
+        .Bind(config => ValidateConfig(config))
+        .Tap(config => _logger.LogInfo("Config loaded"));
+}
+```
+
 ### ❌ DON'T: Use throw for expected business failures
 
 ```csharp
@@ -74,6 +98,19 @@ public Result<User> GetUser(int id)
 ```
 
 ## Railway Operators
+
+### ✅ DO: Use Map for value transformations
+
+```csharp
+// ✅ GOOD: Map for simple transformations
+var emailResult = GetUser(id)
+    .Map(user => user.Email)              // Result<User> → Result<string>
+    .Map(email => email.ToLower());       // Result<string> → Result<string>
+
+// ✅ GOOD: Map to convert void to value
+var countResult = ValidateInput()
+    .Map(() => ProcessedItemsCount);      // Result → Result<int>
+```
 
 ### ✅ DO: Chain operations instead of nesting
 
@@ -128,6 +165,39 @@ result.Map(user => SaveUser(user))
 
 // ✅ GOOD: Returns Result<User>
 result.Bind(user => SaveUser(user))
+```
+
+### ✅ DO: Use Bind on Result for void operation chaining
+
+```csharp
+// Chain void operations (Result → Result)
+var result = ValidateInput()
+    .Bind(() => AuthorizeUser())
+    .Bind(() => SaveToDatabase())
+    .Bind(() => SendNotification());
+
+// Transform void to value operation (Result → Result<T>)
+var userResult = ValidateRequest()
+    .Bind(() => GetUser(userId))
+    .Map(user => user.Email);
+```
+
+### ✅ DO: Mix void and value operations with Bind
+
+```csharp
+// Complete workflow combining Result and Result<T>
+var orderResult = AuthenticateUser()      // Result
+    .Bind(() => GetShoppingCart(userId))  // Result → Result<Cart>
+    .Bind(cart => ProcessOrder(cart))     // Result<Cart> → Result<Order>
+    .Map(order => order.Id);              // Result<Order> → Result<int>
+
+// Real-world example: Multi-step validation and processing
+var result = ValidateRequest()            // Result
+    .Bind(() => CheckUserPermissions())   // Result → Result
+    .Bind(() => FetchUserData(userId))    // Result → Result<User>
+    .Ensure(user => user.IsActive, Error.BusinessError("User inactive"))
+    .Bind(user => ProcessUserOrder(user)) // Result<User> → Result<Order>
+    .Tap(order => _logger.LogInfo($"Order {order.Id} created"));
 ```
 
 ## Error Handling
@@ -225,7 +295,7 @@ public Result<User> FindUser(string email)
 {
     var user = _repository.FindByEmail(email);
     return user;  // ❌ BAD: If user is null, returns Result.Success(null)!
-    
+
     // ✅ GOOD:
     // if (user is null)
     //     return Error.NotFoundError("User not found");
@@ -602,7 +672,7 @@ return ApplyDiscount(user);
 
 ✅ **Railway Operators:**
 - `Map` for transformations
-- `Bind` for Result-returning operations
+- `Bind` for Result-returning operations (both `Result<T>` and `Result`)
 - `Tap` for side effects
 - `Ensure` for validations
 

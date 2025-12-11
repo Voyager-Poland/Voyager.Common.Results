@@ -62,6 +62,18 @@ var message = result.Match(
 );
 ```
 
+## 🧪 Testing
+
+The library includes **464 comprehensive tests** ensuring correctness:
+
+- **Monad Laws** (13 tests) - Verifies mathematical properties of Result<T>
+- **Invariants** (34 tests) - XOR property, null safety, immutability
+- **Error Propagation** (48 tests) - Correct error flow through all operators
+- **Composition** (60 tests) - Operator chaining and combination behavior
+- **Unit Tests** (309 tests) - Core functionality, extensions, edge cases
+
+All tests pass on both **.NET 8.0** and **.NET Framework 4.8**.
+
 ## 📖 Documentation
 
 ### Core Types
@@ -75,10 +87,13 @@ var message = result.Match(
 ```csharp
 Error.ValidationError("Invalid email format")
 Error.NotFoundError("User not found")
+Error.UnauthorizedError("User not logged in")
 Error.PermissionError("Access denied")
 Error.ConflictError("Email already exists")
 Error.DatabaseError("Connection failed")
 Error.BusinessError("Cannot cancel paid order")
+Error.UnavailableError("Service temporarily unavailable")
+Error.TimeoutError("Request timed out")
 Error.UnexpectedError("Something went wrong")
 Error.FromException(exception)
 ```
@@ -91,12 +106,156 @@ GetUser(id)
     .Bind(email => SendEmail(email))       // Chain another Result operation
     .Ensure(sent => sent, Error.BusinessError("Email not sent"))
     .Tap(() => _logger.LogInfo("Email sent"))  // Side effect
+    .Finally(() => connection.Close())     // Cleanup (always executes)
     .OrElse(() => GetDefaultUser())        // Fallback if failed
     .Match(
         onSuccess: () => "Success",
         onFailure: error => error.Message
     );
 ```
+
+### Finally - Resource Cleanup
+
+Executes an action regardless of success or failure (like finally block):
+
+```csharp
+// Always close connection
+var result = SaveToDatabase(data)
+    .Finally(() => connection.Close());
+
+// Always dispose resource
+var userData = LoadFromFile(path)
+    .Finally(() => fileStream.Dispose());
+
+// Chain with other operations
+var result = GetUser(id)
+    .Map(user => user.Email)
+    .Tap(email => _logger.LogInfo(email))
+    .Finally(() => _metrics.RecordOperation());
+```
+
+**When to use Finally:**
+- ✅ Resource cleanup (close connections, dispose streams)
+- ✅ Logging/metrics regardless of outcome
+- ✅ Releasing locks or semaphores
+- ✅ Any cleanup that must happen in both success and failure paths
+
+### Try - Exception Handling
+
+Safely convert exception-throwing code into Result pattern:
+
+```csharp
+// Basic: wraps exceptions with Error.FromException
+var result = Result<int>.Try(() => int.Parse(userInput));
+
+// Custom error mapping
+var result = Result<int>.Try(
+    () => int.Parse(userInput),
+    ex => ex is FormatException 
+        ? Error.ValidationError("Invalid number format")
+        : Error.FromException(ex));
+
+// Void operations
+var result = Result.Try(() => File.Delete(path));
+
+// With custom error handling
+var result = Result.Try(
+    () => File.Delete(path),
+    ex => ex is UnauthorizedAccessException
+        ? Error.PermissionError("Access denied")
+        : Error.FromException(ex));
+
+// Chain with other operations
+var userData = Result<string>.Try(() => File.ReadAllText(path))
+    .Bind(json => ParseJson(json))
+    .Map(data => data.UserId);
+```
+
+**When to use Try:**
+- ✅ Wrapping third-party APIs that throw exceptions
+- ✅ File I/O, parsing, network calls
+- ✅ Converting legacy exception-based code to Result pattern
+- ✅ Custom exception-to-error mapping
+
+### Map - Value Transformations
+
+Transform success values or convert void operations to value operations:
+
+```csharp
+// Transform Result<T> values
+var emailResult = GetUser(id)
+    .Map(user => user.Email);              // Result<User> → Result<string>
+
+// Convert Result (void) to Result<T> (value)
+var numberResult = ValidateInput()
+    .Map(() => 42);                         // Result → Result<int>
+
+// Chain transformations
+var result = GetUser(id)
+    .Map(user => user.Email)
+    .Map(email => email.ToLower())
+    .Map(email => email.Trim());
+```
+
+**When to use Map:**
+- ✅ Transform success value to another type
+- ✅ Convert void success to value success
+- ✅ Simple, non-failing transformations
+- ❌ Don't use for operations that return Result (use `Bind` instead)
+
+### MapError - Error Transformation
+
+Transform errors without affecting success:
+
+```csharp
+// Add context to errors
+var result = Operation()
+    .MapError(error => Error.DatabaseError("DB_" + error.Code, error.Message));
+
+// Convert error types
+var result = ValidateUser()
+    .MapError(error => Error.BusinessError("USER_" + error.Code, error.Message));
+
+// Chain transformations
+var result = GetData()
+    .MapError(e => Error.UnavailableError("Service unavailable: " + e.Message))
+    .TapError(e => _logger.LogError(e.Message));
+```
+
+**When to use MapError:**
+- ✅ Add prefixes or context to error codes/messages
+- ✅ Convert error types for different layers (API → Domain → Infrastructure)
+- ✅ Enrich errors with additional information
+- ✅ Standardize error formats
+
+### Bind - Chaining Operations
+
+The `Bind` method is available on both `Result` and `Result<T>` for seamless operation chaining:
+
+```csharp
+// Chain void operations (Result → Result)
+var result = ValidateInput()
+    .Bind(() => AuthorizeUser())
+    .Bind(() => SaveToDatabase())
+    .Bind(() => SendNotification());
+
+// Transform void operation to value operation (Result → Result<T>)
+var userResult = ValidateRequest()
+    .Bind(() => GetUser(userId))
+    .Map(user => user.Email);
+
+// Mix void and value operations
+var orderResult = AuthenticateUser()      // Result
+    .Bind(() => GetShoppingCart(userId))  // Result → Result<Cart>
+    .Bind(cart => ProcessOrder(cart))     // Result<Cart> → Result<Order>
+    .Map(order => order.Id);              // Result<Order> → Result<int>
+```
+
+**When to use Bind:**
+- ✅ Chain operations that return `Result<T>`
+- ✅ Transform `Result` (void) to `Result<T>` (value)
+- ✅ Maintain railway oriented flow
+- ❌ Don't use for simple value transformations (use `Map` instead)
 
 ### OrElse - Fallback Pattern
 

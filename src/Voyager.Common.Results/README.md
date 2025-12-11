@@ -9,6 +9,18 @@ Biblioteka implementująca **Result Pattern** (Railway Oriented Programming) dla
 
 Wspiera **.NET Framework 4.8** i **.NET 8** 🎯
 
+## 🧪 Testy
+
+Biblioteka zawiera **464 kompleksowe testy** zapewniające poprawność:
+
+- **Monad Laws** (13 testów) - Weryfikacja matematycznych właściwości Result<T>
+- **Invariants** (34 testy) - XOR property, null safety, immutability
+- **Error Propagation** (48 testów) - Poprawny przepływ błędów przez wszystkie operatory
+- **Composition** (60 testów) - Zachowanie łańcuchowania i kombinacji operatorów
+- **Unit Tests** (309 testów) - Podstawowa funkcjonalność, extensions, edge cases
+
+Wszystkie testy przechodzą na **.NET 8.0** i **.NET Framework 4.8**.
+
 ## 📦 Instalacja
 
 ### Package Manager Console
@@ -74,13 +86,59 @@ var userName = result.Match(
 
 ### Map - transformacja wartości
 
+Transform success values or convert void operations to value operations:
+
 ```csharp
+// Transform Result<T> values
 Result<int> GetAge() => Result<int>.Success(25);
 
 var result = GetAge()
-    .Map(age => age + 10)  // Result<int> z wartością 35
-    .Map(age => $"Wiek: {age}");  // Result<string> z wartością "Wiek: 35"
+    .Map(age => age + 10)              // Result<int> z wartością 35
+    .Map(age => $"Wiek: {age}");       // Result<string> z wartością "Wiek: 35"
+
+// Convert Result (void) to Result<T> (value)
+Result ValidateInput() => Result.Success();
+
+var numberResult = ValidateInput()
+    .Map(() => 42);                     // Result → Result<int>
+
+// Real-world example
+var emailResult = GetUser(id)
+    .Map(user => user.Email)            // Result<User> → Result<string>
+    .Map(email => email.ToLower())      // Result<string> → Result<string>
+    .Map(email => email.Trim());        // Clean transformation chain
 ```
+
+**Kiedy używać Map:**
+- ✅ Transformacja wartości sukcesu na inny typ
+- ✅ Konwersja Result (void) na Result<T> (wartość)
+- ✅ Proste transformacje bez ryzyka błędu
+- ❌ NIE używaj dla operacji zwracających Result (użyj `Bind`)
+
+### MapError - transformacja błędów
+
+Transformuj błędy bez wpływu na sukces:
+
+```csharp
+// Dodaj kontekst do błędów
+var result = Operation()
+    .MapError(error => Error.DatabaseError("DB_" + error.Code, error.Message));
+
+// Konwertuj typy błędów
+var result = ValidateUser()
+    .MapError(error => Error.BusinessError("USER_" + error.Code, error.Message));
+
+// Łańcuchuj transformacje
+var result = GetData()
+    .MapError(e => Error.UnavailableError("Serwis niedostępny: " + e.Message))
+    .TapError(e => _logger.LogError(e.Message));
+```
+
+**Kiedy używać MapError:**
+- ✅ Dodawanie prefiksów lub kontekstu do kodów/komunikatów błędów
+- ✅ Konwersja typów błędów między warstwami (API → Domain → Infrastructure)
+- ✅ Wzbogacanie błędów o dodatkowe informacje
+- ✅ Standaryzacja formatów błędów
 
 ### Bind - łańcuchowanie operacji zwracających Result
 
@@ -112,6 +170,32 @@ var result = GetAge()
         Error.ValidationError("Musisz mieć minimum 18 lat")
     );
 ```
+
+### Finally - czyszczenie zasobów
+
+Wykonuje akcję niezależnie od sukcesu czy błędu (jak blok finally):
+
+```csharp
+// Zawsze zamknij połączenie
+var result = SaveToDatabase(data)
+    .Finally(() => connection.Close());
+
+// Zawsze zwolnij zasób
+var userData = LoadFromFile(path)
+    .Finally(() => fileStream.Dispose());
+
+// Łańcuchowanie z innymi operacjami
+var result = GetUser(id)
+    .Map(user => user.Email)
+    .Tap(email => _logger.LogInfo(email))
+    .Finally(() => _metrics.RecordOperation());
+```
+
+**Kiedy używać Finally:**
+- ✅ Czyszczenie zasobów (zamykanie połączeń, dispose strumieni)
+- ✅ Logowanie/metryki niezależnie od wyniku
+- ✅ Zwalnianie locków lub semaforów
+- ✅ Każda operacja cleanup, która musi się wykonać w obu ścieżkach
 
 ### OrElse - wartości alternatywne (fallback pattern)
 
@@ -227,7 +311,69 @@ Error.TimeoutError("Api.Timeout", "Żądanie API przekroczyło limit czasu")
 // Nieoczekiwany błąd
 Error.UnexpectedError("Nieoczekiwany błąd systemowy")
 Error.FromException(exception)
+
+// Niezalogowany użytkownik (authentication failure - 401)
+Error.UnauthorizedError("User not logged in")
+Error.UnauthorizedError("AUTH_TOKEN_EXPIRED", "Session expired")
 ```
+
+## 🛡️ Try - Bezpieczne wywołania mogące rzucić wyjątki
+
+Metoda `Try` konwertuje kod rzucający wyjątki na Result Pattern:
+
+### Podstawowe użycie
+
+```csharp
+// Try dla operacji zwracających wartość
+var result = Result<int>.Try(() => int.Parse(userInput));
+
+// Try dla operacji void
+var result = Result.Try(() => File.Delete(path));
+```
+
+### Niestandardowe mapowanie błędów
+
+```csharp
+// Mapuj wyjątki na konkretne typy błędów
+var result = Result<int>.Try(
+    () => int.Parse(userInput),
+    ex => ex is FormatException
+        ? Error.ValidationError("Invalid number format")
+        : ex is OverflowException
+        ? Error.ValidationError("Number too large")
+        : Error.FromException(ex));
+
+// Try z operacjami file I/O
+var configResult = Result<string>.Try(
+    () => File.ReadAllText(configPath),
+    ex => ex is FileNotFoundException
+        ? Error.NotFoundError("Config file not found")
+        : ex is UnauthorizedAccessException
+        ? Error.PermissionError("Access denied")
+        : Error.FromException(ex));
+```
+
+### Łańcuchowanie Try z innymi operacjami
+
+```csharp
+// Try + Bind + Map
+var userData = Result<string>.Try(() => File.ReadAllText(path))
+    .Bind(json => ParseJson(json))
+    .Bind(data => ValidateData(data))
+    .Map(data => data.UserId);
+
+// Try z obsługą wielu źródeł
+var config = Result<Config>.Try(() => LoadFromFile(primaryPath))
+    .OrElse(() => Result<Config>.Try(() => LoadFromFile(backupPath)))
+    .OrElse(() => GetDefaultConfig());
+```
+
+**Kiedy używać Try:**
+- ✅ Wrapping third-party APIs rzucających wyjątki
+- ✅ File I/O, parsowanie, wywołania sieciowe
+- ✅ Konwersja legacy kodu opartego na wyjątkach
+- ✅ Niestandardowe mapowanie wyjątków na typy błędów
+- ❌ NIE używaj dla oczekiwanej logiki biznesowej (użyj bezpośrednio Result)
 
 ## 🔄 Implicit conversions
 
@@ -296,6 +442,38 @@ public Result<User> GetUser(int id)
     {
         return Error.UnexpectedError("Unexpected error occurred", ex);
     }
+}
+
+// ALTERNATYWNIE: Użyj Try dla prostszych przypadków
+public Result<Config> LoadConfig(string path)
+{
+    // Try automatycznie owija wyjątki w Result
+    return Result<Config>.Try(
+        () => JsonSerializer.Deserialize<Config>(File.ReadAllText(path))!,
+        ex => ex is FileNotFoundException
+            ? Error.NotFoundError("Config file not found")
+            : ex is JsonException
+            ? Error.ValidationError("Invalid JSON format")
+            : Error.FromException(ex));
+}
+
+// Try dla operacji void
+public Result DeleteFile(string path)
+{
+    return Result.Try(
+        () => File.Delete(path),
+        ex => ex is UnauthorizedAccessException
+            ? Error.PermissionError("Access denied")
+            : Error.FromException(ex));
+}
+
+// Try z chain operacji
+public Result<UserData> LoadUserData(string path)
+{
+    return Result<string>.Try(() => File.ReadAllText(path))
+        .Bind(json => ParseJson(json))
+        .Bind(data => ValidateData(data))
+        .Map(data => MapToUserData(data));
 }
 
 // Obsługuj wyjątki infrastruktury i konwertuj na Result

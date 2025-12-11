@@ -22,7 +22,7 @@ This is a **Railway Oriented Programming** library implementing the Result Patte
 - **`ResultCollectionExtensions`**: Collection operations (`Combine`, `Partition`, `GetSuccessValues`)
 
 ### Error Types (ErrorType enum)
-`None`, `Validation`, `Permission`, `Database`, `Business`, `NotFound`, `Conflict`, `Unavailable`, `Timeout`, `Unexpected`
+`None`, `Validation`, `Permission`, `Unauthorized`, `Database`, `Business`, `NotFound`, `Conflict`, `Unavailable`, `Timeout`, `Unexpected`
 
 ## Critical Patterns
 
@@ -105,22 +105,30 @@ Use specific error types with optional custom codes:
 ```csharp
 Error.ValidationError("Email required")                           // Default code
 Error.NotFoundError($"Order {id} not found")                     // Context in message
+Error.UnauthorizedError("User not logged in")                    // Authentication failure
+Error.PermissionError("Access denied")                           // Authorization failure
 Error.BusinessError("INSUFFICIENT_BALANCE", "Balance too low")   // Custom code
 Error.UnavailableError("Service temporarily unavailable")        // Service down/rate limit
 Error.TimeoutError("Request timed out after 30s")               // Operation timeout
 Error.FromException(exception)                                    // Convert exception
 ```
 
+**Common distinction**:
+- `UnauthorizedError` (401) = Not authenticated (not logged in, token expired)
+- `PermissionError` (403) = Authenticated but insufficient permissions
+
 ## Development Workflow
 
 ### Build System Architecture
 Project uses **modular MSBuild configuration** in `build/*.props` files:
 - `Build.Versioning.props` - MinVer Git-based versioning (CRITICAL dependency)
-- `Build.CodeQuality.props` - Analyzers, deterministic builds, warnings as errors
+- `Build.CodeQuality.props` - Analyzers, **deterministic builds**, warnings as errors
 - `Build.NuGet.props` - Package metadata, licensing, publishing settings
 - `Build.SourceLink.props` - Debugging support for published packages
 
 All projects inherit from `Directory.Build.props` which imports these modules.
+
+**Deterministic Builds**: Enabled via `<Deterministic>true</Deterministic>` and `<ContinuousIntegrationBuild>` to ensure identical source code produces identical binaries. This eliminates non-deterministic library warnings in NuGet packages. See `docs/DETERMINISTIC-BUILDS.md`.
 
 ### Build & Test Commands
 ```powershell
@@ -135,8 +143,10 @@ dotnet pack src/Voyager.Common.Results/Voyager.Common.Results.csproj -c Release
 
 **Common Build Issues & Solutions**:
 - **NU5119 XML file error**: `dotnet clean -c Release` then rebuild 
+- **NU5017 no dependencies/content error**: When packing, specify the main project explicitly: `dotnet pack src/Voyager.Common.Results/Voyager.Common.Results.csproj -c Release`
 - **0.0.0.0 version**: Create Git tag (`git tag v1.2.3`) for proper MinVer versioning
 - **Multi-framework issues**: Test both `dotnet build -f net8.0` and `dotnet build -f net48`
+- **IDE0036 modifier order**: Use `public static new` not `public new static` for overriding static methods
 
 ### Critical: MinVer Versioning Dependency
 **PROJECT WILL NOT BUILD CORRECTLY WITHOUT GIT TAGS!**
@@ -182,13 +192,13 @@ dotnet test -f net48
 **Workflow file**: `.github/workflows/ci.yml`
 
 **Triggers**:
-- Push to `main`/`master` → Preview build + publish
+- Push to `main`/`master`/`develop` → Preview build + publish
 - Git tags `v*` → Release build + GitHub Release
 - Pull requests → Build and test only
 
 **Pipeline jobs**:
 1. **build** - Multi-target compile, tests, coverage, pack artifacts, uploads to GitHub artifacts
-2. **deploy** - Downloads artifacts, publishes to GitHub Packages + NuGet.org (main/master push only)  
+2. **deploy** - Downloads artifacts, publishes to GitHub Packages + NuGet.org (push to main/master/develop or tags only)  
 3. **release** - Downloads artifacts, creates GitHub Release with .nupkg files (tags `v*` only)
 
 **Critical CI requirements**:
@@ -196,13 +206,14 @@ dotnet test -f net48
 - Ubuntu + Mono for .NET Framework 4.8 testing  
 - Codecov integration for coverage reports (public repos only)
 - Secrets: `VOY_ACTIONLOGIN`, `VOY_ACTIONLOGINPASS`, `VOY_AND_API_KEY`
+- Pack command targets specific project: `dotnet pack src/Voyager.Common.Results/Voyager.Common.Results.csproj`
 
 See [BUILD.md](../BUILD.md) for manual publishing steps and troubleshooting.
 
 ## Testing Conventions
 
-### Test Structure (NUnit)
-Tests are in `src/Voyager.Common.Results.Tests/`:
+### Test Structure (xUnit)
+Tests are in `src/Voyager.Common.Results.Tests/` using **xUnit** framework:
 - `ErrorTests.cs`: Error factory methods
 - `ResultTests.cs`: Non-generic Result operations
 - `ResultTTests.cs`: Generic Result<T> operations
@@ -211,7 +222,7 @@ Tests are in `src/Voyager.Common.Results.Tests/`:
 
 ### Test Naming
 ```csharp
-[Test]
+[Fact]
 public void MethodName_Scenario_ExpectedBehavior()
 {
     // Arrange
@@ -220,32 +231,32 @@ public void MethodName_Scenario_ExpectedBehavior()
     // Act
     var result = ...;
     
-    // Assert
-    Assert.That(result.IsSuccess, Is.True);
-    Assert.That(result.Value, Is.EqualTo(...));
+    // Assert (xUnit style)
+    Assert.True(result.IsSuccess);
+    Assert.Equal(expectedValue, result.Value);
 }
 ```
 
 ### Testing Both Paths
 Always test success AND failure for each operation:
 ```csharp
-[Test]
+[Fact]
 public void OrElse_Success_ReturnsOriginal() { ... }
 
-[Test]
+[Fact]
 public void OrElse_Failure_ReturnsAlternative() { ... }
 ```
 
 ### Async Test Pattern
 ```csharp
-[Test]
+[Fact]
 public async Task MapAsync_TaskResult_SyncMapper_MapsValue()
 {
     var result = Task.FromResult(Result<int>.Success(5));
     var mapped = await result.MapAsync(x => x * 2);
     
-    Assert.That(mapped.IsSuccess, Is.True);
-    Assert.That(mapped.Value, Is.EqualTo(10));
+    Assert.True(mapped.IsSuccess);
+    Assert.Equal(10, mapped.Value);
 }
 ```
 

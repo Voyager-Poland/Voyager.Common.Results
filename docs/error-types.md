@@ -48,7 +48,7 @@ Error.NotFoundError("Customer with email 'test@example.com' not found")
 
 ### PermissionError
 
-Used when the user lacks necessary permissions.
+Used when the user lacks necessary permissions (authorized but forbidden).
 
 ```csharp
 Error.PermissionError("You don't have permission to delete this resource")
@@ -60,10 +60,40 @@ Error.PermissionError("You can only edit your own profile")
 ```
 
 **When to use:**
-- Authorization failures
+- Authorization failures (user authenticated but lacks permission)
 - Role-based access control
 - Resource ownership checks
-- API key validation failures
+- Feature flags disabled for user
+
+**HTTP Status Code:** 403 Forbidden
+
+### UnauthorizedError
+
+Used when the user is not authenticated (not logged in or session expired).
+
+```csharp
+Error.UnauthorizedError("User not logged in")
+Error.UnauthorizedError("Auth.TokenExpired", "Authentication token has expired")
+
+// Common use cases
+Error.UnauthorizedError("Please log in to access this resource")
+Error.UnauthorizedError("Session expired. Please log in again")
+Error.UnauthorizedError("Auth.InvalidToken", "Invalid authentication token")
+Error.UnauthorizedError("Auth.MissingCredentials", "No authentication credentials provided")
+```
+
+**When to use:**
+- Missing authentication credentials
+- Expired authentication tokens
+- Invalid authentication tokens
+- Session timeout
+- Login required for protected resources
+
+**HTTP Status Code:** 401 Unauthorized
+
+**Common distinction:**
+- `UnauthorizedError` (401) = "Who are you?" (not logged in)
+- `PermissionError` (403) = "I know who you are, but you can't do that" (insufficient permissions)
 
 ### ConflictError
 

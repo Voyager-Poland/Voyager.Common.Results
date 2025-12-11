@@ -41,14 +41,24 @@ namespace Voyager.Common.Results
 				new(ErrorType.Permission, "Permission.Denied", message);
 
 		/// <summary>
+		/// Creates an unauthorized error (user not authenticated)
+		/// </summary>
+		public static Error UnauthorizedError(string code, string message) =>
+				new(ErrorType.Unauthorized, code, message);
+
+		/// <summary>
+		/// Creates an unauthorized error with a default code
+		/// </summary>
+		public static Error UnauthorizedError(string message) =>
+				new(ErrorType.Unauthorized, "Unauthorized", message);
+
+		/// <summary>
 		/// Creates a database error
 		/// </summary>
 		public static Error DatabaseError(string code, string message) =>
-				new(ErrorType.Database, code, message);
-
-		/// <summary>
-		/// Creates a database error with a default code
-		/// </summary>
+				new(ErrorType.Database, code, message);     /// <summary>
+															/// Creates a database error with a default code
+															/// </summary>
 		public static Error DatabaseError(string message) =>
 				new(ErrorType.Database, "Database.Error", message);
 

@@ -189,6 +189,47 @@ public Result<User> GetUser(int userId)
 }
 ```
 
+**Alternative: Using Try Method**
+
+For simpler cases, use `Try` to automatically wrap exceptions:
+
+```csharp
+// Basic: wraps exceptions with Error.FromException
+public Result<string> ReadConfig(string path)
+{
+    return Result<string>.Try(() => File.ReadAllText(path));
+}
+
+// With custom error mapping
+public Result<int> ParseNumber(string input)
+{
+    return Result<int>.Try(
+        () => int.Parse(input),
+        ex => ex is FormatException
+            ? Error.ValidationError("Invalid number format")
+            : Error.FromException(ex));
+}
+
+// Void operations
+public Result DeleteFile(string path)
+{
+    return Result.Try(
+        () => File.Delete(path),
+        ex => ex is UnauthorizedAccessException
+            ? Error.PermissionError("Access denied")
+            : Error.FromException(ex));
+}
+
+// Chain with other operations
+public Result<UserData> LoadUserData(string path)
+{
+    return Result<string>.Try(() => File.ReadAllText(path))
+        .Bind(json => ParseJson(json))
+        .Bind(data => ValidateData(data))
+        .Map(data => MapToUserData(data));
+}
+```
+
 ### 3. ASP.NET Core Integration
 
 ```csharp
