@@ -57,6 +57,57 @@ namespace Voyager.Common.Results
         /// <returns>A failed Result instance containing the specified error.</returns>
         public static Result Failure(Error error) => new(false, error);
 
+        /// <summary>
+        /// Executes an action and wraps any exceptions in a Result
+        /// </summary>
+        /// <example>
+        /// <code>
+        /// var result = Result.Try(() => File.WriteAllText("log.txt", message));
+        /// </code>
+        /// </example>
+        /// <param name="action">Action to execute.</param>
+        /// <returns>Success if action completes without exception, otherwise Failure with error from exception.</returns>
+        public static Result Try(Action action)
+        {
+            try
+            {
+                action();
+                return Success();
+            }
+            catch (Exception ex)
+            {
+                return Failure(Error.FromException(ex));
+            }
+        }
+
+        /// <summary>
+        /// Executes an action and wraps any exceptions in a Result with custom error mapping
+        /// </summary>
+        /// <example>
+        /// <code>
+        /// var result = Result.Try(
+        ///     () => File.WriteAllText("log.txt", message),
+        ///     ex => ex is IOException 
+        ///         ? Error.UnavailableError("File system unavailable")
+        ///         : Error.UnexpectedError(ex.Message));
+        /// </code>
+        /// </example>
+        /// <param name="action">Action to execute.</param>
+        /// <param name="errorMapper">Function to convert exception to custom error.</param>
+        /// <returns>Success if action completes without exception, otherwise Failure with mapped error.</returns>
+        public static Result Try(Action action, Func<Exception, Error> errorMapper)
+        {
+            try
+            {
+                action();
+                return Success();
+            }
+            catch (Exception ex)
+            {
+                return Failure(errorMapper(ex));
+            }
+        }
+
         // ========== PATTERN MATCHING ==========
 
         /// <summary>
@@ -87,6 +138,25 @@ namespace Voyager.Common.Results
         }
 
         // ========== FUNCTIONAL METHODS ==========
+
+        /// <summary>
+        /// Map - transforms void result into a Result with a value (functor map)
+        /// </summary>
+        /// <example>
+        /// <code>
+        /// var result = ValidateInput()
+        ///     .Map(() => DateTime.UtcNow); // Result → Result&lt;DateTime&gt;
+        /// </code>
+        /// </example>
+        /// <param name="mapper">Function producing a value from success.</param>
+        /// <typeparam name="TValue">Type of value to produce.</typeparam>
+        /// <returns>Result&lt;TValue&gt; with mapped value or propagates failure.</returns>
+        public Result<TValue> Map<TValue>(Func<TValue> mapper)
+        {
+            return IsSuccess
+                ? Result<TValue>.Success(mapper())
+                : Result<TValue>.Failure(Error);
+        }
 
         /// <summary>
         /// Bind - chains void operations returning Result (monad bind for void operations)
@@ -120,6 +190,81 @@ namespace Voyager.Common.Results
         public Result<TValue> Bind<TValue>(Func<Result<TValue>> binder)
         {
             return IsSuccess ? binder() : Result<TValue>.Failure(Error);
+        }
+
+        // ========== SIDE EFFECTS ==========
+
+        /// <summary>
+        /// Executes a side effect if the result is a success, without modifying the result
+        /// </summary>
+        /// <example>
+        /// <code>
+        /// var result = SaveToDatabase(data)
+        ///     .Tap(() => _logger.LogInfo("Data saved"));
+        /// </code>
+        /// </example>
+        /// <param name="action">Action to execute on success.</param>
+        /// <returns>The original Result unchanged.</returns>
+        public Result Tap(Action action)
+        {
+            if (IsSuccess)
+                action();
+
+            return this;
+        }
+
+        /// <summary>
+        /// Executes a side effect if the result is a failure, without modifying the result
+        /// </summary>
+        /// <example>
+        /// <code>
+        /// var result = SaveToDatabase(data)
+        ///     .TapError(error => _logger.LogError(error.Message));
+        /// </code>
+        /// </example>
+        /// <param name="action">Action to execute on failure.</param>
+        /// <returns>The original Result unchanged.</returns>
+        public Result TapError(Action<Error> action)
+        {
+            if (IsFailure)
+                action(Error);
+
+            return this;
+        }
+
+        /// <summary>
+        /// MapError - transforms the error without affecting success
+        /// </summary>
+        /// <example>
+        /// <code>
+        /// var result = Operation()
+        ///     .MapError(error => Error.DatabaseError("DB_" + error.Code, error.Message));
+        /// </code>
+        /// </example>
+        /// <param name="mapper">Function to transform the error.</param>
+        /// <returns>Transformed failure or original success.</returns>
+        public Result MapError(Func<Error, Error> mapper)
+        {
+            return IsFailure
+                ? Failure(mapper(Error))
+                : this;
+        }
+
+        /// <summary>
+        /// Executes an action regardless of whether the result is success or failure (like finally block)
+        /// </summary>
+        /// <example>
+        /// <code>
+        /// var result = SaveToDatabase(data)
+        ///     .Finally(() => connection.Close());
+        /// </code>
+        /// </example>
+        /// <param name="action">Action to execute always.</param>
+        /// <returns>The original Result unchanged.</returns>
+        public Result Finally(Action action)
+        {
+            action();
+            return this;
         }
 
         // ========== IMPLICIT CONVERSIONS ==========

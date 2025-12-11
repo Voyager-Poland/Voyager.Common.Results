@@ -45,6 +45,30 @@ public Result<User> GetUser(int id)
 }
 ```
 
+**Alternative: Using Try for simpler cases**
+
+```csharp
+// ✅ GOOD: Try for simple exception wrapping
+public Result<Config> LoadConfig(string path)
+{
+    return Result<Config>.Try(
+        () => JsonSerializer.Deserialize<Config>(File.ReadAllText(path))!,
+        ex => ex is FileNotFoundException
+            ? Error.NotFoundError("Config file not found")
+            : ex is JsonException
+            ? Error.ValidationError("Invalid JSON format")
+            : Error.FromException(ex));
+}
+
+// ✅ GOOD: Try with validation
+public Result<Config> LoadAndValidateConfig(string path)
+{
+    return Result<Config>.Try(() => LoadConfigFile(path))
+        .Bind(config => ValidateConfig(config))
+        .Tap(config => _logger.LogInfo("Config loaded"));
+}
+```
+
 ### ❌ DON'T: Use throw for expected business failures
 
 ```csharp
@@ -74,6 +98,19 @@ public Result<User> GetUser(int id)
 ```
 
 ## Railway Operators
+
+### ✅ DO: Use Map for value transformations
+
+```csharp
+// ✅ GOOD: Map for simple transformations
+var emailResult = GetUser(id)
+    .Map(user => user.Email)              // Result<User> → Result<string>
+    .Map(email => email.ToLower());       // Result<string> → Result<string>
+
+// ✅ GOOD: Map to convert void to value
+var countResult = ValidateInput()
+    .Map(() => ProcessedItemsCount);      // Result → Result<int>
+```
 
 ### ✅ DO: Chain operations instead of nesting
 

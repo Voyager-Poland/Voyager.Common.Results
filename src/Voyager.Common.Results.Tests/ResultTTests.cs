@@ -33,6 +33,63 @@ public class ResultTTests
 		Assert.Equal(error, result.Error);
 	}
 
+	// ========== TRY TESTS ==========
+
+	[Fact]
+	public void Try_WithSuccessfulFunc_ReturnsSuccessWithValue()
+	{
+		// Act
+		var result = Result<int>.Try(() => 42);
+
+		// Assert
+		Assert.True(result.IsSuccess);
+		Assert.Equal(42, result.Value);
+	}
+
+	[Fact]
+	public void Try_WithExceptionThrowingFunc_ReturnsFailure()
+	{
+		// Act
+		var result = Result<int>.Try(() => throw new InvalidOperationException("Test exception"));
+
+		// Assert
+		Assert.False(result.IsSuccess);
+		Assert.Equal(ErrorType.Unexpected, result.Error.Type);
+		Assert.Equal("Exception", result.Error.Code);
+		Assert.Equal("Test exception", result.Error.Message);
+	}
+
+	[Fact]
+	public void Try_WithCustomErrorMapper_MapsException()
+	{
+		// Act
+		var result = Result<int>.Try(
+			() => int.Parse("invalid"),
+			ex => ex is FormatException
+				? Error.ValidationError("Invalid number format")
+				: Error.UnexpectedError(ex.Message));
+
+		// Assert
+		Assert.False(result.IsSuccess);
+		Assert.Equal(ErrorType.Validation, result.Error.Type);
+		Assert.Equal("Invalid number format", result.Error.Message);
+	}
+
+	[Fact]
+	public void Try_RealWorldExample_SafeOperation()
+	{
+		// Act - safer operation that doesn't require System.Text.Json in .NET 4.8
+		var result = Result<string>.Try(
+			() => "test",
+			ex => Error.ValidationError("Operation failed"));
+
+		// Assert
+		Assert.True(result.IsSuccess);
+		Assert.Equal("test", result.Value);
+	}
+
+	// ========== MATCH TESTS ==========
+
 	[Fact]
 	public void Match_WithSuccess_CallsOnSuccessWithValue()
 	{
@@ -102,9 +159,9 @@ public class ResultTTests
 		var result = Result<int>.Success(5);
 
 		// Act
-		var bound = result.Bind(x => 
-			x > 0 
-				? Result<string>.Success(x.ToString()) 
+		var bound = result.Bind(x =>
+			x > 0
+				? Result<string>.Success(x.ToString())
 				: Result<string>.Failure(Error.ValidationError("Must be positive"))
 		);
 
@@ -136,9 +193,9 @@ public class ResultTTests
 		var binderError = Error.ValidationError("Must be positive");
 
 		// Act
-		var bound = result.Bind(x => 
-			x > 0 
-				? Result<string>.Success(x.ToString()) 
+		var bound = result.Bind(x =>
+			x > 0
+				? Result<string>.Success(x.ToString())
 				: Result<string>.Failure(binderError)
 		);
 
@@ -311,6 +368,74 @@ public class ResultTTests
 		// Assert
 		Assert.True(result.IsSuccess);
 		Assert.Equal("Value: 10", result.Value);
+	}
+
+	// ========== FINALLY TESTS ==========
+
+	[Fact]
+	public void Finally_WithSuccess_ExecutesAction()
+	{
+		// Arrange
+		var result = Result<int>.Success(42);
+		var actionExecuted = false;
+
+		// Act
+		var finalResult = result.Finally(() => actionExecuted = true);
+
+		// Assert
+		Assert.True(actionExecuted);
+		Assert.True(finalResult.IsSuccess);
+		Assert.Equal(42, finalResult.Value);
+	}
+
+	[Fact]
+	public void Finally_WithFailure_ExecutesAction()
+	{
+		// Arrange
+		var result = Result<int>.Failure(Error.ValidationError("Test error"));
+		var actionExecuted = false;
+
+		// Act
+		var finalResult = result.Finally(() => actionExecuted = true);
+
+		// Assert
+		Assert.True(actionExecuted);
+		Assert.True(finalResult.IsFailure);
+	}
+
+	[Fact]
+	public void Finally_ChainWithOtherOperations()
+	{
+		// Arrange
+		var cleanupCalled = false;
+		var processCalled = false;
+
+		// Act
+		var result = Result<int>.Success(10)
+			.Map(x => x * 2)
+			.Tap(x => processCalled = true)
+			.Finally(() => cleanupCalled = true);
+
+		// Assert
+		Assert.True(processCalled);
+		Assert.True(cleanupCalled);
+		Assert.True(result.IsSuccess);
+		Assert.Equal(20, result.Value);
+	}
+
+	[Fact]
+	public void Finally_SimulatesResourceCleanup()
+	{
+		// Arrange
+		var resourceClosed = false;
+
+		// Act
+		var result = Result<string>.Success("data")
+			.Finally(() => resourceClosed = true);
+
+		// Assert
+		Assert.True(resourceClosed);
+		Assert.True(result.IsSuccess);
 	}
 
 	// ========== ORELSE TESTS ==========
