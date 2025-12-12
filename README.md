@@ -13,7 +13,9 @@ A lightweight, functional **Result Pattern** implementation for .NET that enable
 
 - 🎯 **Type-safe error handling** without exceptions
 - 🚂 **Railway Oriented Programming** with method chaining
-- ⚡ **Async/await support** with extension methods
+- ⚡ **Async/await support** with extension methods and instance proxies
+- 🧩 **Contextual errors** with Ensure/EnsureAsync error factories
+- 🧵 **Deadlock-safe async** - library uses ConfigureAwait(false) internally
 - 📦 **Zero dependencies** (except polyfills for .NET Framework)
 - 🔍 **Source Link enabled** for debugging
 - 📚 **Comprehensive XML documentation**
@@ -32,7 +34,7 @@ dotnet add package Voyager.Common.Results
 ```csharp
 using Voyager.Common.Results;
 
-// Define operations that can fail
+// Define operations that can fail (assumes repository doesn't throw exceptions)
 public Result<User> GetUser(int id)
 {
     var user = _repository.Find(id);
@@ -64,15 +66,15 @@ var message = result.Match(
 
 ## 🧪 Testing
 
-The library includes **464 comprehensive tests** ensuring correctness:
+The library includes a comprehensive test suite ensuring correctness across multiple dimensions:
 
-- **Monad Laws** (13 tests) - Verifies mathematical properties of Result<T>
-- **Invariants** (34 tests) - XOR property, null safety, immutability
-- **Error Propagation** (48 tests) - Correct error flow through all operators
-- **Composition** (60 tests) - Operator chaining and combination behavior
-- **Unit Tests** (309 tests) - Core functionality, extensions, edge cases
+- **Monad Laws** - Verifies mathematical properties of Result<T> (identity, composition)
+- **Invariants** - XOR property, null safety, immutability guarantees
+- **Error Propagation** - Correct error flow through all operators and chains
+- **Composition** - Operator chaining and combination behavior in complex scenarios
+- **Unit Tests** - Core functionality, extension methods, edge cases, and cancellation
 
-All tests pass on both **.NET 8.0** and **.NET Framework 4.8**.
+All tests validate behavior on both **.NET 8.0** and **.NET Framework 4.8** to ensure cross-platform compatibility.
 
 ## 📖 Documentation
 
@@ -120,14 +122,6 @@ GetUser(id)
 Executes an action regardless of success or failure (like finally block):
 
 ```csharp
-// Always close connection
-var result = SaveToDatabase(data)
-    .Finally(() => connection.Close());
-
-// Always dispose resource
-var userData = LoadFromFile(path)
-    .Finally(() => fileStream.Dispose());
-
 // Chain with other operations
 var result = GetUser(id)
     .Map(user => user.Email)
@@ -170,6 +164,13 @@ var result = Result.Try(
 var userData = Result<string>.Try(() => File.ReadAllText(path))
     .Bind(json => ParseJson(json))
     .Map(data => data.UserId);
+
+// Robust database operations (handles both exceptions and null)
+public Result<User> GetUser(int id)
+{
+    return Result<User>.Try(() => _repository.Find(id))
+        .Ensure(user => user is not null, Error.NotFoundError($"User {id} not found"));
+}
 ```
 
 **When to use Try:**
@@ -180,14 +181,14 @@ var userData = Result<string>.Try(() => File.ReadAllText(path))
 
 ### TryAsync - Async Exception Handling
 
-Safely convert async exception-throwing code into Result pattern:
+Safely convert async exception-throwing code into Result pattern. Automatically maps `OperationCanceledException` to `ErrorType.Cancelled` when using CancellationToken:
 
 ```csharp
 // Preferred: Use Result<T>.TryAsync proxy for cleaner syntax
 var result = await Result<Config>.TryAsync(async () => 
     await JsonSerializer.DeserializeAsync<Config>(stream));
 
-// With CancellationToken support (returns ErrorType.Cancelled if cancelled)
+// With CancellationToken support (auto-maps OperationCanceledException → ErrorType.Cancelled)
 var result = await Result<string>.TryAsync(
     async ct => await httpClient.GetStringAsync(url, ct),
     cancellationToken);
@@ -325,6 +326,61 @@ var data = await GetFromPrimaryCacheAsync(key)
 - Cache → Database → Default value
 - Primary API → Fallback API → Cached data  
 - User preferences → Team defaults → System defaults
+
+### Ensure - Contextual Validation
+
+Validate with error messages that include the actual value:
+
+```csharp
+// Static error (old way)
+var result = GetUser(id)
+    .Ensure(
+        user => user.Age >= 18,
+        Error.ValidationError("Must be 18 or older"));
+
+// Contextual error (recommended - provides better error messages)
+var result = GetUser(id)
+    .Ensure(
+        user => user.Age >= 18,
+        user => Error.ValidationError($"User {user.Name} is {user.Age} years old, must be 18+"));
+```
+
+### EnsureAsync - Async Contextual Validation
+
+Validate with async predicates and contextual errors:
+
+```csharp
+// With sync predicate
+var result = await GetUserAsync(id)
+    .EnsureAsync(
+        user => user.Age >= 18,
+        user => Error.ValidationError($"User {user.Name} is {user.Age}, must be 18+"));
+
+// With async predicate
+var result = await GetUserAsync(id)
+    .EnsureAsync(
+        async user => await _repo.IsActiveAsync(user.Id),
+        user => Error.ValidationError($"User {user.Name} is inactive"));
+```
+
+### Instance Method Proxies
+
+No need to import `Extensions` namespace - common async methods are available directly on `Result<T>`:
+
+```csharp
+var result = await GetUser(id)              // Result<User>
+    .EnsureAsync(
+        async u => await _repo.IsActiveAsync(u.Id),
+        u => Error.ValidationError($"User {u.Name} inactive"))
+    .TapAsync(async u => await _audit.LogAsync($"Access: {u.Id}"))
+    .OrElseAsync(() => GetDefaultUserAsync());
+```
+
+Available instance proxies:
+- `EnsureAsync(asyncPredicate, error)` - async validation
+- `EnsureAsync(asyncPredicate, errorFactory)` - async validation with contextual error
+- `TapAsync(asyncAction)` - async side effects
+- `OrElseAsync(asyncAlternativeFunc)` - async fallback
 
 ### Async Operations
 

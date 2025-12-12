@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **README improvements**: Updated documentation for clarity and accuracy
+  - Removed hardcoded test counts in Testing section (now generic descriptions)
+  - Enhanced TryAsync section to clarify automatic `OperationCanceledException` → `ErrorType.Cancelled` mapping
+  - Added comment to Quick Start example explaining repository doesn't throw exceptions
+  - Added robust database example showing `Try()` + `Ensure()` pattern for handling both exceptions and null values
+  - Updated Features list with new capabilities (contextual errors, deadlock-safe async, instance proxies)
+
 ### Added
 - **`Ensure` with contextual error factory**: New overload that receives the value to create context-aware error messages
   ```csharp
