@@ -39,7 +39,7 @@ public Result<User> GetUser(int id)
 {
     var user = _repository.Find(id);
     return user is not null 
-        ? Result<User>.Success(user)
+        ? user  // Implicit conversion: User → Result<User>
         : Error.NotFoundError($"User {id} not found");
 }
 
@@ -47,7 +47,7 @@ public Result<Order> GetLatestOrder(User user)
 {
     var order = _repository.GetLatestOrder(user.Id);
     return order is not null
-        ? Result<Order>.Success(order)
+        ? order 
         : Error.NotFoundError("No orders found");
 }
 
@@ -109,7 +109,6 @@ GetUser(id)
     .Bind(email => SendEmail(email))       // Chain another Result operation
     .Ensure(sent => sent, Error.BusinessError("Email not sent"))
     .Tap(() => _logger.LogInfo("Email sent"))  // Side effect
-    .Finally(() => connection.Close())     // Cleanup (always executes)
     .OrElse(() => GetDefaultUser())        // Fallback if failed
     .Match(
         onSuccess: () => "Success",
@@ -394,10 +393,10 @@ await GetUserAsync(id)
 ### Collection Operations
 
 ```csharp
-var results = new[] {
-    Result<int>.Success(1),
-    Result<int>.Success(2),
-    Result<int>.Success(3)
+var results = new Result<int>[] {
+    1,  // Implicit conversion: int → Result<int>
+    2,
+    3
 };
 
 // Combine all results into one
@@ -468,16 +467,6 @@ dotnet test --collect:"XPlat Code Coverage"
 dotnet tool install -g dotnet-reportgenerator-globaltool
 reportgenerator -reports:**/coverage.cobertura.xml -targetdir:coverage-report -reporttypes:Html
 ```
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
 
 ### Development Workflow
 
