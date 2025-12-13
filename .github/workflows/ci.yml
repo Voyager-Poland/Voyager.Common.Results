@@ -42,8 +42,10 @@ jobs:
     - name: Build
       run: dotnet build --no-restore -c Release
 
-    - name: Test
-      run: dotnet test --no-build --verbosity normal -c Release --collect:"XPlat Code Coverage"
+    - name: Test (matrix target only)
+      env:
+        TARGET_FRAMEWORK: ${{ matrix.dotnet-version == '6.0.x' && 'net6.0' || 'net8.0' }}
+      run: dotnet test --no-build --verbosity normal -c Release -f $TARGET_FRAMEWORK --collect:"XPlat Code Coverage"
 
     - name: Upload coverage reports
       uses: codecov/codecov-action@v5
@@ -67,9 +69,36 @@ jobs:
         retention-days: 1
         overwrite: true
 
+  test-net48:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup .NET 8 SDK (for tooling)
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+
+    - name: Add Voyager Source
+      run: dotnet nuget add source "https://nuget.pkg.github.com/Voyager-Poland/index.json" -n Voyager-Poland -u ${{secrets.VOY_ACTIONLOGIN}} -p ${{secrets.VOY_ACTIONLOGINPASS}} --store-password-in-clear-text
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build net48
+      run: dotnet build --no-restore -c Release -f net48
+
+    - name: Test net48 (no coverage)
+      run: dotnet test --no-build -c Release -f net48
+
   deploy:
     runs-on: ubuntu-latest
-    needs: build
+    needs: [build, test-net48]
     # Only deploy on push to main/master (not on PR)
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
     permissions:
@@ -94,7 +123,7 @@ jobs:
 
   release:
     runs-on: ubuntu-latest
-    needs: build
+    needs: [build, test-net48]
     # Only create release on tags
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
