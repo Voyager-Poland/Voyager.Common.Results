@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added robust database example showing `Try()` + `Ensure()` pattern for handling both exceptions and null values
   - Updated Features list with new capabilities (contextual errors, deadlock-safe async, instance proxies)
   - Use implicit conversions in examples instead of explicit `Result<T>.Success()` calls
+- **Build tooling**: Disabled implicit usings and added explicit global usings for net6/net8 targets to ensure consistent compilation across frameworks
 - **Strong Name signing**: Added assembly signing configuration for distributed library
   - Generated `Voyager.Common.Results.snk` key file for strong name signing
   - Configured `Build.Signing.props` to enable assembly signing in both net8.0 and net48 targets

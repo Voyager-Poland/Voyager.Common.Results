@@ -1,8 +1,6 @@
-﻿#if NET48
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-#endif
 
 namespace Voyager.Common.Results.Extensions
 {
