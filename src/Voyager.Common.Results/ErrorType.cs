@@ -54,6 +54,11 @@
 		Timeout,
 
 		/// <summary>
+		/// Operation was cancelled
+		/// </summary>
+		Cancelled,
+
+		/// <summary>
 		/// Unexpected system error
 		/// </summary>
 		Unexpected,

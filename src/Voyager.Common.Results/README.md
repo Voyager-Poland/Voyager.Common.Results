@@ -375,198 +375,115 @@ var config = Result<Config>.Try(() => LoadFromFile(primaryPath))
 - ✅ Niestandardowe mapowanie wyjątków na typy błędów
 - ❌ NIE używaj dla oczekiwanej logiki biznesowej (użyj bezpośrednio Result)
 
-## 🔄 Implicit conversions
+## ⚡ TryAsync - Bezpieczne wywołania asynchroniczne mogące rzucić wyjątki
+
+Metoda `TryAsync` konwertuje asynchroniczny kod rzucający wyjątki na Result Pattern:
+
+### Podstawowe użycie
 
 ```csharp
-// Automatyczna konwersja wartości na Result
-Result<int> GetNumber() => 42;  // Zamiast Result<int>.Success(42)
+// Preferowane: użyj Result<T>.TryAsync dla czystszej składni
+var result = await Result<Config>.TryAsync(async () => 
+    await JsonSerializer.DeserializeAsync<Config>(stream));
 
-// Automatyczna konwersja Error na Result
-Result<User> GetUser(int id)
-{
-    if (id <= 0)
-        return Error.ValidationError("ID must be positive");
-    // ...
-}
+// Z CancellationToken (zwraca ErrorType.Cancelled przy anulowaniu)
+var result = await Result<string>.TryAsync(
+    async ct => await httpClient.GetStringAsync(url, ct),
+    cancellationToken);
 ```
 
-## 💡 Best Practices
-
-### ✅ DO
+### Niestandardowe mapowanie błędów
 
 ```csharp
-// Używaj Result dla OCZEKIWANYCH błędów biznesowych
-public Result<User> CreateUser(string email)
-{
-    if (string.IsNullOrEmpty(email))
-        return Error.ValidationError("Email is required");
-    
-    // ...
-    return user;
-}
+// Mapuj wyjątki async na konkretne typy błędów
+var config = await Result<Config>.TryAsync(
+    async () => await JsonSerializer.DeserializeAsync<Config>(stream),
+    ex => ex is JsonException
+        ? Error.ValidationError("Nieprawidłowy format JSON")
+        : ex is IOException
+        ? Error.UnavailableError("Błąd odczytu pliku")
+        : Error.FromException(ex));
 
-// Łańcuchuj operacje Result bez zagnieżdżania
-var result = GetUser(id)
-    .Bind(user => ValidateUser(user))
-    .Bind(user => SaveUser(user))
-    .Tap(user => SendWelcomeEmail(user));
-
-// Używaj OrElse dla wartości alternatywnych (fallback)
-var config = LoadFromCache()
-    .OrElse(() => LoadFromDatabase())
-    .OrElse(() => GetDefaultConfig());
-
-// ŁĄCZ Result Pattern z try-catch dla NIEOCZEKIWANYCH wyjątków technicznych
-public Result<User> GetUser(int id)
-{
-    // Oczekiwane błędy biznesowe → Result
-    if (id <= 0)
-        return Error.ValidationError("ID must be positive");
-    
-    try
-    {
-        // Nieoczekiwane błędy techniczne (DB, sieć, itp.) → try-catch
-        var user = _repository.GetUser(id);
-        
-        if (user is null)
-            return Error.NotFoundError($"User {id} not found");
-        
-        return user;
-    }
-    catch (DbException ex)
-    {
-        // Konwertuj nieoczekiwany wyjątek techniczny na Result
-        return Error.DatabaseError("Database connection failed", ex);
-    }
-    catch (Exception ex)
-    {
-        return Error.UnexpectedError("Unexpected error occurred", ex);
-    }
-}
-
-// ALTERNATYWNIE: Użyj Try dla prostszych przypadków
-public Result<Config> LoadConfig(string path)
-{
-    // Try automatycznie owija wyjątki w Result
-    return Result<Config>.Try(
-        () => JsonSerializer.Deserialize<Config>(File.ReadAllText(path))!,
-        ex => ex is FileNotFoundException
-            ? Error.NotFoundError("Config file not found")
-            : ex is JsonException
-            ? Error.ValidationError("Invalid JSON format")
-            : Error.FromException(ex));
-}
-
-// Try dla operacji void
-public Result DeleteFile(string path)
-{
-    return Result.Try(
-        () => File.Delete(path),
-        ex => ex is UnauthorizedAccessException
-            ? Error.PermissionError("Access denied")
-            : Error.FromException(ex));
-}
-
-// Try z chain operacji
-public Result<UserData> LoadUserData(string path)
-{
-    return Result<string>.Try(() => File.ReadAllText(path))
-        .Bind(json => ParseJson(json))
-        .Bind(data => ValidateData(data))
-        .Map(data => MapToUserData(data));
-}
-
-// Obsługuj wyjątki infrastruktury i konwertuj na Result
-public async Task<Result<Order>> PlaceOrderAsync(Order order)
-{
-    // Walidacja biznesowa
-    if (order.Items.Count == 0)
-        return Error.ValidationError("Order must contain at least one item");
-    
-    try
-    {
-        await _orderRepository.SaveAsync(order);
-        await _emailService.SendConfirmationAsync(order);
-        return order;
-    }
-    catch (TimeoutException ex)
-    {
-        return Error.UnexpectedError("Email service timeout", ex);
-    }
-    catch (InvalidOperationException ex)
-    {
-        return Error.BusinessError("Cannot place order in current state", ex);
-    }
-}
+// TryAsync z operacjami HTTP i CancellationToken
+var response = await Result<string>.TryAsync(
+    async ct => await httpClient.GetStringAsync(url, ct),
+    cancellationToken,
+    ex => ex is HttpRequestException
+        ? Error.UnavailableError("Serwis niedostępny")
+        : Error.FromException(ex));
 ```
 
-### ❌ DON'T
+### Łańcuchowanie TryAsync z innymi operacjami async
 
 ```csharp
-// NIE używaj throw dla OCZEKIWANYCH błędów biznesowych
-public Result<User> GetUser(int id)
-{
-    if (id <= 0)
-        throw new ArgumentException("Invalid ID"); // ❌ BAD: użyj return Error.ValidationError()
-    
-    // ...
-}
+// TryAsync + BindAsync + MapAsync
+var userData = await Result<string>.TryAsync(
+        async ct => await File.ReadAllTextAsync(path, ct),
+        cancellationToken)
+    .BindAsync(json => ParseJsonAsync(json))
+    .BindAsync(data => ValidateDataAsync(data))
+    .MapAsync(data => data.UserId);
 
-// NIE ignoruj nieoczekiwanych wyjątków technicznych
-public Result<User> GetUser(int id)
-{
-    // ❌ BAD: brak try-catch - wyjątek DB może "wyskoczyć" i zepsuć Result Pattern
-    var user = _repository.GetUser(id); // może rzucić DbException!
-    
-    if (user is null)
-        return Error.NotFoundError("User not found");
-    
-    return user;
-}
+// TryAsync z obsługą wielu źródeł async (fallback pattern)
+var config = await Result<Config>.TryAsync(
+        async () => await LoadFromFileAsync(primaryPath))
+    .OrElseAsync(() => Result<Config>.TryAsync(
+        async () => await LoadFromFileAsync(backupPath)))
+    .OrElseAsync(() => GetDefaultConfigAsync());
 
-// NIE zwracaj null zamiast Result.Failure
-public Result<User> FindUser(string email)
-{
-    var user = _repository.FindByEmail(email);
-    return user; // ❌ BAD: jeśli user == null, zwróci Result.Success(null)!
-    
-    // ✅ GOOD:
-    // if (user is null)
-    //     return Error.NotFoundError("User not found");
-    // return user;
-}
-
-// NIE używaj try-catch do kontroli przepływu biznesowego
-public Result<decimal> CalculateDiscount(User user)
-{
-    try
-    {
-        if (!user.IsPremium)
-            throw new Exception("Not premium"); // ❌ BAD
-        
-        return user.DiscountPercentage;
-    }
-    catch
-    {
-        return Error.BusinessError("User is not premium");
-    }
-    
-    // ✅ GOOD:
-    // if (!user.IsPremium)
-    //     return Error.BusinessError("User is not premium");
-    // return user.DiscountPercentage;
-}
+// TryAsync z operacjami bazy danych
+var user = await Result<User>.TryAsync(
+    async ct => await dbContext.Users.FindAsync(new object[] { userId }, ct),
+    cancellationToken,
+    ex => ex is DbUpdateException
+        ? Error.DatabaseError("Błąd zapisu do bazy danych")
+        : ex is TimeoutException
+        ? Error.TimeoutError("Zapytanie przekroczyło limit czasu")
+        : Error.FromException(ex));
 ```
 
-### 🎯 Zasada: Kiedy używać Result vs try-catch?
+**Kiedy używać TryAsync:**
+- ✅ Async file I/O, operacje na bazie danych
+- ✅ Wywołania HTTP/API
+- ✅ Async parsowanie i serializacja (JSON, XML)
+- ✅ Konwersja async legacy kodu opartego na wyjątkach
+- ✅ Niestandardowe mapowanie wyjątków na typy błędów w operacjach async
+- ❌ NIE używaj dla oczekiwanej logiki biznesowej (użyj bezpośrednio Result)
 
-| Sytuacja | Użyj | Przykład |
-|----------|------|----------|
-| **Oczekiwany** błąd biznesowy/walidacyjny | `Result.Failure` | Nieprawidłowy email, brak uprawnień, zasób nie znaleziony |
-| **Nieoczekiwany** błąd techniczny/infrastruktury | `try-catch` → `Error.FromException()` | Błąd DB, timeout sieci, OutOfMemoryException |
-| Operacja może się **normalnie** nie udać | `Result Pattern` | Logowanie użytkownika (złe hasło to normalny scenariusz) |
-| **Bug** w kodzie (null reference, itp.) | `throw` (w dev), `try-catch` (w prod) | NullReferenceException - powinien być naprawiony, nie obsłużony |
+### Przykłady z praktyki
 
-**Złota zasada**: 
-- **Expected failures** (część logiki biznesowej) → **Result Pattern**
-- **Unexpected exceptions** (problemy techniczne) → **try-catch + Error.FromException()**
+```csharp
+// API call z CancellationToken i error handling
+var apiData = await Result<Data>.TryAsync(
+    async ct => await httpClient.GetFromJsonAsync<Data>(url, ct),
+    cancellationToken,
+    ex => ex switch
+    {
+        HttpRequestException => Error.UnavailableError("API niedostępne"),
+        TaskCanceledException => Error.CancelledError("Żądanie anulowane"),
+        JsonException => Error.ValidationError("Nieprawidłowa odpowiedź API"),
+        _ => Error.FromException(ex)
+    });
+
+// Database operations z transaction
+var saveResult = await Result.TryAsync(
+    async ct =>
+    {
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(ct);
+        await dbContext.Users.AddAsync(newUser, ct);
+        await dbContext.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+    },
+    cancellationToken,
+    ex => ex switch
+    {
+        DbUpdateException => Error.ConflictError("Użytkownik już istnieje"),
+        OperationCanceledException => Error.CancelledError("Operacja anulowana"),
+        _ => Error.DatabaseError("Błąd zapisu", ex)
+    });
+
+// File upload with cancellation support  
+var uploadResult = await Result<string>.TryAsync(
+    async ct => await UploadFileAsync(file, ct),
+    cancellationToken);
+// Automatycznie zwraca ErrorType.Cancelled przy anulowaniu

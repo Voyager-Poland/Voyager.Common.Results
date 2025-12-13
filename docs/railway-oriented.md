@@ -136,12 +136,16 @@ public Result<Order> ProcessOrder(Order order)
 
 `Ensure` validates a condition on a successful Result. If the condition fails, it returns an error.
 
-**Signature:**
+**Signatures:**
 ```csharp
+// Static error
 Result<T> Ensure(Func<T, bool> predicate, Error error)
+
+// Contextual error - can use value in error message
+Result<T> Ensure(Func<T, bool> predicate, Func<T, Error> errorFactory)
 ```
 
-**Example:**
+**Example with static error:**
 ```csharp
 var result = GetAge()
     .Ensure(
@@ -152,6 +156,17 @@ var result = GetAge()
         age => age <= 120,
         Error.ValidationError("Invalid age")
     );
+```
+
+**Example with contextual error (recommended for better messages):**
+```csharp
+var result = GetUser(id)
+    .Ensure(
+        user => user.Age >= 18,
+        user => Error.ValidationError($"User {user.Name} is {user.Age} years old, must be 18+"))
+    .Ensure(
+        user => user.IsActive,
+        user => Error.BusinessError($"User {user.Name} (ID: {user.Id}) is inactive"));
 ```
 
 **Real-world example:**

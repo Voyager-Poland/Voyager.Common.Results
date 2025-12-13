@@ -1,5 +1,6 @@
 ﻿#if NET48
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 #endif
 
@@ -10,6 +11,223 @@ namespace Voyager.Common.Results.Extensions
 	/// </summary>
 	public static class TaskResultExtensions
 	{
+		// ========== TRY ASYNC ==========
+
+		/// <summary>
+		/// Executes an asynchronous action and wraps any exceptions in a Result
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// var result = await Result.TryAsync(async () => await File.WriteAllTextAsync("log.txt", message));
+		/// </code>
+		/// </example>
+		/// <param name="action">Asynchronous action to execute.</param>
+		/// <returns>Success if action completes without exception, otherwise Failure with error from exception.</returns>
+		public static async Task<Result> TryAsync(Func<Task> action)
+		{
+			try
+			{
+				await action().ConfigureAwait(false);
+				return Result.Success();
+			}
+			catch (Exception ex)
+			{
+				return Result.Failure(Error.FromException(ex));
+			}
+		}
+
+		/// <summary>
+		/// Executes an asynchronous action and wraps any exceptions in a Result with custom error mapping
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// var result = await Result.TryAsync(
+		///     async () => await File.WriteAllTextAsync("log.txt", message),
+		///     ex => ex is IOException 
+		///         ? Error.UnavailableError("File system unavailable")
+		///         : Error.UnexpectedError(ex.Message));
+		/// </code>
+		/// </example>
+		/// <param name="action">Asynchronous action to execute.</param>
+		/// <param name="errorMapper">Function to convert exception to custom error.</param>
+		/// <returns>Success if action completes without exception, otherwise Failure with mapped error.</returns>
+		public static async Task<Result> TryAsync(Func<Task> action, Func<Exception, Error> errorMapper)
+		{
+			try
+			{
+				await action().ConfigureAwait(false);
+				return Result.Success();
+			}
+			catch (Exception ex)
+			{
+				return Result.Failure(errorMapper(ex));
+			}
+		}
+
+		/// <summary>
+		/// Executes an asynchronous action with cancellation support
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// var result = await TaskResultExtensions.TryAsync(
+		///     async ct => await httpClient.GetAsync(url, ct),
+		///     cancellationToken);
+		/// </code>
+		/// </example>
+		/// <param name="action">Asynchronous action that accepts a CancellationToken.</param>
+		/// <param name="cancellationToken">Token to cancel the operation.</param>
+		/// <returns>Success if completes, Failure with CancelledError if cancelled, or error from exception.</returns>
+		public static async Task<Result> TryAsync(Func<CancellationToken, Task> action, CancellationToken cancellationToken)
+		{
+			try
+			{
+				await action(cancellationToken).ConfigureAwait(false);
+				return Result.Success();
+			}
+			catch (OperationCanceledException)
+			{
+				return Result.Failure(Error.CancelledError("Operation was cancelled"));
+			}
+			catch (Exception ex)
+			{
+				return Result.Failure(Error.FromException(ex));
+			}
+		}
+
+		/// <summary>
+		/// Executes an asynchronous action with cancellation support and custom error mapping
+		/// </summary>
+		/// <param name="action">Asynchronous action that accepts a CancellationToken.</param>
+		/// <param name="cancellationToken">Token to cancel the operation.</param>
+		/// <param name="errorMapper">Function to convert exception to custom error.</param>
+		/// <returns>Success if completes, Failure with CancelledError if cancelled, or mapped error from exception.</returns>
+		public static async Task<Result> TryAsync(Func<CancellationToken, Task> action, CancellationToken cancellationToken, Func<Exception, Error> errorMapper)
+		{
+			try
+			{
+				await action(cancellationToken).ConfigureAwait(false);
+				return Result.Success();
+			}
+			catch (OperationCanceledException)
+			{
+				return Result.Failure(Error.CancelledError("Operation was cancelled"));
+			}
+			catch (Exception ex)
+			{
+				return Result.Failure(errorMapper(ex));
+			}
+		}
+
+		/// <summary>
+		/// Executes an asynchronous function and wraps any exceptions in a Result
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// var result = await Result.TryAsync(async () => await LoadDataAsync());
+		/// var config = await Result.TryAsync(async () => await JsonSerializer.DeserializeAsync&lt;Config&gt;(stream));
+		/// </code>
+		/// </example>
+		/// <param name="func">Asynchronous function to execute.</param>
+		/// <typeparam name="TValue">Type of value returned by the function.</typeparam>
+		/// <returns>Success with function result if completes without exception, otherwise Failure with error from exception.</returns>
+		public static async Task<Result<TValue>> TryAsync<TValue>(Func<Task<TValue>> func)
+		{
+			try
+			{
+				var value = await func().ConfigureAwait(false);
+				return Result<TValue>.Success(value);
+			}
+			catch (Exception ex)
+			{
+				return Result<TValue>.Failure(Error.FromException(ex));
+			}
+		}
+
+		/// <summary>
+		/// Executes an asynchronous function and wraps any exceptions in a Result with custom error mapping
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// var result = await Result.TryAsync(
+		///     async () => await JsonSerializer.DeserializeAsync&lt;Config&gt;(stream),
+		///     ex => ex is JsonException 
+		///         ? Error.ValidationError("Invalid JSON")
+		///         : Error.UnexpectedError(ex.Message));
+		/// </code>
+		/// </example>
+		/// <param name="func">Asynchronous function to execute.</param>
+		/// <param name="errorMapper">Function to convert exception to custom error.</param>
+		/// <typeparam name="TValue">Type of value returned by the function.</typeparam>
+		/// <returns>Success with function result if completes without exception, otherwise Failure with mapped error.</returns>
+		public static async Task<Result<TValue>> TryAsync<TValue>(Func<Task<TValue>> func, Func<Exception, Error> errorMapper)
+		{
+			try
+			{
+				var value = await func().ConfigureAwait(false);
+				return Result<TValue>.Success(value);
+			}
+			catch (Exception ex)
+			{
+				return Result<TValue>.Failure(errorMapper(ex));
+			}
+		}
+
+		/// <summary>
+		/// Executes an asynchronous function with cancellation support
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// var result = await TaskResultExtensions.TryAsync(
+		///     async ct => await httpClient.GetStringAsync(url, ct),
+		///     cancellationToken);
+		/// </code>
+		/// </example>
+		/// <param name="func">Asynchronous function that accepts a CancellationToken.</param>
+		/// <param name="cancellationToken">Token to cancel the operation.</param>
+		/// <typeparam name="TValue">Type of value returned by the function.</typeparam>
+		/// <returns>Success with value if completes, Failure with CancelledError if cancelled, or error from exception.</returns>
+		public static async Task<Result<TValue>> TryAsync<TValue>(Func<CancellationToken, Task<TValue>> func, CancellationToken cancellationToken)
+		{
+			try
+			{
+				var value = await func(cancellationToken).ConfigureAwait(false);
+				return Result<TValue>.Success(value);
+			}
+			catch (OperationCanceledException)
+			{
+				return Result<TValue>.Failure(Error.CancelledError("Operation was cancelled"));
+			}
+			catch (Exception ex)
+			{
+				return Result<TValue>.Failure(Error.FromException(ex));
+			}
+		}
+
+		/// <summary>
+		/// Executes an asynchronous function with cancellation support and custom error mapping
+		/// </summary>
+		/// <param name="func">Asynchronous function that accepts a CancellationToken.</param>
+		/// <param name="cancellationToken">Token to cancel the operation.</param>
+		/// <param name="errorMapper">Function to convert exception to custom error.</param>
+		/// <typeparam name="TValue">Type of value returned by the function.</typeparam>
+		/// <returns>Success with value if completes, Failure with CancelledError if cancelled, or mapped error from exception.</returns>
+		public static async Task<Result<TValue>> TryAsync<TValue>(Func<CancellationToken, Task<TValue>> func, CancellationToken cancellationToken, Func<Exception, Error> errorMapper)
+		{
+			try
+			{
+				var value = await func(cancellationToken).ConfigureAwait(false);
+				return Result<TValue>.Success(value);
+			}
+			catch (OperationCanceledException)
+			{
+				return Result<TValue>.Failure(Error.CancelledError("Operation was cancelled"));
+			}
+			catch (Exception ex)
+			{
+				return Result<TValue>.Failure(errorMapper(ex));
+			}
+		}
+
 		// ========== MAP ASYNC ==========
 
 		/// <summary>
@@ -199,6 +417,61 @@ namespace Voyager.Common.Results.Extensions
 		{
 			var result = await resultTask.ConfigureAwait(false);
 			return await result.EnsureAsync(predicate, error).ConfigureAwait(false);
+		}
+
+		/// <summary>
+		/// Ensure for Task&lt;Result&lt;TValue&gt;&gt; with contextual error factory
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// var result = await GetUserAsync(id)
+		///     .EnsureAsync(
+		///         user => user.Age >= 18,
+		///         user => Error.ValidationError($"User {user.Name} is {user.Age}, must be 18+"));
+		/// </code>
+		/// </example>
+		public static async Task<Result<TValue>> EnsureAsync<TValue>(
+			this Task<Result<TValue>> resultTask,
+			Func<TValue, bool> predicate,
+			Func<TValue, Error> errorFactory)
+		{
+			var result = await resultTask.ConfigureAwait(false);
+			return result.Ensure(predicate, errorFactory);
+		}
+
+		/// <summary>
+		/// Ensure for Result&lt;TValue&gt; with async predicate and contextual error factory
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// var result = await GetUser(id)
+		///     .EnsureAsync(
+		///         async user => await _repo.IsActiveAsync(user.Id),
+		///         user => Error.ValidationError($"User {user.Name} is inactive"));
+		/// </code>
+		/// </example>
+		public static async Task<Result<TValue>> EnsureAsync<TValue>(
+			this Result<TValue> result,
+			Func<TValue, Task<bool>> predicate,
+			Func<TValue, Error> errorFactory)
+		{
+			if (result.IsFailure)
+				return result;
+
+			var isValid = await predicate(result.Value!).ConfigureAwait(false);
+			return isValid ? result : Result<TValue>.Failure(errorFactory(result.Value!));
+		}
+
+		/// <summary>
+		/// Ensure for Task&lt;Result&lt;TValue&gt;&gt; with async predicate and contextual error factory
+		/// </summary>
+		public static async Task<Result<TValue>> EnsureAsync<TValue>(
+			this Task<Result<TValue>> resultTask,
+			Func<TValue, Task<bool>> predicate,
+			Func<TValue, Error> errorFactory)
+		{
+			var result = await resultTask.ConfigureAwait(false);
+			return await result.EnsureAsync(predicate, errorFactory).ConfigureAwait(false);
 		}
 
 		// ========== ORELSE ASYNC ==========

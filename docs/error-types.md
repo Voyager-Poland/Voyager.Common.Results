@@ -165,6 +165,37 @@ Error.TimeoutError("Lock acquisition timeout - resource is busy")
 
 **HTTP Status Code:** 408 Request Timeout or 504 Gateway Timeout
 
+### CancelledError
+
+Used when an operation was cancelled via CancellationToken.
+
+```csharp
+Error.CancelledError("Operation was cancelled by user")
+Error.CancelledError("Request.Cancelled", "The request was cancelled")
+
+// Common use cases
+Error.CancelledError("Download cancelled")
+Error.CancelledError("Search.Cancelled", "Search operation was cancelled")
+Error.CancelledError("Upload cancelled by user")
+```
+
+**When to use:**
+- CancellationToken triggered cancellation
+- User-initiated cancellation
+- Timeout-based cancellation
+- Background task cancellation
+
+**Note:** This error type is automatically returned by `TryAsync` methods when `OperationCanceledException` is caught.
+
+```csharp
+// TryAsync automatically handles cancellation
+var result = await Result<string>.TryAsync(
+    async ct => await httpClient.GetStringAsync(url, ct),
+    cancellationToken);
+
+// If cancelled, result.Error.Type == ErrorType.Cancelled
+```
+
 ### DatabaseError
 
 Used for database-related failures.

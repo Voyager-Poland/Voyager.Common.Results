@@ -7,6 +7,86 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **README improvements**: Updated documentation for clarity and accuracy
+  - Removed hardcoded test counts in Testing section (now generic descriptions)
+  - Enhanced TryAsync section to clarify automatic `OperationCanceledException` → `ErrorType.Cancelled` mapping
+  - Added comment to Quick Start example explaining repository doesn't throw exceptions
+  - Added robust database example showing `Try()` + `Ensure()` pattern for handling both exceptions and null values
+  - Updated Features list with new capabilities (contextual errors, deadlock-safe async, instance proxies)
+  - Use implicit conversions in examples instead of explicit `Result<T>.Success()` calls
+- **Build tooling**: Disabled implicit usings and added explicit global usings for net6/net8 targets to ensure consistent compilation across frameworks
+- **Strong Name signing**: Added assembly signing configuration for distributed library
+  - Generated `Voyager.Common.Results.snk` key file for strong name signing
+  - Configured `Build.Signing.props` to enable assembly signing in both net8.0 and net48 targets
+  - Ensures compatibility and trust verification in secure environments
+
+### Added
+- **`Ensure` with contextual error factory**: New overload that receives the value to create context-aware error messages
+  ```csharp
+  result.Ensure(
+      user => user.Age >= 18,
+      user => Error.ValidationError($"User {user.Name} is {user.Age} years old, must be 18+"));
+  ```
+- **`EnsureAsync` with contextual error factory**: 3 new async overloads with `Func<TValue, Error>` for contextual errors
+  - `Task<Result<T>>.EnsureAsync(predicate, errorFactory)` - sync predicate
+  - `Result<T>.EnsureAsync(asyncPredicate, errorFactory)` - async predicate on sync result
+  - `Task<Result<T>>.EnsureAsync(asyncPredicate, errorFactory)` - async predicate on async result
+- **Instance method proxies in `Result<T>`**: No need to import `Extensions` namespace
+  - `EnsureAsync(asyncPredicate, error)` - async validation
+  - `EnsureAsync(asyncPredicate, errorFactory)` - async validation with contextual error
+  - `TapAsync(asyncAction)` - async side effects
+  - `OrElseAsync(asyncAlternativeFunc)` - async fallback
+- **`ErrorType.Cancelled`**: New error type for cancelled async operations
+  - `Error.CancelledError(string message)` - Creates cancelled error with default code
+  - `Error.CancelledError(string code, string message)` - Creates cancelled error with custom code
+  - Enables proper handling of `OperationCanceledException` in async workflows
+- **`TryAsync` methods**: Safe async exception-to-Result conversion with optional custom error mapping
+  - `TryAsync(Func<Task> action)` - Wraps async action exceptions with `Error.FromException`
+  - `TryAsync(Func<Task> action, Func<Exception, Error> errorMapper)` - Custom exception mapping for async actions
+  - `TryAsync(Func<CancellationToken, Task> action, CancellationToken)` - Async action with cancellation support
+  - `TryAsync(Func<CancellationToken, Task> action, CancellationToken, Func<Exception, Error>)` - Async action with cancellation and custom mapping
+  - `TryAsync<TValue>(Func<Task<TValue>> func)` - Wraps async function exceptions with `Error.FromException`
+  - `TryAsync<TValue>(Func<Task<TValue>> func, Func<Exception, Error> errorMapper)` - Custom exception mapping for async functions
+  - `TryAsync<TValue>(Func<CancellationToken, Task<TValue>> func, CancellationToken)` - Async function with cancellation support
+  - `TryAsync<TValue>(Func<CancellationToken, Task<TValue>> func, CancellationToken, Func<Exception, Error>)` - Async function with cancellation and custom mapping
+- **`Result<T>.TryAsync` proxy methods**: Convenience static methods on `Result<T>` for cleaner syntax
+  ```csharp
+  // Proxy syntax (cleaner):
+  var result = await Result<Config>.TryAsync(async () => 
+      await JsonSerializer.DeserializeAsync<Config>(stream));
+  
+  // With CancellationToken:
+  var result = await Result<string>.TryAsync(
+      async ct => await httpClient.GetStringAsync(url, ct),
+      cancellationToken);
+  
+  // Custom error mapping:
+  var config = await Result<Config>.TryAsync(
+      async () => await JsonSerializer.DeserializeAsync<Config>(stream),
+      ex => ex is JsonException 
+          ? Error.ValidationError("Invalid JSON")
+          : Error.UnexpectedError(ex.Message));
+  ```
+- 26 unit tests for `TryAsync` methods covering:
+  - Async action execution success and exception wrapping
+  - Custom error mapping for various exception types (InvalidOperationException, IOException, FormatException)
+  - Async functions returning values with success and exception scenarios
+  - Complex object handling in async functions
+  - Chaining with `MapAsync` and `BindAsync`
+  - Error propagation through async chains
+  - Cancellation token support and handling
+
+### Documentation
+- **Enhanced `ConfigureAwait` documentation** in [docs/async-operations.md](docs/async-operations.md):
+  - Explained library's internal `ConfigureAwait(false)` behavior and deadlock prevention
+  - Added ASP.NET 4.8 `HttpContext` preservation patterns with examples
+  - Added `AsyncLocal<T>` pattern for context flowing through async boundaries
+  - Comparison table: local variables vs parameter passing vs `AsyncLocal<T>`
+- **Updated AI coding instructions** in [.github/copilot-instructions.md](.github/copilot-instructions.md):
+  - Added `ConfigureAwait(false)` requirements for new async methods
+  - Referenced [ADR-0001](docs/adr/ADR-0001-no-configureawait-parameter-in-tryasync.md) architectural decision
+
 ## [1.3.0] - 2025-01-16
 
 ### Added

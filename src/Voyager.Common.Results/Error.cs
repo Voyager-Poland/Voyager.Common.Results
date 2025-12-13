@@ -124,6 +124,18 @@ namespace Voyager.Common.Results
 		public static Error TimeoutError(string message) =>
 				new(ErrorType.Timeout, "Operation.Timeout", message);
 		/// <summary>
+		/// Creates a cancelled error
+		/// </summary>
+		public static Error CancelledError(string code, string message) =>
+				new(ErrorType.Cancelled, code, message);
+
+		/// <summary>
+		/// Creates a cancelled error with a default code
+		/// </summary>
+		public static Error CancelledError(string message) =>
+				new(ErrorType.Cancelled, "Operation.Cancelled", message);
+
+		/// <summary>
 		/// Creates an unexpected error
 		/// </summary>
 		public static Error UnexpectedError(string code, string message) =>

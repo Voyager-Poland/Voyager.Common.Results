@@ -1,5 +1,7 @@
 ﻿#if NET48
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 #endif
 
 namespace Voyager.Common.Results
@@ -88,6 +90,66 @@ namespace Voyager.Common.Results
 				return Failure(errorMapper(ex));
 			}
 		}
+
+		// ========== TRY ASYNC (PROXY METHODS) ==========
+
+		/// <summary>
+		/// Executes an asynchronous function and wraps any exceptions in a Result
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// var result = await Result&lt;Config&gt;.TryAsync(async () => 
+		///     await JsonSerializer.DeserializeAsync&lt;Config&gt;(stream));
+		/// </code>
+		/// </example>
+		/// <param name="func">Asynchronous function to execute.</param>
+		/// <returns>Success with function result if completes without exception, otherwise Failure with error from exception.</returns>
+		public static Task<Result<TValue>> TryAsync(Func<Task<TValue>> func) =>
+			Extensions.TaskResultExtensions.TryAsync(func);
+
+		/// <summary>
+		/// Executes an asynchronous function and wraps any exceptions in a Result with custom error mapping
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// var result = await Result&lt;Config&gt;.TryAsync(
+		///     async () => await JsonSerializer.DeserializeAsync&lt;Config&gt;(stream),
+		///     ex => ex is JsonException 
+		///         ? Error.ValidationError("Invalid JSON")
+		///         : Error.UnexpectedError(ex.Message));
+		/// </code>
+		/// </example>
+		/// <param name="func">Asynchronous function to execute.</param>
+		/// <param name="errorMapper">Function to convert exception to custom error.</param>
+		/// <returns>Success with function result if completes without exception, otherwise Failure with mapped error.</returns>
+		public static Task<Result<TValue>> TryAsync(Func<Task<TValue>> func, Func<Exception, Error> errorMapper) =>
+			Extensions.TaskResultExtensions.TryAsync(func, errorMapper);
+
+		/// <summary>
+		/// Executes an asynchronous function with cancellation support
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// var result = await Result&lt;string&gt;.TryAsync(
+		///     async ct => await httpClient.GetStringAsync(url, ct),
+		///     cancellationToken);
+		/// </code>
+		/// </example>
+		/// <param name="func">Asynchronous function that accepts a CancellationToken.</param>
+		/// <param name="cancellationToken">Token to cancel the operation.</param>
+		/// <returns>Success with value if completes, Failure with CancelledError if cancelled, or error from exception.</returns>
+		public static Task<Result<TValue>> TryAsync(Func<CancellationToken, Task<TValue>> func, CancellationToken cancellationToken) =>
+			Extensions.TaskResultExtensions.TryAsync(func, cancellationToken);
+
+		/// <summary>
+		/// Executes an asynchronous function with cancellation support and custom error mapping
+		/// </summary>
+		/// <param name="func">Asynchronous function that accepts a CancellationToken.</param>
+		/// <param name="cancellationToken">Token to cancel the operation.</param>
+		/// <param name="errorMapper">Function to convert exception to custom error.</param>
+		/// <returns>Success with value if completes, Failure with CancelledError if cancelled, or mapped error from exception.</returns>
+		public static Task<Result<TValue>> TryAsync(Func<CancellationToken, Task<TValue>> func, CancellationToken cancellationToken, Func<Exception, Error> errorMapper) =>
+			Extensions.TaskResultExtensions.TryAsync(func, cancellationToken, errorMapper);
 
 		// ========== PATTERN MATCHING ==========
 
@@ -212,6 +274,90 @@ namespace Voyager.Common.Results
 
 			return predicate(Value!) ? this : Failure(error);
 		}
+
+		/// <summary>
+		/// Ensure - validates the success value with contextual error, may convert to Failure
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// var result = GetUser(id)
+		///     .Ensure(
+		///         user => user.Age >= 18,
+		///         user => Error.ValidationError($"User {user.Name} is {user.Age} years old, must be 18+"));
+		/// </code>
+		/// </example>
+		/// <param name="predicate">Predicate to validate the success value.</param>
+		/// <param name="errorFactory">Function to create error from the value if predicate fails.</param>
+		/// <returns>Original result if predicate passes, otherwise a Failure result with contextual error.</returns>
+		public Result<TValue> Ensure(Func<TValue, bool> predicate, Func<TValue, Error> errorFactory)
+		{
+			if (IsFailure)
+				return this;
+
+			return predicate(Value!) ? this : Failure(errorFactory(Value!));
+		}
+
+		/// <summary>
+		/// EnsureAsync - validates the success value with an async predicate
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// var result = await GetUser(id)
+		///     .EnsureAsync(
+		///         async user => await _repo.IsActiveAsync(user.Id),
+		///         Error.ValidationError("User is inactive"));
+		/// </code>
+		/// </example>
+		/// <param name="predicate">Async predicate to validate the success value.</param>
+		/// <param name="error">Error to return if predicate fails.</param>
+		/// <returns>Original result if predicate passes, otherwise a Failure result.</returns>
+		public Task<Result<TValue>> EnsureAsync(Func<TValue, Task<bool>> predicate, Error error) =>
+			Extensions.TaskResultExtensions.EnsureAsync(this, predicate, error);
+
+		/// <summary>
+		/// EnsureAsync - validates the success value with an async predicate and contextual error
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// var result = await GetUser(id)
+		///     .EnsureAsync(
+		///         async user => await _repo.IsActiveAsync(user.Id),
+		///         user => Error.ValidationError($"User {user.Name} is inactive"));
+		/// </code>
+		/// </example>
+		/// <param name="predicate">Async predicate to validate the success value.</param>
+		/// <param name="errorFactory">Function to create error from the value if predicate fails.</param>
+		/// <returns>Original result if predicate passes, otherwise a Failure result with contextual error.</returns>
+		public Task<Result<TValue>> EnsureAsync(Func<TValue, Task<bool>> predicate, Func<TValue, Error> errorFactory) =>
+			Extensions.TaskResultExtensions.EnsureAsync(this, predicate, errorFactory);
+
+		/// <summary>
+		/// TapAsync - executes an async side effect if the result is a success
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// var result = await GetUser(id)
+		///     .TapAsync(async user => await _auditLog.LogAsync($"User {user.Name} accessed"));
+		/// </code>
+		/// </example>
+		/// <param name="action">Async action to execute on success value.</param>
+		/// <returns>Original result unchanged.</returns>
+		public Task<Result<TValue>> TapAsync(Func<TValue, Task> action) =>
+			Extensions.TaskResultExtensions.TapAsync(this, action);
+
+		/// <summary>
+		/// OrElseAsync - provides an async fallback if the result is a failure
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// var result = await GetUserFromCache(id)
+		///     .OrElseAsync(async () => await GetUserFromDatabaseAsync(id));
+		/// </code>
+		/// </example>
+		/// <param name="alternativeFunc">Async function returning alternative result.</param>
+		/// <returns>Original result if success, otherwise the alternative result.</returns>
+		public Task<Result<TValue>> OrElseAsync(Func<Task<Result<TValue>>> alternativeFunc) =>
+			Extensions.TaskResultExtensions.OrElseAsync(this, alternativeFunc);
 
 		/// <summary>
 		/// MapError - transforms the error

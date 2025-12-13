@@ -1,0 +1,8 @@
+<Project>
+
+	<PropertyGroup>
+		<SignAssembly>true</SignAssembly>
+		<AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)..\Voyager.Common.Results.snk</AssemblyOriginatorKeyFile>
+	</PropertyGroup>
+
+</Project>

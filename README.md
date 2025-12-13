@@ -13,7 +13,9 @@ A lightweight, functional **Result Pattern** implementation for .NET that enable
 
 - 🎯 **Type-safe error handling** without exceptions
 - 🚂 **Railway Oriented Programming** with method chaining
-- ⚡ **Async/await support** with extension methods
+- ⚡ **Async/await support** with extension methods and instance proxies
+- 🧩 **Contextual errors** with Ensure/EnsureAsync error factories
+- 🧵 **Deadlock-safe async** - library uses ConfigureAwait(false) internally
 - 📦 **Zero dependencies** (except polyfills for .NET Framework)
 - 🔍 **Source Link enabled** for debugging
 - 📚 **Comprehensive XML documentation**
@@ -32,12 +34,12 @@ dotnet add package Voyager.Common.Results
 ```csharp
 using Voyager.Common.Results;
 
-// Define operations that can fail
+// Define operations that can fail (assumes repository doesn't throw exceptions)
 public Result<User> GetUser(int id)
 {
     var user = _repository.Find(id);
     return user is not null 
-        ? Result<User>.Success(user)
+        ? user  // Implicit conversion: User → Result<User>
         : Error.NotFoundError($"User {id} not found");
 }
 
@@ -45,7 +47,7 @@ public Result<Order> GetLatestOrder(User user)
 {
     var order = _repository.GetLatestOrder(user.Id);
     return order is not null
-        ? Result<Order>.Success(order)
+        ? order 
         : Error.NotFoundError("No orders found");
 }
 
@@ -64,15 +66,15 @@ var message = result.Match(
 
 ## 🧪 Testing
 
-The library includes **464 comprehensive tests** ensuring correctness:
+The library includes a comprehensive test suite ensuring correctness across multiple dimensions:
 
-- **Monad Laws** (13 tests) - Verifies mathematical properties of Result<T>
-- **Invariants** (34 tests) - XOR property, null safety, immutability
-- **Error Propagation** (48 tests) - Correct error flow through all operators
-- **Composition** (60 tests) - Operator chaining and combination behavior
-- **Unit Tests** (309 tests) - Core functionality, extensions, edge cases
+- **Monad Laws** - Verifies mathematical properties of Result<T> (identity, composition)
+- **Invariants** - XOR property, null safety, immutability guarantees
+- **Error Propagation** - Correct error flow through all operators and chains
+- **Composition** - Operator chaining and combination behavior in complex scenarios
+- **Unit Tests** - Core functionality, extension methods, edge cases, and cancellation
 
-All tests pass on both **.NET 8.0** and **.NET Framework 4.8**.
+All tests validate behavior on both **.NET 8.0** and **.NET Framework 4.8** to ensure cross-platform compatibility.
 
 ## 📖 Documentation
 
@@ -94,6 +96,7 @@ Error.DatabaseError("Connection failed")
 Error.BusinessError("Cannot cancel paid order")
 Error.UnavailableError("Service temporarily unavailable")
 Error.TimeoutError("Request timed out")
+Error.CancelledError("Operation was cancelled")
 Error.UnexpectedError("Something went wrong")
 Error.FromException(exception)
 ```
@@ -106,7 +109,6 @@ GetUser(id)
     .Bind(email => SendEmail(email))       // Chain another Result operation
     .Ensure(sent => sent, Error.BusinessError("Email not sent"))
     .Tap(() => _logger.LogInfo("Email sent"))  // Side effect
-    .Finally(() => connection.Close())     // Cleanup (always executes)
     .OrElse(() => GetDefaultUser())        // Fallback if failed
     .Match(
         onSuccess: () => "Success",
@@ -119,14 +121,6 @@ GetUser(id)
 Executes an action regardless of success or failure (like finally block):
 
 ```csharp
-// Always close connection
-var result = SaveToDatabase(data)
-    .Finally(() => connection.Close());
-
-// Always dispose resource
-var userData = LoadFromFile(path)
-    .Finally(() => fileStream.Dispose());
-
 // Chain with other operations
 var result = GetUser(id)
     .Map(user => user.Email)
@@ -169,6 +163,13 @@ var result = Result.Try(
 var userData = Result<string>.Try(() => File.ReadAllText(path))
     .Bind(json => ParseJson(json))
     .Map(data => data.UserId);
+
+// Robust database operations (handles both exceptions and null)
+public Result<User> GetUser(int id)
+{
+    return Result<User>.Try(() => _repository.Find(id))
+        .Ensure(user => user is not null, Error.NotFoundError($"User {id} not found"));
+}
 ```
 
 **When to use Try:**
@@ -176,6 +177,49 @@ var userData = Result<string>.Try(() => File.ReadAllText(path))
 - ✅ File I/O, parsing, network calls
 - ✅ Converting legacy exception-based code to Result pattern
 - ✅ Custom exception-to-error mapping
+
+### TryAsync - Async Exception Handling
+
+Safely convert async exception-throwing code into Result pattern. Automatically maps `OperationCanceledException` to `ErrorType.Cancelled` when using CancellationToken:
+
+```csharp
+// Preferred: Use Result<T>.TryAsync proxy for cleaner syntax
+var result = await Result<Config>.TryAsync(async () => 
+    await JsonSerializer.DeserializeAsync<Config>(stream));
+
+// With CancellationToken support (auto-maps OperationCanceledException → ErrorType.Cancelled)
+var result = await Result<string>.TryAsync(
+    async ct => await httpClient.GetStringAsync(url, ct),
+    cancellationToken);
+
+// Custom error mapping
+var result = await Result<Config>.TryAsync(
+    async () => await JsonSerializer.DeserializeAsync<Config>(stream),
+    ex => ex is JsonException 
+        ? Error.ValidationError("Invalid JSON")
+        : Error.UnexpectedError(ex.Message));
+
+// With CancellationToken and custom error mapping
+var result = await Result<string>.TryAsync(
+    async ct => await httpClient.GetStringAsync(url, ct),
+    cancellationToken,
+    ex => ex is HttpRequestException 
+        ? Error.UnavailableError("Service unavailable")
+        : Error.UnexpectedError(ex.Message));
+
+// Chain with other async operations
+var userData = await Result<string>.TryAsync(async () => 
+        await File.ReadAllTextAsync(path))
+    .BindAsync(json => ParseJsonAsync(json))
+    .MapAsync(data => data.UserId);
+```
+
+**When to use TryAsync:**
+- ✅ Async file I/O, database operations
+- ✅ HTTP/API calls with cancellation support
+- ✅ Async parsing and serialization
+- ✅ Converting async exception-based code to Result pattern
+- ✅ Operations that need proper cancellation handling
 
 ### Map - Value Transformations
 
@@ -282,6 +326,61 @@ var data = await GetFromPrimaryCacheAsync(key)
 - Primary API → Fallback API → Cached data  
 - User preferences → Team defaults → System defaults
 
+### Ensure - Contextual Validation
+
+Validate with error messages that include the actual value:
+
+```csharp
+// Static error (old way)
+var result = GetUser(id)
+    .Ensure(
+        user => user.Age >= 18,
+        Error.ValidationError("Must be 18 or older"));
+
+// Contextual error (recommended - provides better error messages)
+var result = GetUser(id)
+    .Ensure(
+        user => user.Age >= 18,
+        user => Error.ValidationError($"User {user.Name} is {user.Age} years old, must be 18+"));
+```
+
+### EnsureAsync - Async Contextual Validation
+
+Validate with async predicates and contextual errors:
+
+```csharp
+// With sync predicate
+var result = await GetUserAsync(id)
+    .EnsureAsync(
+        user => user.Age >= 18,
+        user => Error.ValidationError($"User {user.Name} is {user.Age}, must be 18+"));
+
+// With async predicate
+var result = await GetUserAsync(id)
+    .EnsureAsync(
+        async user => await _repo.IsActiveAsync(user.Id),
+        user => Error.ValidationError($"User {user.Name} is inactive"));
+```
+
+### Instance Method Proxies
+
+No need to import `Extensions` namespace - common async methods are available directly on `Result<T>`:
+
+```csharp
+var result = await GetUser(id)              // Result<User>
+    .EnsureAsync(
+        async u => await _repo.IsActiveAsync(u.Id),
+        u => Error.ValidationError($"User {u.Name} inactive"))
+    .TapAsync(async u => await _audit.LogAsync($"Access: {u.Id}"))
+    .OrElseAsync(() => GetDefaultUserAsync());
+```
+
+Available instance proxies:
+- `EnsureAsync(asyncPredicate, error)` - async validation
+- `EnsureAsync(asyncPredicate, errorFactory)` - async validation with contextual error
+- `TapAsync(asyncAction)` - async side effects
+- `OrElseAsync(asyncAlternativeFunc)` - async fallback
+
 ### Async Operations
 
 ```csharp
@@ -294,10 +393,10 @@ await GetUserAsync(id)
 ### Collection Operations
 
 ```csharp
-var results = new[] {
-    Result<int>.Success(1),
-    Result<int>.Success(2),
-    Result<int>.Success(3)
+var results = new Result<int>[] {
+    1,  // Implicit conversion: int → Result<int>
+    2,
+    3
 };
 
 // Combine all results into one
@@ -368,16 +467,6 @@ dotnet test --collect:"XPlat Code Coverage"
 dotnet tool install -g dotnet-reportgenerator-globaltool
 reportgenerator -reports:**/coverage.cobertura.xml -targetdir:coverage-report -reporttypes:Html
 ```
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
 
 ### Development Workflow
 
