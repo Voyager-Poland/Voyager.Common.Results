@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_TBD_
+
+## [1.4.0] - 2025-12-15
+
 ### Changed
 - **README improvements**: Updated documentation for clarity and accuracy
   - Removed hardcoded test counts in Testing section (now generic descriptions)
