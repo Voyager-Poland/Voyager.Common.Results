@@ -15,7 +15,7 @@ src/Voyager.Common.Results/
     └── ResultCollectionExtensions.cs  # Combine, Partition, GetSuccessValues
 ```
 
-## Multi-Framework: .NET 8.0 + .NET 4.8
+## Multi-Framework: .NET 8.0 + .NET 6.0 + .NET 4.8
 
 **Required conditional imports for .NET 4.8 compatibility:**
 ```csharp
@@ -25,12 +25,17 @@ using System.Threading.Tasks;
 #endif
 ```
 
-| Framework | ImplicitUsings | LangVersion |
-|-----------|---------------|-------------|
-| .NET 8.0  | enabled       | latest      |
-| .NET 4.8  | disabled      | 10.0        |
+**Key differences:**
 
-**Always verify both:** `dotnet build -f net8.0 && dotnet build -f net48`
+| Framework | Targets | ImplicitUsings | LangVersion | Notes |
+|-----------|---------|---------------|-------------|-------|
+| .NET 8.0  | net8.0  | enabled       | latest      | Modern, no compatibility layer needed |
+| .NET 6.0  | net6.0  | disabled      | 10.0        | Source Link enabled, no polyfills needed |
+| .NET 4.8  | net48   | disabled      | 10.0        | Requires `IsExternalInit` polyfill, strict type inference |
+
+**Per-target file location:** Check [Directory.Build.props](../Directory.Build.props) for framework-specific settings.
+
+**Always verify both:** `dotnet build -c Release && dotnet test -c Release --no-build`
 
 ## Critical Operator Selection
 
@@ -38,12 +43,38 @@ using System.Threading.Tasks;
 |----------|-------------|----------|
 | `Map` | `Result<TOut>` | Transform value: `.Map(x => x.ToString())` |
 | `Bind` | `Result<TOut>` | Chain Result-returning: `.Bind(x => Validate(x))` |
-| `Tap` | Same `Result<T>` | Side effects: `.Tap(x => Log(x))` |
-| `Ensure` | Same `Result<T>` | Conditional fail: `.Ensure(x => x > 0, error)` |
-| `OrElse` | Same `Result<T>` | Fallback: `.OrElse(() => GetDefault())` |
+| `Tap` / `TapError` | Same `Result<T>` | Side effects (logging): `.Tap(x => Log(x))` |
+| `Ensure` / `EnsureAsync` | Same `Result<T>` | Conditional fail: `.Ensure(x => x > 0, error)` |
+| `OrElse` / `OrElseAsync` | Same `Result<T>` | Fallback/alternative: `.OrElse(() => GetDefault())` |
 | `Finally` | Same `Result<T>` | Cleanup (always runs): `.Finally(() => Dispose())` |
+| `Match` / `Switch` | TResult / void | Pattern match: `.Match(v => $"OK: {v}", e => $"Error: {e}")` |
 
 **Common mistake:** Using `Map` for Result-returning functions creates `Result<Result<T>>`. Use `Bind` instead.
+
+## OrElse Pattern (Fallback/Alternatives)
+
+Use `OrElse` to provide alternatives when a result fails. Lazy evaluation avoids expensive operations if not needed.
+
+```csharp
+// Sync: Try primary source, fall back to secondary
+var result = _cache.GetUser(id)
+    .OrElse(() => _database.GetUser(id))
+    .OrElse(() => Error.NotFoundError($"User {id} not found"));
+
+// Async: Multi-tier retrieval (cache → database → external API → default)
+var user = await _cache.GetAsync(id)
+    .OrElseAsync(() => _db.GetAsync(id))
+    .OrElseAsync(async () => await _externalApi.GetAsync(id))
+    .OrElseAsync(() => Task.FromResult(GetDefaultUser()));
+
+// Real-world: Resilient config loading with fallbacks
+var config = Config.LoadFromFile("config.json")
+    .OrElse(() => Config.LoadFromEnv())
+    .OrElse(() => Config.LoadDefaults())
+    .Ensure(c => c.IsValid, Error.ValidationError("Config invalid"));
+```
+
+**Key difference from if-checks:** OrElse uses Result<T> chains, avoiding nested conditionals and making error propagation explicit.
 
 ## Implicit Conversions (Prefer These)
 
@@ -110,7 +141,12 @@ dotnet test --collect:"XPlat Code Coverage"
 dotnet pack src/Voyager.Common.Results/Voyager.Common.Results.csproj -c Release
 ```
 
-**NU5119 fix:** `dotnet clean -c Release` before rebuild.
+**NU5119 fix:** Always `dotnet clean -c Release` before rebuild - MinVer caches versions.
+
+**Versioning workflow:**
+- **Push to main** → GitHub Actions builds with preview version (e.g., `0.1.0-preview.5`)
+- **Create tag `v1.2.3`** → Automatic release to NuGet.org + GitHub Packages
+- **CI requires `fetch-depth: 0`** for MinVer to access all git history
 
 ## Testing Conventions (xUnit)
 
@@ -123,21 +159,29 @@ public void Map_Success_TransformsValue() { }
 public void Map_Failure_PropagatesError() { }
 ```
 
-**Test categories in codebase:** MonadLawsTests, InvariantTests, ErrorPropagationTests, CompositionTests
+**Test organization:** Files mirror source structure ([MonadLawsTests.cs](../src/Voyager.Common.Results.Tests/MonadLawsTests.cs), [ErrorPropagationTests.cs](../src/Voyager.Common.Results.Tests/ErrorPropagationTests.cs), [CompositionTests.cs](../src/Voyager.Common.Results.Tests/CompositionTests.cs), etc.)
+
+**Always test both frameworks:** `dotnet test -c Release` runs against net8.0, net6.0, and net48
+
+**Coverage requirement:** Run `dotnet test --collect:"XPlat Code Coverage"` - no significant decreases allowed
 
 ## Error Factory Methods
 
-| Method | ErrorType | HTTP |
-|--------|-----------|------|
-| `ValidationError(msg)` | Validation | 400 |
-| `NotFoundError(msg)` | NotFound | 404 |
-| `UnauthorizedError(msg)` | Unauthorized | 401 |
-| `PermissionError(msg)` | Permission | 403 |
-| `ConflictError(msg)` | Conflict | 409 |
-| `BusinessError(code, msg)` | Business | 400/422 |
-| `FromException(ex)` | Unexpected | 500 |
+| Method | ErrorType | HTTP | Use Case |
+|--------|-----------|------|----------|
+| `ValidationError(msg)` | Validation | 400 | Input validation failures |
+| `NotFoundError(msg)` | NotFound | 404 | Resource doesn't exist |
+| `UnauthorizedError(msg)` | Unauthorized | 401 | User not authenticated |
+| `PermissionError(msg)` | Permission | 403 | User lacks authorization |
+| `ConflictError(msg)` | Conflict | 409 | Duplicate/collision (e.g., username taken) |
+| `BusinessError(msg)` | Business | 422 | Business rule violation |
+| `DatabaseError(msg)` | Database | 500 | Database operation failed |
+| `UnavailableError(msg)` | Unavailable | 503 | Service temporarily down/rate limited |
+| `TimeoutError(msg)` | Timeout | 504 | Operation exceeded timeout |
+| `CancelledError(msg)` | Cancelled | 499 | Operation cancelled by user/token |
+| `UnexpectedError(msg)` | Unexpected | 500 | Catch-all for unhandled exceptions |
 
-**Always include context:** `$"User {id} not found"` not `"Not found"`
+**Always include context:** `$"User {id} not found"` not `"Not found"`. Both code and message overloads exist - use message version for simplicity.
 
 ## CI/CD Pipeline
 

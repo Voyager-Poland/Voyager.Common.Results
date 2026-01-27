@@ -169,6 +169,24 @@ result.Bind(user => SaveUser(user))
 
 ### ✅ DO: Use Bind on Result for void operation chaining
 
+**From Result<T> to Result (new Bind overload):**
+
+```csharp
+// Chain Result<T> → Result operations (void operations taking the value)
+var result = GetUser(userId)
+    .Bind(user => ValidateAge(user))       // Result<User> → Result
+    .Bind(user => SendNotification(user))  // Result<User> → Result
+    .Map(() => "User processed");
+
+// Prevents error loss that happens with Tap
+var result = GetUser(userId)
+    .Bind(user => SendNotification(user))  // ✅ Errors propagate
+    // vs
+    .Tap(user => SendNotification(user))   // ❌ Errors ignored
+```
+
+**From Result (void) to Result/Result<T>:**
+
 ```csharp
 // Chain void operations (Result → Result)
 var result = ValidateInput()

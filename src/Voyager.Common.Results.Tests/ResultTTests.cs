@@ -205,6 +205,121 @@ public class ResultTTests
 	}
 
 	[Fact]
+	public void Bind_VoidResult_WithSuccess_ExecutesBinderReturningVoidResult()
+	{
+		// Arrange
+		var result = Result<int>.Success(5);
+		var executed = false;
+
+		// Act
+		var bound = result.Bind(x =>
+		{
+			executed = x > 0;
+			return executed ? Result.Success() : Result.Failure(Error.ValidationError("Must be positive"));
+		});
+
+		// Assert
+		Assert.True(executed);
+		Assert.True(bound.IsSuccess);
+		Assert.Equal(ErrorType.None, bound.Error.Type);
+	}
+
+	[Fact]
+	public void Bind_VoidResult_WithSuccess_PropagatesBinderError()
+	{
+		// Arrange
+		var result = Result<int>.Success(-5);
+		var binderError = Error.ValidationError("Must be positive");
+
+		// Act
+		var bound = result.Bind(x =>
+			x > 0
+				? Result.Success()
+				: Result.Failure(binderError)
+		);
+
+		// Assert
+		Assert.True(bound.IsFailure);
+		Assert.Equal(binderError, bound.Error);
+	}
+
+	[Fact]
+	public void Bind_VoidResult_WithFailure_DoesNotExecuteBinder()
+	{
+		// Arrange
+		var originalError = Error.ValidationError("Original");
+		var result = Result<int>.Failure(originalError);
+		var binderExecuted = false;
+
+		// Act
+		var bound = result.Bind(x =>
+		{
+			binderExecuted = true;
+			return Result.Success();
+		});
+
+		// Assert
+		Assert.False(binderExecuted);
+		Assert.True(bound.IsFailure);
+		Assert.Equal(originalError, bound.Error);
+	}
+
+	[Fact]
+	public void Bind_VoidResult_Chaining_WithMultipleOperations()
+	{
+		// Arrange
+		var result = Result<int>.Success(5);
+		var log = new List<string>();
+
+		// Act
+		var final = result
+			.Bind(x =>
+			{
+				log.Add($"Bind1: {x}");
+				return x > 0
+					? Result.Success()
+					: Result.Failure(Error.ValidationError("Must be positive"));
+			})
+			.Bind(() =>
+			{
+				log.Add("Bind2");
+				return Result.Success();
+			});
+
+		// Assert
+		Assert.True(final.IsSuccess);
+		Assert.Equal(new[] { "Bind1: 5", "Bind2" }, log);
+	}
+
+	[Fact]
+	public void Bind_VoidResult_ChainingStopsOnFirstError()
+	{
+		// Arrange
+		var result = Result<int>.Success(5);
+		var log = new List<string>();
+		var firstError = Error.ValidationError("First failed");
+
+		// Act
+		var final = result
+			.Bind(x =>
+			{
+				log.Add("Bind1");
+				return Result.Failure(firstError);
+			})
+			.Bind(() =>
+			{
+				log.Add("Bind2"); // Should not execute
+				return Result.Success();
+			});
+
+		// Assert
+		Assert.True(final.IsFailure);
+		Assert.Equal(firstError, final.Error);
+		Assert.Single(log); // Only first bind executed
+		Assert.Equal("Bind1", log[0]);
+	}
+
+	[Fact]
 	public void Tap_WithSuccess_ExecutesAction()
 	{
 		// Arrange

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`Bind(Func<TValue, Result>)` overload for `Result<T>`**: Chains `Result<T>` with operations returning void `Result`
+  - Enables natural composition: `Result<T>` → `Result` → `Result<T>` → ...
+  - Propagates errors from void operations (unlike `Tap`)
+  - Example: `.Bind(user => SendNotification(user))` safely chains operations that can fail
+  - Completes the monad pattern for void operations
+
 _TBD_
 
 ## [1.4.0] - 2025-12-15
