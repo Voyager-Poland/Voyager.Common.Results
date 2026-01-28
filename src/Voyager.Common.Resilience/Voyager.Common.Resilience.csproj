@@ -11,6 +11,13 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\Voyager.Common.Results\Voyager.Common.Results.csproj" />
+		<!-- Use ProjectReference during development/compilation for debugging and faster builds -->
+		<!-- PrivateAssets="All" prevents project reference from flowing to consuming packages -->
+		<ProjectReference Include="..\Voyager.Common.Results\Voyager.Common.Results.csproj"
+			PrivateAssets="All" />
+
+		<!-- Explicitly add PackageReference for published NuGet package -->
+		<!-- This ensures consumers get the NuGet package dependency, not a project reference -->
+		<PackageReference Include="Voyager.Common.Results" Version="*" />
 	</ItemGroup>
 </Project>

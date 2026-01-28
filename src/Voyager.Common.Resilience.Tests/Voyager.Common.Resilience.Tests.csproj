@@ -18,6 +18,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<ProjectReference Include="..\Voyager.Common.Results\Voyager.Common.Results.csproj" />
 		<ProjectReference Include="..\Voyager.Common.Resilience\Voyager.Common.Resilience.csproj" />
 	</ItemGroup>
 </Project>
