@@ -300,5 +300,113 @@ namespace Voyager.Common.Resilience.Tests
 			Assert.True(result.IsSuccess);
 			Assert.Equal("User: 42", result.Value);
 		}
+
+		[Fact]
+		public async Task BindWithCircuitBreakerAsync_OperationIndependentOfInput_AsyncFunc_ExecutesCorrectly()
+		{
+			// Arrange
+			var policy = new CircuitBreakerPolicy();
+			var previousResult = Result.Success(); // Non-generic Result
+			var executeCount = 0;
+
+			// Act - Operation independent of input value
+			var result = await previousResult.BindWithCircuitBreakerAsync(
+				async () =>
+				{
+					executeCount++;
+					return await Task.FromResult(Result<string>.Success("Operation executed"));
+				},
+				policy);
+
+			// Assert
+			Assert.True(result.IsSuccess);
+			Assert.Equal("Operation executed", result.Value);
+			Assert.Equal(1, executeCount);
+			Assert.Equal(CircuitState.Closed, policy.State);
+		}
+
+		[Fact]
+		public async Task BindWithCircuitBreakerAsync_OperationIndependentOfInput_PropagatesPreviousError()
+		{
+			// Arrange
+			var policy = new CircuitBreakerPolicy();
+			var previousError = Error.ValidationError("Previous operation failed");
+			var previousResult = Result.Failure(previousError);
+
+			// Act - Should not execute if previous result was failure
+			var result = await previousResult.BindWithCircuitBreakerAsync(
+				async () => Result<string>.Success("Operation executed"),
+				policy);
+
+			// Assert
+			Assert.False(result.IsSuccess);
+			Assert.Equal(previousError, result.Error);
+			Assert.Equal(0, policy.FailureCount); // Operation didn't run, so no failure recorded
+		}
+
+		[Fact]
+		public async Task BindWithCircuitBreakerAsync_OperationIndependentOfInput_SyncFunc_ExecutesCorrectly()
+		{
+			// Arrange
+			var policy = new CircuitBreakerPolicy();
+			var previousResult = Result.Success();
+			var executeCount = 0;
+
+			// Act - Synchronous operation independent of input
+			var result = await previousResult.BindWithCircuitBreakerAsync(
+				() =>
+				{
+					executeCount++;
+					return Result<int>.Success(42);
+				},
+				policy);
+
+			// Assert
+			Assert.True(result.IsSuccess);
+			Assert.Equal(42, result.Value);
+			Assert.Equal(1, executeCount);
+		}
+
+		[Fact]
+		public async Task BindWithCircuitBreakerAsync_OperationIndependentOfInput_RecordsFailure()
+		{
+			// Arrange
+			var policy = new CircuitBreakerPolicy(failureThreshold: 2);
+			var previousResult = Result.Success();
+			var operationError = Error.UnavailableError("Operation failed");
+
+			// Act - Operation fails
+			var result = await previousResult.BindWithCircuitBreakerAsync(
+				async () => Result<string>.Failure(operationError),
+				policy);
+
+			// Assert
+			Assert.False(result.IsSuccess);
+			Assert.Equal(operationError, result.Error);
+			Assert.Equal(1, policy.FailureCount);
+			Assert.Equal(operationError, policy.LastError);
+		}
+
+		[Fact]
+		public async Task BindWithCircuitBreakerAsync_OperationIndependentOfInput_OpenCircuit_FailsFast()
+		{
+			// Arrange
+			var policy = new CircuitBreakerPolicy(failureThreshold: 1);
+			var previousResult = Result.Success();
+			var operationError = Error.UnavailableError("Operation failed");
+
+			// Open the circuit
+			await policy.RecordFailureAsync(operationError);
+
+			// Act - Circuit is open, operation shouldn't execute
+			var result = await previousResult.BindWithCircuitBreakerAsync(
+				async () => Result<string>.Success("Should not execute"),
+				policy);
+
+			// Assert
+			Assert.False(result.IsSuccess);
+			Assert.Equal(ErrorType.CircuitBreakerOpen, result.Error.Type);
+			Assert.Equal(CircuitState.Open, policy.State);
+		}
 	}
 }

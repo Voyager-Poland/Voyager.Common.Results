@@ -68,6 +68,57 @@ namespace Voyager.Common.Resilience
 		}
 
 		/// <summary>
+		/// Applies a circuit breaker to an operation independent of input value, failing fast when the circuit is open
+		/// </summary>
+		/// <typeparam name="TOut">Output value type</typeparam>
+		/// <param name="result">The input result (only for error propagation, not used as parameter)</param>
+		/// <param name="func">Function to execute if circuit allows (no parameters required)</param>
+		/// <param name="policy">Circuit breaker policy to use</param>
+		/// <returns>Result of operation or CircuitBreakerOpenError if blocked</returns>
+		public static async Task<Result<TOut>> BindWithCircuitBreakerAsync<TOut>(
+			this Result result,
+			Func<Task<Result<TOut>>> func,
+			CircuitBreakerPolicy policy)
+		{
+			if (!result.IsSuccess)
+				return Result<TOut>.Failure(result.Error);
+
+			// Check if circuit breaker allows the request
+			var allowResult = await policy.ShouldAllowRequestAsync().ConfigureAwait(false);
+			if (!allowResult.IsSuccess)
+				return Result<TOut>.Failure(allowResult.Error);
+
+			// Execute the operation (no input parameter)
+			var opResult = await func().ConfigureAwait(false);
+
+			// Record success or failure
+			if (opResult.IsSuccess)
+				await policy.RecordSuccessAsync().ConfigureAwait(false);
+			else
+				await policy.RecordFailureAsync(opResult.Error).ConfigureAwait(false);
+
+			return opResult;
+		}
+
+		/// <summary>
+		/// Applies a circuit breaker to a synchronous operation independent of input value
+		/// </summary>
+		/// <typeparam name="TOut">Output value type</typeparam>
+		/// <param name="result">The input result (only for error propagation, not used as parameter)</param>
+		/// <param name="func">Synchronous function to execute if circuit allows (no parameters required)</param>
+		/// <param name="policy">Circuit breaker policy to use</param>
+		/// <returns>Result of operation or CircuitBreakerOpenError if blocked</returns>
+		public static Task<Result<TOut>> BindWithCircuitBreakerAsync<TOut>(
+			this Result result,
+			Func<Result<TOut>> func,
+			CircuitBreakerPolicy policy)
+		{
+			return result.BindWithCircuitBreakerAsync(
+				() => Task.FromResult(func()),
+				policy);
+		}
+
+		/// <summary>
 		/// Applies a circuit breaker to a synchronous function, converting it to async execution
 		/// </summary>
 		/// <typeparam name="TIn">Input value type</typeparam>
