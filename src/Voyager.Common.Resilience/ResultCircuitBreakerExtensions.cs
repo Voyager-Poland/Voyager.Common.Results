@@ -103,5 +103,77 @@ namespace Voyager.Common.Resilience
 			var result = await resultTask.ConfigureAwait(false);
 			return await result.BindWithCircuitBreakerAsync(func, policy).ConfigureAwait(false);
 		}
+
+		/// <summary>
+		/// Applies a circuit breaker directly to a value with an async operation
+		/// </summary>
+		/// <typeparam name="TIn">Input value type</typeparam>
+		/// <typeparam name="TOut">Output value type</typeparam>
+		/// <param name="policy">Circuit breaker policy to use</param>
+		/// <param name="value">The input value (not wrapped in Result)</param>
+		/// <param name="func">Async function to execute if circuit allows</param>
+		/// <returns>Result of operation or CircuitBreakerOpenError if blocked</returns>
+		public static Task<Result<TOut>> ExecuteAsync<TIn, TOut>(
+			this CircuitBreakerPolicy policy,
+			TIn value,
+			Func<TIn, Task<Result<TOut>>> func)
+		{
+			return Result<TIn>.Success(value)
+				.BindWithCircuitBreakerAsync(func, policy);
+		}
+
+		/// <summary>
+		/// Applies a circuit breaker directly to a value with a synchronous operation
+		/// </summary>
+		/// <typeparam name="TIn">Input value type</typeparam>
+		/// <typeparam name="TOut">Output value type</typeparam>
+		/// <param name="policy">Circuit breaker policy to use</param>
+		/// <param name="value">The input value (not wrapped in Result)</param>
+		/// <param name="func">Synchronous function to execute if circuit allows</param>
+		/// <returns>Result of operation or CircuitBreakerOpenError if blocked</returns>
+		public static Task<Result<TOut>> ExecuteAsync<TIn, TOut>(
+			this CircuitBreakerPolicy policy,
+			TIn value,
+			Func<TIn, Result<TOut>> func)
+		{
+			return Result<TIn>.Success(value)
+				.BindWithCircuitBreakerAsync(func, policy);
+		}
+
+		/// <summary>
+		/// Applies a circuit breaker directly to an async value task with an async operation
+		/// </summary>
+		/// <typeparam name="TIn">Input value type</typeparam>
+		/// <typeparam name="TOut">Output value type</typeparam>
+		/// <param name="policy">Circuit breaker policy to use</param>
+		/// <param name="valueTask">Async task returning the input value</param>
+		/// <param name="func">Async function to execute if circuit allows</param>
+		/// <returns>Result of operation or CircuitBreakerOpenError if blocked</returns>
+		public static async Task<Result<TOut>> ExecuteAsync<TIn, TOut>(
+			this CircuitBreakerPolicy policy,
+			Task<TIn> valueTask,
+			Func<TIn, Task<Result<TOut>>> func)
+		{
+			var value = await valueTask.ConfigureAwait(false);
+			return await policy.ExecuteAsync(value, func).ConfigureAwait(false);
+		}
+
+		/// <summary>
+		/// Applies a circuit breaker directly to an async value task with a synchronous operation
+		/// </summary>
+		/// <typeparam name="TIn">Input value type</typeparam>
+		/// <typeparam name="TOut">Output value type</typeparam>
+		/// <param name="policy">Circuit breaker policy to use</param>
+		/// <param name="valueTask">Async task returning the input value</param>
+		/// <param name="func">Synchronous function to execute if circuit allows</param>
+		/// <returns>Result of operation or CircuitBreakerOpenError if blocked</returns>
+		public static async Task<Result<TOut>> ExecuteAsync<TIn, TOut>(
+			this CircuitBreakerPolicy policy,
+			Task<TIn> valueTask,
+			Func<TIn, Result<TOut>> func)
+		{
+			var value = await valueTask.ConfigureAwait(false);
+			return await policy.ExecuteAsync(value, func).ConfigureAwait(false);
+		}
 	}
 }

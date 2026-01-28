@@ -24,8 +24,7 @@ namespace Voyager.Common.Resilience.Tests
 			var input = Result<int>.Success(42);
 
 			// Act
-			var result = await input.BindWithCircuitBreakerAsync(
-				async x => Result<string>.Success($"Value: {x}"),
+			var result = await input.BindWithCircuitBreakerAsync(async x => Result<string>.Success($"Value: {x}"),
 				policy);
 
 			// Assert
@@ -48,8 +47,7 @@ namespace Voyager.Common.Resilience.Tests
 			var input = Result<int>.Success(42);
 
 			// Act
-			var result = await input.BindWithCircuitBreakerAsync(
-				async x => Result<string>.Success($"Value: {x}"),
+			var result = await input.BindWithCircuitBreakerAsync(async x => Result<string>.Success($"Value: {x}"),
 				policy);
 
 			// Assert
@@ -87,8 +85,7 @@ namespace Voyager.Common.Resilience.Tests
 			var input = Result<int>.Failure(error);
 
 			// Act
-			var result = await input.BindWithCircuitBreakerAsync(
-				async x => Result<string>.Success($"Value: {x}"),
+			var result = await input.BindWithCircuitBreakerAsync(async x => Result<string>.Success($"Value: {x}"),
 				policy);
 
 			// Assert
@@ -111,8 +108,7 @@ namespace Voyager.Common.Resilience.Tests
 			var input = Result<int>.Success(42);
 
 			// Act
-			var result = await input.BindWithCircuitBreakerAsync(
-				async x => Result<string>.Success($"Value: {x}"),
+			var result = await input.BindWithCircuitBreakerAsync(async x => Result<string>.Success($"Value: {x}"),
 				policy);
 
 			// Assert
@@ -162,8 +158,7 @@ namespace Voyager.Common.Resilience.Tests
 			var input = Result<int>.Success(42);
 
 			// Act
-			var result = await input.BindWithCircuitBreakerAsync(
-				async x => Result<string>.Success($"Value: {x}"),
+			var result = await input.BindWithCircuitBreakerAsync(async x => Result<string>.Success($"Value: {x}"),
 				policy);
 
 			// Assert
@@ -207,8 +202,7 @@ namespace Voyager.Common.Resilience.Tests
 			var inputTask = Task.FromResult(Result<int>.Success(42));
 
 			// Act
-			var result = await inputTask.BindWithCircuitBreakerAsync(
-				async x => Result<string>.Success($"Value: {x}"),
+			var result = await inputTask.BindWithCircuitBreakerAsync(async x => Result<string>.Success($"Value: {x}"),
 				policy);
 
 			// Assert
@@ -241,8 +235,7 @@ namespace Voyager.Common.Resilience.Tests
 			var inputTask = Task.FromResult(Result<int>.Success(42));
 
 			// Act
-			var result = await inputTask.BindWithCircuitBreakerAsync(
-				x => Result<string>.Success($"Value: {x}"),
+			var result = await inputTask.BindWithCircuitBreakerAsync(x => Result<string>.Success($"Value: {x}"),
 				policy);
 
 			// Assert
@@ -264,8 +257,7 @@ namespace Voyager.Common.Resilience.Tests
 			var input = Result<int>.Success(42);
 
 			// Act
-			var result = await input.BindWithCircuitBreakerAsync(
-				async x => Result<string>.Success($"Value: {x}"),
+			var result = await input.BindWithCircuitBreakerAsync(async x => Result<string>.Success($"Value: {x}"),
 				policy);
 
 			// Assert
@@ -275,6 +267,38 @@ namespace Voyager.Common.Resilience.Tests
 			// Verify original error context is preserved
 			Assert.Contains(originalError.Type.ToString(), result.Error.Message);
 			Assert.Contains(originalError.Message, result.Error.Message);
+		}
+
+		[Fact]
+		public async Task BindWithCircuitBreakerAsync_DirectValue_AsyncFunc_NoNeedForResultSuccess()
+		{
+			// Arrange
+			var policy = new CircuitBreakerPolicy();
+			var serviceDate = "2025-01-28";
+
+			// Act - Direct value via policy.ExecuteAsync, no Result.Success() wrapper needed
+			var result = await policy.ExecuteAsync(serviceDate,
+				async sd => Result<string>.Success($"Processed: {sd}"));
+
+			// Assert
+			Assert.True(result.IsSuccess);
+			Assert.Equal("Processed: 2025-01-28", result.Value);
+		}
+
+		[Fact]
+		public async Task BindWithCircuitBreakerAsync_DirectValue_SyncFunc_NoNeedForResultSuccess()
+		{
+			// Arrange
+			var policy = new CircuitBreakerPolicy();
+			var userId = 42;
+
+			// Act - Direct value with sync function
+			var result = await policy.ExecuteAsync(userId,
+				id => Result<string>.Success($"User: {id}"));
+
+			// Assert
+			Assert.True(result.IsSuccess);
+			Assert.Equal("User: 42", result.Value);
 		}
 	}
 }
