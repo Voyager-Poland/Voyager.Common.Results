@@ -4,8 +4,10 @@
 
 		<!-- NuGet Package Metadata -->
 		<Title>Voyager Common Resilience</Title>
-		<Description>Resilience patterns (Circuit Breaker) for Railway Oriented Programming - extends Voyager.Common.Results with stateful fault tolerance patterns</Description>
-		<PackageTags>result;monad;railway;functional;csharp;error-handling;circuit-breaker;resilience;fault-tolerance;reliability</PackageTags>
+		<Description>Resilience patterns (Circuit Breaker) for Railway Oriented Programming - extends
+			Voyager.Common.Results with stateful fault tolerance patterns</Description>
+		<PackageTags>
+			result;monad;railway;functional;csharp;error-handling;circuit-breaker;resilience;fault-tolerance;reliability</PackageTags>
 	</PropertyGroup>
 
 	<ItemGroup>
