@@ -408,5 +408,86 @@ namespace Voyager.Common.Resilience.Tests
 			Assert.Equal(ErrorType.CircuitBreakerOpen, result.Error.Type);
 			Assert.Equal(CircuitState.Open, policy.State);
 		}
+
+		[Fact]
+		public async Task ExecuteAsync_InputIndependent_AsyncFunc_ExecutesCorrectly()
+		{
+			// Arrange
+			var policy = new CircuitBreakerPolicy();
+			var executeCount = 0;
+
+			// Act - Execute async operation without input parameter via policy.ExecuteAsync
+			var result = await policy.ExecuteAsync(
+				async () =>
+				{
+					executeCount++;
+					return await Task.FromResult(Result<string>.Success("Executed"));
+				});
+
+			// Assert
+			Assert.True(result.IsSuccess);
+			Assert.Equal("Executed", result.Value);
+			Assert.Equal(1, executeCount);
+			Assert.Equal(CircuitState.Closed, policy.State);
+		}
+
+		[Fact]
+		public async Task ExecuteAsync_InputIndependent_SyncFunc_ExecutesCorrectly()
+		{
+			// Arrange
+			var policy = new CircuitBreakerPolicy();
+			var executeCount = 0;
+
+			// Act - Execute sync operation without input parameter
+			var result = await policy.ExecuteAsync(
+				() =>
+				{
+					executeCount++;
+					return Result<int>.Success(100);
+				});
+
+			// Assert
+			Assert.True(result.IsSuccess);
+			Assert.Equal(100, result.Value);
+			Assert.Equal(1, executeCount);
+		}
+
+		[Fact]
+		public async Task ExecuteAsync_InputIndependent_RecordsFailure()
+		{
+			// Arrange
+			var policy = new CircuitBreakerPolicy(failureThreshold: 2);
+			var operationError = Error.DatabaseError("Database unavailable");
+
+			// Act - Operation fails
+			var result = await policy.ExecuteAsync(
+				async () => Result<string>.Failure(operationError));
+
+			// Assert
+			Assert.False(result.IsSuccess);
+			Assert.Equal(operationError, result.Error);
+			Assert.Equal(1, policy.FailureCount);
+			Assert.Equal(operationError, policy.LastError);
+		}
+
+		[Fact]
+		public async Task ExecuteAsync_InputIndependent_OpenCircuit_FailsFast()
+		{
+			// Arrange
+			var policy = new CircuitBreakerPolicy(failureThreshold: 1);
+			var operationError = Error.TimeoutError("Timeout");
+
+			// Open the circuit
+			await policy.RecordFailureAsync(operationError);
+
+			// Act - Circuit is open, should fail fast
+			var result = await policy.ExecuteAsync(
+				async () => Result<string>.Success("Should not execute"));
+
+			// Assert
+			Assert.False(result.IsSuccess);
+			Assert.Equal(ErrorType.CircuitBreakerOpen, result.Error.Type);
+			Assert.Equal(CircuitState.Open, policy.State);
+		}
 	}
 }

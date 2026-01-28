@@ -174,6 +174,36 @@ namespace Voyager.Common.Resilience
 		}
 
 		/// <summary>
+		/// Applies a circuit breaker to an async operation independent of input value
+		/// </summary>
+		/// <typeparam name="TOut">Output value type</typeparam>
+		/// <param name="policy">Circuit breaker policy to use</param>
+		/// <param name="func">Async function to execute if circuit allows (no parameters required)</param>
+		/// <returns>Result of operation or CircuitBreakerOpenError if blocked</returns>
+		public static Task<Result<TOut>> ExecuteAsync<TOut>(
+			this CircuitBreakerPolicy policy,
+			Func<Task<Result<TOut>>> func)
+		{
+			return Result.Success()
+				.BindWithCircuitBreakerAsync(func, policy);
+		}
+
+		/// <summary>
+		/// Applies a circuit breaker to a synchronous operation independent of input value
+		/// </summary>
+		/// <typeparam name="TOut">Output value type</typeparam>
+		/// <param name="policy">Circuit breaker policy to use</param>
+		/// <param name="func">Synchronous function to execute if circuit allows (no parameters required)</param>
+		/// <returns>Result of operation or CircuitBreakerOpenError if blocked</returns>
+		public static Task<Result<TOut>> ExecuteAsync<TOut>(
+			this CircuitBreakerPolicy policy,
+			Func<Result<TOut>> func)
+		{
+			return Result.Success()
+				.BindWithCircuitBreakerAsync(func, policy);
+		}
+
+		/// <summary>
 		/// Applies a circuit breaker directly to a value with a synchronous operation
 		/// </summary>
 		/// <typeparam name="TIn">Input value type</typeparam>
