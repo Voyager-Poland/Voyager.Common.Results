@@ -44,7 +44,7 @@ var circuitBreaker = new CircuitBreakerPolicy(
 
 // Execute operations through the circuit breaker
 var result = await GetUser(userId)
-    .ExecuteAsync(
+    .BindWithCircuitBreakerAsync(
         user => CallExternalApiAsync(user),
         circuitBreaker
     );
@@ -104,15 +104,15 @@ var policy = new CircuitBreakerPolicy(
 );
 
 // Sync function
-var result = GetUserId()
-    .Execute(
+var result = await GetUserId()
+    .BindWithCircuitBreakerAsync(
         id => _externalService.GetUserData(id),
         policy
     );
 
 // Async function
 var result = await GetUserIdAsync()
-    .ExecuteAsync(
+    .BindWithCircuitBreakerAsync(
         id => _externalService.GetUserDataAsync(id),
         policy
     );
@@ -123,7 +123,7 @@ var result = await GetUserIdAsync()
 ```csharp
 var result = await ValidateRequestAsync(request)
     .BindAsync(req => AuthenticateAsync(req))
-    .ExecuteAsync(
+    .BindWithCircuitBreakerAsync(
         user => _externalApi.FetchDataAsync(user),
         circuitBreaker
     )
@@ -154,7 +154,7 @@ policy.Reset();
 ### Error Handling
 
 ```csharp
-var result = await operation.ExecuteAsync(CallServiceAsync, policy);
+var result = await operation.BindWithCircuitBreakerAsync(CallServiceAsync, policy);
 
 result.Switch(
     onSuccess: data => Console.WriteLine($"Success: {data}"),
@@ -189,7 +189,7 @@ var result = await GetConnectionAsync()
         conn => ExecuteQueryAsync(conn),
         RetryPolicies.TransientErrors(maxAttempts: 3)
     )
-    .ExecuteAsync(
+    .BindWithCircuitBreakerAsync(
         data => CallDownstreamServiceAsync(data),
         circuitBreaker
     );

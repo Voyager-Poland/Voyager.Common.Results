@@ -294,7 +294,7 @@ var policy = new CircuitBreakerPolicy(
 
 // Execute operations through the circuit breaker
 var result = await GetUser(userId)
-    .ExecuteAsync(
+    .BindWithCircuitBreakerAsync(
         user => CallExternalServiceAsync(user),
         policy
     );
