@@ -7,7 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_TBD_
+### Added
+- **Retry extensions for transient failures**: Lightweight retry functionality without external dependencies
+  - `BindWithRetryAsync(func, policy)` - Executes operations with configurable retry logic
+  - `RetryPolicy` delegate for flexible retry strategies
+  - `RetryPolicies.TransientErrors()` - Default policy retrying only `Unavailable` and `Timeout` errors with exponential backoff
+  - `RetryPolicies.Custom()` - Build custom retry policies with predicates and delay strategies
+  - `RetryPolicies.Default()` - Convenient default (3 attempts, 1s base delay)
+  - **CRITICAL**: Always preserves original error context - never replaces with generic "max retries exceeded"
+  - Task&lt;Result&gt; overload for async result chains
+  - See [ADR-0003](docs/adr/ADR-0003-retry-extensions-for-transient-failures.md) for design rationale
 
 ## [1.5.0] - 2026-01-27
 

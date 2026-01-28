@@ -13,14 +13,26 @@ src/Voyager.Common.Results/
 └── Extensions/
     ├── TaskResultExtensions.cs        # Async: MapAsync, BindAsync, TryAsync
     └── ResultCollectionExtensions.cs  # Combine, Partition, GetSuccessValues
+
+build/                 # Modular MSBuild configuration (imported by Directory.Build.props)
+├── Build.Versioning.props   # MinVer git-based versioning
+├── Build.CodeQuality.props  # Warnings as errors, analyzers, deterministic builds
+├── Build.SourceLink.props   # Source linking for debugging
+├── Build.NuGet.props        # Package metadata, licensing
+└── Build.Signing.props      # Strong naming (.snk)
 ```
 
+**Build system pattern:** All `.props` files are imported automatically via `Directory.Build.props` - modify modular files, NOT individual `.csproj` files.
+
 ## Multi-Framework: .NET 8.0 + .NET 6.0 + .NET 4.8
+
+**CRITICAL: ImplicitUsings is DISABLED for all targets** - always add explicit `using` statements or use `#if NET48` conditionals.
 
 **Required conditional imports for .NET 4.8 compatibility:**
 ```csharp
 #if NET48
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 #endif
 ```
@@ -29,13 +41,13 @@ using System.Threading.Tasks;
 
 | Framework | Targets | ImplicitUsings | LangVersion | Notes |
 |-----------|---------|---------------|-------------|-------|
-| .NET 8.0  | net8.0  | enabled       | latest      | Modern, no compatibility layer needed |
+| .NET 8.0  | net8.0  | **disabled**  | latest      | Modern, but no implicit usings - explicit imports required |
 | .NET 6.0  | net6.0  | disabled      | 10.0        | Source Link enabled, no polyfills needed |
 | .NET 4.8  | net48   | disabled      | 10.0        | Requires `IsExternalInit` polyfill, strict type inference |
 
 **Per-target file location:** Check [Directory.Build.props](../Directory.Build.props) for framework-specific settings.
 
-**Always verify both:** `dotnet build -c Release && dotnet test -c Release --no-build`
+**Always verify all targets:** `dotnet build -c Release && dotnet test -c Release --no-build`
 
 ## Critical Operator Selection
 
@@ -159,9 +171,16 @@ public void Map_Success_TransformsValue() { }
 public void Map_Failure_PropagatesError() { }
 ```
 
-**Test organization:** Files mirror source structure ([MonadLawsTests.cs](../src/Voyager.Common.Results.Tests/MonadLawsTests.cs), [ErrorPropagationTests.cs](../src/Voyager.Common.Results.Tests/ErrorPropagationTests.cs), [CompositionTests.cs](../src/Voyager.Common.Results.Tests/CompositionTests.cs), etc.)
+**Test categories (mirror source architecture):**
+- **MonadLawsTests.cs** - Mathematical properties (left/right identity, associativity, functor laws)
+- **ErrorPropagationTests.cs** - Error flow through Map, Bind, Tap, Ensure, OrElse, MapError chains
+- **CompositionTests.cs** - Operator chaining behavior and complex scenarios
+- **InvariantTests.cs** - XOR property, null safety, immutability guarantees
+- **ResultTests.cs / ResultTTests.cs** - Core factory methods, Match/Switch, conversions
+- **TaskResultExtensionsTests.cs** - Async operators, cancellation token handling
+- **ResultCollectionExtensionsTests.cs** - Combine, Partition, collection operations
 
-**Always test both frameworks:** `dotnet test -c Release` runs against net8.0, net6.0, and net48
+**Always test all targets:** `dotnet test -c Release` validates net8.0, net6.0, AND net48
 
 **Coverage requirement:** Run `dotnet test --collect:"XPlat Code Coverage"` - no significant decreases allowed
 
@@ -193,5 +212,6 @@ public void Map_Failure_PropagatesError() { }
 
 1. **Modifier order:** `public static new` (not `public new static`)
 2. **Don't access `.Value` without checking `IsSuccess`** - use `Match` or `GetValueOrDefault`
-3. **Test both frameworks** - .NET 4.8 lacks implicit usings
+3. **Test all frameworks** - .NET 4.8 lacks implicit usings, requires `#if NET48` conditionals
 4. **Warnings are errors** - `TreatWarningsAsErrors` is enabled
+5. **MinVer versioning caching** - Always `dotnet clean -c Release` before rebuild to clear cached versions

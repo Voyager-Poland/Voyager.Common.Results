@@ -221,6 +221,55 @@ var userData = await Result<string>.TryAsync(async () =>
 - ✅ Converting async exception-based code to Result pattern
 - ✅ Operations that need proper cancellation handling
 
+### Retry - Transient Failure Handling
+
+Handle temporary failures (network issues, service unavailability) with automatic retry logic:
+
+```csharp
+using Voyager.Common.Results.Extensions;
+
+// Basic retry with default policy (3 attempts, exponential backoff)
+var result = await GetDatabaseConnection()
+    .BindWithRetryAsync(
+        conn => ExecuteQuery(conn),
+        RetryPolicies.TransientErrors()
+    );
+
+// Custom retry configuration
+var result = await FetchDataAsync()
+    .BindWithRetryAsync(
+        data => ProcessData(data),
+        RetryPolicies.TransientErrors(maxAttempts: 5, baseDelayMs: 500)
+    );
+
+// Custom retry policy for specific errors
+var policy = RetryPolicies.Custom(
+    maxAttempts: 10,
+    shouldRetry: e => e.Type == ErrorType.Unavailable || e.Code == "RATE_LIMIT",
+    delayStrategy: attempt => 500 // Fixed 500ms delay
+);
+
+var result = await apiCall.BindWithRetryAsync(ProcessResponse, policy);
+
+// Retry automatically handles:
+// ✅ ErrorType.Unavailable - Service down, network issues, deadlocks
+// ✅ ErrorType.Timeout - Operation exceeded time limit
+// ❌ Permanent errors (Validation, NotFound, etc.) - NOT retried
+```
+
+**Key features:**
+- 🔄 Exponential backoff by default (1s → 2s → 4s → ...)
+- 🎯 Only retries transient errors (`Unavailable`, `Timeout`)
+- 📝 **Always preserves original error** - never generic "max retries exceeded"
+- ⚡ Zero external dependencies
+- 🔧 Fully customizable via `RetryPolicies.Custom()`
+
+**When to use Retry:**
+- ✅ Network calls with temporary failures
+- ✅ Database operations during brief unavailability
+- ✅ API calls that may be rate-limited or temporarily down
+- ❌ NOT for circuit breaker patterns (use Polly or separate library)
+
 ### Map - Value Transformations
 
 Transform success values or convert void operations to value operations:
