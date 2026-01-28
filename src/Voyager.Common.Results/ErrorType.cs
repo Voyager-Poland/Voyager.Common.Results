@@ -29,8 +29,8 @@
 		/// Database error
 		/// </summary>
 		Database,       /// <summary>
-						/// Business logic error
-						/// </summary>
+										/// Business logic error
+										/// </summary>
 		Business,
 
 		/// <summary>
@@ -63,5 +63,9 @@
 		/// </summary>
 		Unexpected,
 
+		/// <summary>
+		/// Circuit breaker is open (protection mechanism active)
+		/// </summary>
+		CircuitBreakerOpen
 	}
 }
