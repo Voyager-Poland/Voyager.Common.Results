@@ -50,21 +50,26 @@ namespace Voyager.Common.Results.Extensions
 			Func<TIn, Task<Result<TOut>>> func,
 			RetryPolicy policy)
 		{
-			if (result.IsFailure) return Result<TOut>.Failure(result.Error);
+			if (result.IsFailure)
+				return Result<TOut>.Failure(result.Error);
 
+			// Store input value - guaranteed non-null because IsSuccess = true
+			var inputValue = result.Value!;
 			int attempt = 1;
 			Result<TOut> lastOutcome = default!;
 
 			while (true)
 			{
-				lastOutcome = await func(result.Value!).ConfigureAwait(false);
+				lastOutcome = await func(inputValue).ConfigureAwait(false);
 
-				if (lastOutcome.IsSuccess) return lastOutcome;
+				if (lastOutcome.IsSuccess)
+					return lastOutcome;
 
 				var retryDecision = policy(attempt, lastOutcome.Error);
 
 				// Stop retrying - return the ORIGINAL error, never replace it
-				if (retryDecision.IsFailure) return lastOutcome;
+				if (retryDecision.IsFailure)
+					return lastOutcome;
 
 				// Wait before next attempt
 				await Task.Delay(retryDecision.Value).ConfigureAwait(false);
