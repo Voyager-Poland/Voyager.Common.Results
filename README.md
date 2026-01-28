@@ -321,6 +321,8 @@ policy.Reset();
 - 🧵 Thread-safe with SemaphoreSlim for async operations
 - 📝 Preserves last error context via `CircuitBreakerOpenError(lastError)`
 - 🎯 Returns `ErrorType.CircuitBreakerOpen` when circuit is open
+- 🔎 **Only counts infrastructure errors** (Unavailable, Timeout, Database, Unexpected)
+- ✅ **Ignores business errors** (Validation, NotFound, Permission, Business, Conflict)
 
 **When to use Circuit Breaker:**
 - ✅ External API/service calls that may fail

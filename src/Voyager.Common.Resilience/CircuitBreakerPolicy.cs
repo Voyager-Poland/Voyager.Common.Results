@@ -159,11 +159,19 @@ namespace Voyager.Common.Resilience
 		}
 
 		/// <summary>
-		/// Records a failed operation
+		/// Records a failed operation. Only infrastructure errors (Unavailable, Timeout, Database, Unexpected)
+		/// are counted towards circuit breaker threshold. Business/validation errors are ignored.
 		/// </summary>
 		/// <param name="error">The error that occurred</param>
 		public async Task RecordFailureAsync(Error error)
 		{
+			// Only count infrastructure failures - ignore business/validation errors
+			if (!IsInfrastructureError(error))
+			{
+				// Business errors don't affect circuit state
+				return;
+			}
+
 			await _lock.WaitAsync().ConfigureAwait(false);
 			try
 			{
@@ -188,6 +196,17 @@ namespace Voyager.Common.Resilience
 			{
 				_lock.Release();
 			}
+		}
+
+		/// <summary>
+		/// Determines if an error represents an infrastructure failure that should affect circuit breaker state
+		/// </summary>
+		private static bool IsInfrastructureError(Error error)
+		{
+			return error.Type == ErrorType.Unavailable
+				|| error.Type == ErrorType.Timeout
+				|| error.Type == ErrorType.Database
+				|| error.Type == ErrorType.Unexpected;
 		}
 
 		/// <summary>

@@ -39,7 +39,7 @@ namespace Voyager.Common.Resilience.Tests
 		{
 			// Arrange
 			var policy = new CircuitBreakerPolicy(failureThreshold: 3);
-			var error = Error.ValidationError("Test error");
+			var error = Error.UnavailableError("Test error");
 
 			// Fail once
 			await policy.RecordFailureAsync(error);
@@ -64,7 +64,7 @@ namespace Voyager.Common.Resilience.Tests
 			// Arrange
 			var policy = new CircuitBreakerPolicy(failureThreshold: 3);
 			var input = Result<int>.Success(42);
-			var error = Error.ValidationError("Operation failed");
+			var error = Error.UnavailableError("Operation failed");
 
 			// Act
 			var result = await input.BindWithCircuitBreakerAsync(
@@ -83,7 +83,7 @@ namespace Voyager.Common.Resilience.Tests
 		{
 			// Arrange
 			var policy = new CircuitBreakerPolicy();
-			var error = Error.ValidationError("Input error");
+			var error = Error.UnavailableError("Input error");
 			var input = Result<int>.Failure(error);
 
 			// Act
@@ -102,7 +102,7 @@ namespace Voyager.Common.Resilience.Tests
 		{
 			// Arrange
 			var policy = new CircuitBreakerPolicy(failureThreshold: 2);
-			var opError = Error.ValidationError("Operation failed");
+			var opError = Error.UnavailableError("Operation failed");
 
 			// Open the circuit
 			await policy.RecordFailureAsync(opError);
@@ -127,7 +127,7 @@ namespace Voyager.Common.Resilience.Tests
 		{
 			// Arrange
 			var policy = new CircuitBreakerPolicy(failureThreshold: 3);
-			var error = Error.ValidationError("Operation failed");
+			var error = Error.UnavailableError("Operation failed");
 
 			// Act - Execute multiple failing operations
 			for (int i = 0; i < 3; i++)
@@ -150,7 +150,7 @@ namespace Voyager.Common.Resilience.Tests
 			var policy = new CircuitBreakerPolicy(
 				failureThreshold: 2,
 				openTimeout: TimeSpan.FromMilliseconds(100));
-			var error = Error.ValidationError("Operation failed");
+			var error = Error.UnavailableError("Operation failed");
 
 			// Open circuit
 			await policy.RecordFailureAsync(error);
@@ -178,7 +178,7 @@ namespace Voyager.Common.Resilience.Tests
 			var policy = new CircuitBreakerPolicy(
 				failureThreshold: 2,
 				openTimeout: TimeSpan.FromMilliseconds(100));
-			var error = Error.ValidationError("Operation failed");
+			var error = Error.UnavailableError("Operation failed");
 
 			// Open circuit
 			await policy.RecordFailureAsync(error);

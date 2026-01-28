@@ -11,9 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **NEW LIBRARY: Voyager.Common.Resilience** - Separate package for advanced resilience patterns
   - **Circuit Breaker pattern**: Prevents cascading failures by temporarily blocking calls to failing operations
     - `CircuitBreakerPolicy` - Thread-safe implementation with 3-state model (Closed/Open/HalfOpen)
-    - `ExecuteAsync(func, policy)` extension methods for Result&lt;T&gt; integration
+    - `BindWithCircuitBreakerAsync(func, policy)` extension methods for Result&lt;T&gt; integration
     - Configurable thresholds: failure threshold, open timeout, half-open max attempts
     - Automatic state transitions based on success/failure patterns
+    - **Smart error filtering**: Only infrastructure errors (Unavailable, Timeout, Database, Unexpected) open the circuit
+    - **Business errors ignored**: Validation, NotFound, Permission, Business, Conflict errors do NOT affect circuit state
     - ErrorType.CircuitBreakerOpen with last error preservation for context
     - See [ADR-0004](docs/adr/ADR-0004-circuit-breaker-pattern-for-resilience.md) for architectural rationale
   - **NuGet dependency**: Resilience library depends on Voyager.Common.Results package

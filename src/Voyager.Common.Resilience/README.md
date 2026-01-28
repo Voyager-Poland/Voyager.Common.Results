@@ -60,7 +60,7 @@ var message = result.Match(
 
 ## 🎯 Circuit Breaker States
 
-The circuit breaker implements a 3-state model:
+The circuit breaker implements a 3-state model and **only counts infrastructure errors** (Unavailable, Timeout, Database, Unexpected) towards failure thresholds. Business errors (Validation, NotFound, Permission, etc.) are ignored.
 
 ### 🟢 Closed (Normal Operation)
 - All requests flow through to the protected operation
@@ -91,6 +91,19 @@ var policy = new CircuitBreakerPolicy(
 - **failureThreshold**: 3-10 for most scenarios (lower = more sensitive)
 - **openTimeout**: 30-60 seconds for typical services (longer for slow recovery)
 - **halfOpenMaxAttempts**: 3-5 attempts (enough to verify recovery without overload)
+
+**Infrastructure Errors (counted towards threshold):**
+- `ErrorType.Unavailable` - Service down, network issues
+- `ErrorType.Timeout` - Request exceeded time limit
+- `ErrorType.Database` - Database connection/query failed
+- `ErrorType.Unexpected` - Unhandled exceptions
+
+**Business Errors (ignored by circuit breaker):**
+- `ErrorType.Validation` - Invalid input
+- `ErrorType.NotFound` - Resource doesn't exist
+- `ErrorType.Business` - Business rule violation
+- `ErrorType.Permission` / `ErrorType.Unauthorized` - Access denied
+- `ErrorType.Conflict` - Duplicate/collision
 
 ## 📖 Usage Examples
 

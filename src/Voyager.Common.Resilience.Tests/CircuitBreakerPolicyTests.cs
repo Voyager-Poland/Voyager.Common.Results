@@ -84,7 +84,7 @@ namespace Voyager.Common.Resilience.Tests
 		{
 			// Arrange
 			var policy = new CircuitBreakerPolicy(failureThreshold: 3);
-			var error = Error.ValidationError("Test error");
+			var error = Error.UnavailableError("Service unavailable");
 
 			// Act
 			await policy.RecordFailureAsync(error);
@@ -101,7 +101,7 @@ namespace Voyager.Common.Resilience.Tests
 		{
 			// Arrange
 			var policy = new CircuitBreakerPolicy(failureThreshold: 3);
-			var error = Error.ValidationError("Test error");
+			var error = Error.UnavailableError("Service unavailable");
 
 			// Act
 			await policy.RecordFailureAsync(error);
@@ -115,11 +115,51 @@ namespace Voyager.Common.Resilience.Tests
 		}
 
 		[Fact]
+		public async Task RecordFailureAsync_BusinessErrors_DoNotOpenCircuit()
+		{
+			// Arrange
+			var policy = new CircuitBreakerPolicy(failureThreshold: 2);
+
+			// Act - Record business/validation errors (should be ignored)
+			await policy.RecordFailureAsync(Error.ValidationError("Invalid input"));
+			await policy.RecordFailureAsync(Error.NotFoundError("User not found"));
+			await policy.RecordFailureAsync(Error.BusinessError("Business rule violation"));
+			await policy.RecordFailureAsync(Error.PermissionError("Access denied"));
+			await policy.RecordFailureAsync(Error.ConflictError("Duplicate entry"));
+			await policy.RecordFailureAsync(Error.UnauthorizedError("Not authenticated"));
+
+			// Assert - Circuit should remain closed
+			Assert.Equal(CircuitState.Closed, policy.State);
+			Assert.Equal(0, policy.FailureCount);
+			Assert.Null(policy.LastError);
+		}
+
+		[Fact]
+		public async Task RecordFailureAsync_InfrastructureErrors_OpenCircuit()
+		{
+			// Arrange
+			var policy = new CircuitBreakerPolicy(failureThreshold: 3);
+
+			// Act - Only infrastructure errors should count
+			await policy.RecordFailureAsync(Error.ValidationError("Ignored"));
+			await policy.RecordFailureAsync(Error.UnavailableError("Service down"));
+			await policy.RecordFailureAsync(Error.BusinessError("Ignored"));
+			await policy.RecordFailureAsync(Error.TimeoutError("Request timeout"));
+			await policy.RecordFailureAsync(Error.NotFoundError("Ignored"));
+			await policy.RecordFailureAsync(Error.DatabaseError("Connection failed"));
+
+			// Assert - Should open after 3 infrastructure failures
+			Assert.Equal(CircuitState.Open, policy.State);
+			Assert.Equal(3, policy.FailureCount);
+			Assert.Equal(ErrorType.Database, policy.LastError!.Type);
+		}
+
+		[Fact]
 		public async Task ShouldAllowRequestAsync_OpenCircuit_BlocksRequest()
 		{
 			// Arrange
 			var policy = new CircuitBreakerPolicy(failureThreshold: 2);
-			var error = Error.ValidationError("Test error");
+			var error = Error.TimeoutError("Request timeout");
 
 			await policy.RecordFailureAsync(error);
 			await policy.RecordFailureAsync(error);
@@ -141,7 +181,7 @@ namespace Voyager.Common.Resilience.Tests
 			var policy = new CircuitBreakerPolicy(
 				failureThreshold: 2,
 				openTimeout: TimeSpan.FromMilliseconds(100));
-			var error = Error.ValidationError("Test error");
+			var error = Error.DatabaseError("Connection failed");
 
 			await policy.RecordFailureAsync(error);
 			await policy.RecordFailureAsync(error);
@@ -162,7 +202,7 @@ namespace Voyager.Common.Resilience.Tests
 			var policy = new CircuitBreakerPolicy(
 				failureThreshold: 2,
 				openTimeout: TimeSpan.FromMilliseconds(100));
-			var error = Error.ValidationError("Test error");
+			var error = Error.UnavailableError("Service unavailable");
 
 			await policy.RecordFailureAsync(error);
 			await policy.RecordFailureAsync(error);
@@ -183,7 +223,7 @@ namespace Voyager.Common.Resilience.Tests
 		{
 			// Arrange
 			var policy = new CircuitBreakerPolicy(failureThreshold: 5);
-			var error = Error.ValidationError("Test error");
+			var error = Error.UnavailableError("Service unavailable");
 
 			await policy.RecordFailureAsync(error);
 			await policy.RecordFailureAsync(error);
@@ -204,7 +244,7 @@ namespace Voyager.Common.Resilience.Tests
 			var policy = new CircuitBreakerPolicy(
 				failureThreshold: 2,
 				openTimeout: TimeSpan.FromMilliseconds(100));
-			var error = Error.ValidationError("Test error");
+			var error = Error.UnavailableError("Service unavailable");
 
 			await policy.RecordFailureAsync(error);
 			await policy.RecordFailureAsync(error);
@@ -223,7 +263,7 @@ namespace Voyager.Common.Resilience.Tests
 		{
 			// Arrange
 			var policy = new CircuitBreakerPolicy(failureThreshold: 2);
-			var error = Error.ValidationError("Test error");
+			var error = Error.UnavailableError("Service unavailable");
 
 			await policy.RecordFailureAsync(error);
 			await policy.RecordFailureAsync(error);
@@ -244,7 +284,7 @@ namespace Voyager.Common.Resilience.Tests
 			var policy = new CircuitBreakerPolicy(
 				failureThreshold: 2,
 				openTimeout: TimeSpan.FromMilliseconds(100));
-			var error = Error.ValidationError("Test error");
+			var error = Error.UnavailableError("Service unavailable");
 
 			await policy.RecordFailureAsync(error);
 			await policy.RecordFailureAsync(error);
