@@ -6,6 +6,83 @@ namespace Voyager.Common.Results.Tests;
 public class ResultRetryExtensionsTests
 {
 	[Fact]
+	public async Task BindWithRetryAsync_WithDefaultPolicy_ReturnsSuccessImmediately()
+	{
+		// Arrange
+		var result = Result<int>.Success(42);
+		var callCount = 0;
+
+		// Act - uses default policy (no second parameter)
+		var outcome = await result.BindWithRetryAsync(
+			async value =>
+			{
+				callCount++;
+				await Task.Delay(1);
+				return Result<string>.Success(value.ToString());
+			}
+		);
+
+		// Assert
+		Assert.True(outcome.IsSuccess);
+		Assert.Equal("42", outcome.Value);
+		Assert.Equal(1, callCount);
+	}
+
+	[Fact]
+	public async Task BindWithRetryAsync_DefaultPolicy_RetriesTransientErrors()
+	{
+		// Arrange
+		var result = Result<int>.Success(42);
+		var callCount = 0;
+
+		// Act - default policy should retry transient errors
+		var outcome = await result.BindWithRetryAsync(
+			async value =>
+			{
+				callCount++;
+				await Task.Delay(1);
+
+				if (callCount < 2)
+					return Result<string>.Failure(Error.UnavailableError("Temporary failure"));
+
+				return Result<string>.Success(value.ToString());
+			}
+		);
+
+		// Assert
+		Assert.True(outcome.IsSuccess);
+		Assert.Equal("42", outcome.Value);
+		Assert.Equal(2, callCount); // Should retry once
+	}
+
+	[Fact]
+	public async Task BindWithRetryAsync_TaskOverload_WithDefaultPolicy_WorksCorrectly()
+	{
+		// Arrange
+		var resultTask = Task.FromResult(Result<int>.Success(42));
+		var callCount = 0;
+
+		// Act - Task overload with default policy
+		var outcome = await resultTask.BindWithRetryAsync(
+			async value =>
+			{
+				callCount++;
+				await Task.Delay(1);
+
+				if (callCount < 2)
+					return Result<string>.Failure(Error.TimeoutError("Temporary timeout"));
+
+				return Result<string>.Success(value.ToString());
+			}
+		);
+
+		// Assert
+		Assert.True(outcome.IsSuccess);
+		Assert.Equal("42", outcome.Value);
+		Assert.Equal(2, callCount);
+	}
+
+	[Fact]
 	public async Task BindWithRetryAsync_WithSuccess_ReturnsSuccessImmediately()
 	{
 		// Arrange

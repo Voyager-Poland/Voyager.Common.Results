@@ -23,6 +23,53 @@ namespace Voyager.Common.Results.Extensions
 	public static class ResultRetryExtensions
 	{
 		/// <summary>
+		/// Executes an operation with retry logic using the default retry policy
+		/// </summary>
+		/// <typeparam name="TIn">Type of the input value</typeparam>
+		/// <typeparam name="TOut">Type of the output value</typeparam>
+		/// <param name="result">Input result to bind</param>
+		/// <param name="func">Function to execute that may fail transiently</param>
+		/// <returns>Result from the operation with default retry policy (3 attempts, exponential backoff)</returns>
+		/// <remarks>
+		/// Uses <see cref="RetryPolicies.Default()"/> which retries only transient errors (Unavailable, Timeout).
+		/// For custom retry behavior, use the overload that accepts a RetryPolicy parameter.
+		/// </remarks>
+		/// <example>
+		/// <code>
+		/// // Uses default policy (3 attempts, 1s base delay, exponential backoff)
+		/// var result = await GetDatabaseConnection()
+		///     .BindWithRetryAsync(conn => ExecuteQuery(conn));
+		/// </code>
+		/// </example>
+		public static async Task<Result<TOut>> BindWithRetryAsync<TIn, TOut>(
+			this Result<TIn> result,
+			Func<TIn, Task<Result<TOut>>> func)
+		{
+			return await result.BindWithRetryAsync(func, RetryPolicies.Default()).ConfigureAwait(false);
+		}
+
+		/// <summary>
+		/// Executes an operation with retry logic using the default retry policy (Task&lt;Result&gt; overload)
+		/// </summary>
+		/// <typeparam name="TIn">Type of the input value</typeparam>
+		/// <typeparam name="TOut">Type of the output value</typeparam>
+		/// <param name="resultTask">Task returning the input result to bind</param>
+		/// <param name="func">Function to execute that may fail transiently</param>
+		/// <returns>Result from the operation with default retry policy (3 attempts, exponential backoff)</returns>
+		/// <example>
+		/// <code>
+		/// var result = await GetDatabaseConnectionAsync()
+		///     .BindWithRetryAsync(conn => ExecuteQuery(conn));
+		/// </code>
+		/// </example>
+		public static async Task<Result<TOut>> BindWithRetryAsync<TIn, TOut>(
+			this Task<Result<TIn>> resultTask,
+			Func<TIn, Task<Result<TOut>>> func)
+		{
+			return await resultTask.BindWithRetryAsync(func, RetryPolicies.Default()).ConfigureAwait(false);
+		}
+
+		/// <summary>
 		/// Executes an operation with retry logic for transient failures
 		/// </summary>
 		/// <typeparam name="TIn">Type of the input value</typeparam>
