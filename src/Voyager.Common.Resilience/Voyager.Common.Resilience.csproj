@@ -8,7 +8,15 @@
 			Voyager.Common.Results with stateful fault tolerance patterns</Description>
 		<PackageTags>
 			result;monad;railway;functional;csharp;error-handling;circuit-breaker;resilience;fault-tolerance;reliability</PackageTags>
+
+		<!-- Include README in NuGet package (NuGet 5.10+) -->
+		<PackageReadmeFile>README.md</PackageReadmeFile>
 	</PropertyGroup>
+
+	<ItemGroup>
+		<!-- Include README in NuGet package -->
+		<None Include="README.md" Pack="true" PackagePath="\" />
+	</ItemGroup>
 
 	<ItemGroup>
 		<!-- Use ProjectReference during development/compilation for debugging and faster builds -->
