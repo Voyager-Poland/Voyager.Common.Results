@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **NEW LIBRARY: Voyager.Common.Resilience** - Separate package for advanced resilience patterns
+  - **Circuit Breaker pattern**: Prevents cascading failures by temporarily blocking calls to failing operations
+    - `CircuitBreakerPolicy` - Thread-safe implementation with 3-state model (Closed/Open/HalfOpen)
+    - `ExecuteAsync(func, policy)` extension methods for Result&lt;T&gt; integration
+    - Configurable thresholds: failure threshold, open timeout, half-open max attempts
+    - Automatic state transitions based on success/failure patterns
+    - ErrorType.CircuitBreakerOpen with last error preservation for context
+    - See [ADR-0004](docs/adr/ADR-0004-circuit-breaker-pattern-for-resilience.md) for architectural rationale
+  - **NuGet dependency**: Resilience library depends on Voyager.Common.Results package
+  - **Installation**: `dotnet add package Voyager.Common.Resilience`
+
 - **Retry extensions for transient failures**: Lightweight retry functionality without external dependencies
   - `BindWithRetryAsync(func, policy)` - Executes operations with configurable retry logic
   - `RetryPolicy` delegate for flexible retry strategies
@@ -17,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **CRITICAL**: Always preserves original error context - never replaces with generic "max retries exceeded"
   - Task&lt;Result&gt; overload for async result chains
   - See [ADR-0003](docs/adr/ADR-0003-retry-extensions-for-transient-failures.md) for design rationale
+
+- **ErrorType.CircuitBreakerOpen**: New error type for circuit breaker open state
+  - `CircuitBreakerOpenError(lastError)` - Preserves context from original failure
+  - HTTP mapping: 503 Service Unavailable
 
 ## [1.5.0] - 2026-01-27
 
