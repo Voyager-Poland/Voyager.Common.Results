@@ -7,14 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_TBD_
+
+## [1.5.0] - 2026-01-27
+
 ### Added
 - **`Bind(Func<TValue, Result>)` overload for `Result<T>`**: Chains `Result<T>` with operations returning void `Result`
   - Enables natural composition: `Result<T>` → `Result` → `Result<T>` → ...
   - Propagates errors from void operations (unlike `Tap`)
   - Example: `.Bind(user => SendNotification(user))` safely chains operations that can fail
   - Completes the monad pattern for void operations
-
-_TBD_
 
 ## [1.4.0] - 2025-12-15
 
@@ -316,7 +318,9 @@ _TBD_
 - .NET Framework 4.8
 - .NET 8.0
 
-[Unreleased]: https://github.com/Voyager-Poland/Voyager.Common.Results/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/Voyager-Poland/Voyager.Common.Results/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/Voyager-Poland/Voyager.Common.Results/releases/tag/v1.5.0
+[1.4.0]: https://github.com/Voyager-Poland/Voyager.Common.Results/releases/tag/v1.4.0
 [1.3.0]: https://github.com/Voyager-Poland/Voyager.Common.Results/releases/tag/v1.3.0
 [1.2.0]: https://github.com/Voyager-Poland/Voyager.Common.Results/releases/tag/v1.2.0
 [1.1.0]: https://github.com/Voyager-Poland/Voyager.Common.Results/releases/tag/v1.1.0
