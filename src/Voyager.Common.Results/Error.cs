@@ -57,8 +57,8 @@ namespace Voyager.Common.Results
 		/// </summary>
 		public static Error DatabaseError(string code, string message) =>
 				new(ErrorType.Database, code, message);     /// <summary>
-															/// Creates a database error with a default code
-															/// </summary>
+																										/// Creates a database error with a default code
+																										/// </summary>
 		public static Error DatabaseError(string message) =>
 				new(ErrorType.Database, "Database.Error", message);
 
@@ -136,10 +136,32 @@ namespace Voyager.Common.Results
 				new(ErrorType.Cancelled, "Operation.Cancelled", message);
 
 		/// <summary>
+		/// Creates a circuit breaker open error
+		/// </summary>
+		public static Error CircuitBreakerOpenError(string code, string message) =>
+				new(ErrorType.CircuitBreakerOpen, code, message);
+
+		/// <summary>
+		/// Creates a circuit breaker open error with a default code
+		/// </summary>
+		public static Error CircuitBreakerOpenError(string message) =>
+				new(ErrorType.CircuitBreakerOpen, "CircuitBreaker.Open", message);
+
+		/// <summary>
+		/// Creates a circuit breaker open error with context from the last failure
+		/// </summary>
+		/// <param name="lastError">The error that caused the circuit breaker to open</param>
+		/// <returns>Circuit breaker error with context from the last failure</returns>
+		public static Error CircuitBreakerOpenError(Error lastError) =>
+				new(ErrorType.CircuitBreakerOpen,
+					"CircuitBreaker.Open",
+					$"Circuit breaker open. Last error: [{lastError.Type}] {lastError.Message}");
+
+		/// <summary>
 		/// Creates an unexpected error
 		/// </summary>
 		public static Error UnexpectedError(string code, string message) =>
-						new(ErrorType.Unexpected, code, message);
+				new(ErrorType.Unexpected, code, message);
 
 		/// <summary>
 		/// Creates an unexpected error with a default code

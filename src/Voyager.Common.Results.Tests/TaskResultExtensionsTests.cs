@@ -785,6 +785,135 @@ public class TaskResultExtensionsTests
 		Assert.Equal(42, tapped.Value);
 	}
 
+	// ========== TAP ERROR ASYNC TESTS ==========
+
+	[Fact]
+	public async Task TapErrorAsync_TaskResultWithSyncAction_ExecutesActionOnFailure()
+	{
+		// Arrange
+		var error = Error.ValidationError("Test error");
+		var resultTask = Task.FromResult(Result<int>.Failure(error));
+		var actionExecuted = false;
+		Error? capturedError = null;
+
+		// Act
+		var tapped = await resultTask.TapErrorAsync(e =>
+		{
+			actionExecuted = true;
+			capturedError = e;
+		});
+
+		// Assert
+		Assert.True(actionExecuted);
+		Assert.Equal(error, capturedError);
+		Assert.True(tapped.IsFailure);
+		Assert.Equal(error, tapped.Error);
+	}
+
+	[Fact]
+	public async Task TapErrorAsync_TaskResultWithSyncAction_DoesNotExecuteOnSuccess()
+	{
+		// Arrange
+		var resultTask = Task.FromResult(Result<int>.Success(42));
+		var actionExecuted = false;
+
+		// Act
+		var tapped = await resultTask.TapErrorAsync(e => actionExecuted = true);
+
+		// Assert
+		Assert.False(actionExecuted);
+		Assert.True(tapped.IsSuccess);
+		Assert.Equal(42, tapped.Value);
+	}
+
+	[Fact]
+	public async Task TapErrorAsync_ResultWithAsyncAction_ExecutesActionOnFailure()
+	{
+		// Arrange
+		var error = Error.ValidationError("Test error");
+		var result = Result<int>.Failure(error);
+		var actionExecuted = false;
+		Error? capturedError = null;
+
+		// Act
+		var tapped = await result.TapErrorAsync(async e =>
+		{
+			await Task.Delay(10);
+			actionExecuted = true;
+			capturedError = e;
+		});
+
+		// Assert
+		Assert.True(actionExecuted);
+		Assert.Equal(error, capturedError);
+		Assert.True(tapped.IsFailure);
+		Assert.Equal(error, tapped.Error);
+	}
+
+	[Fact]
+	public async Task TapErrorAsync_ResultWithAsyncAction_DoesNotExecuteOnSuccess()
+	{
+		// Arrange
+		var result = Result<int>.Success(42);
+		var actionExecuted = false;
+
+		// Act
+		var tapped = await result.TapErrorAsync(async e =>
+		{
+			await Task.Delay(10);
+			actionExecuted = true;
+		});
+
+		// Assert
+		Assert.False(actionExecuted);
+		Assert.True(tapped.IsSuccess);
+		Assert.Equal(42, tapped.Value);
+	}
+
+	[Fact]
+	public async Task TapErrorAsync_TaskResultWithAsyncAction_ExecutesActionOnFailure()
+	{
+		// Arrange
+		var error = Error.ValidationError("Test error");
+		var resultTask = Task.FromResult(Result<int>.Failure(error));
+		var actionExecuted = false;
+		Error? capturedError = null;
+
+		// Act
+		var tapped = await resultTask.TapErrorAsync(async e =>
+		{
+			await Task.Delay(10);
+			actionExecuted = true;
+			capturedError = e;
+		});
+
+		// Assert
+		Assert.True(actionExecuted);
+		Assert.Equal(error, capturedError);
+		Assert.True(tapped.IsFailure);
+		Assert.Equal(error, tapped.Error);
+	}
+
+	[Fact]
+	public async Task TapErrorAsync_TaskResultWithAsyncAction_DoesNotExecuteOnSuccess()
+	{
+		// Arrange
+		var resultTask = Task.FromResult(Result<int>.Success(42));
+		var actionExecuted = false;
+
+		// Act
+		var tapped = await resultTask.TapErrorAsync(async e =>
+		{
+			await Task.Delay(10);
+			actionExecuted = true;
+		});
+
+		// Assert
+		Assert.False(actionExecuted);
+		Assert.True(tapped.IsSuccess);
+		Assert.Equal(42, tapped.Value);
+	}
+
 	// ========== MATCH ASYNC TESTS ==========
 
 	[Fact]

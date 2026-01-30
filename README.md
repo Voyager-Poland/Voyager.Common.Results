@@ -26,7 +26,11 @@ A lightweight, functional **Result Pattern** implementation for .NET that enable
 ## 📦 Installation
 
 ```bash
+# Core Result pattern library
 dotnet add package Voyager.Common.Results
+
+# Advanced resilience patterns (Circuit Breaker)
+dotnet add package Voyager.Common.Resilience
 ```
 
 ## 🚀 Quick Start
@@ -97,6 +101,7 @@ Error.BusinessError("Cannot cancel paid order")
 Error.UnavailableError("Service temporarily unavailable")
 Error.TimeoutError("Request timed out")
 Error.CancelledError("Operation was cancelled")
+Error.CircuitBreakerOpenError(lastError) // Circuit breaker open (from Resilience library)
 Error.UnexpectedError("Something went wrong")
 Error.FromException(exception)
 ```
@@ -220,6 +225,118 @@ var userData = await Result<string>.TryAsync(async () =>
 - ✅ Async parsing and serialization
 - ✅ Converting async exception-based code to Result pattern
 - ✅ Operations that need proper cancellation handling
+
+### Retry - Transient Failure Handling
+
+Handle temporary failures (network issues, service unavailability) with automatic retry logic:
+
+```csharp
+using Voyager.Common.Results.Extensions;
+
+// Basic retry with default policy (3 attempts, exponential backoff)
+var result = await GetDatabaseConnection()
+    .BindWithRetryAsync(
+        conn => ExecuteQuery(conn),
+        RetryPolicies.TransientErrors()
+    );
+
+// Custom retry configuration
+var result = await FetchDataAsync()
+    .BindWithRetryAsync(
+        data => ProcessData(data),
+        RetryPolicies.TransientErrors(maxAttempts: 5, baseDelayMs: 500)
+    );
+
+// Custom retry policy for specific errors
+var policy = RetryPolicies.Custom(
+    maxAttempts: 10,
+    shouldRetry: e => e.Type == ErrorType.Unavailable || e.Code == "RATE_LIMIT",
+    delayStrategy: attempt => 500 // Fixed 500ms delay
+);
+
+var result = await apiCall.BindWithRetryAsync(ProcessResponse, policy);
+
+// Retry automatically handles:
+// ✅ ErrorType.Unavailable - Service down, network issues, deadlocks
+// ✅ ErrorType.Timeout - Operation exceeded time limit
+// ❌ Permanent errors (Validation, NotFound, etc.) - NOT retried
+```
+
+**Key features:**
+- 🔄 Exponential backoff by default (1s → 2s → 4s → ...)
+- 🎯 Only retries transient errors (`Unavailable`, `Timeout`)
+- 📝 **Always preserves original error** - never generic "max retries exceeded"
+- ⚡ Zero external dependencies
+- 🔧 Fully customizable via `RetryPolicies.Custom()`
+
+**When to use Retry:**
+- ✅ Network calls with temporary failures
+- ✅ Database operations during brief unavailability
+- ✅ API calls that may be rate-limited or temporarily down
+- ❌ NOT for permanent errors (Validation, NotFound)
+- 💡 For cascading failure prevention, use Circuit Breaker from Voyager.Common.Resilience
+
+### Circuit Breaker - Cascading Failure Prevention
+
+**(Requires `Voyager.Common.Resilience` package)**
+
+Prevent cascading failures by temporarily blocking calls to failing services:
+
+```csharp
+using Voyager.Common.Resilience;
+
+// Create a circuit breaker policy
+var policy = new CircuitBreakerPolicy(
+    failureThreshold: 5,      // Open after 5 consecutive failures
+    openTimeout: TimeSpan.FromSeconds(30),  // Stay open for 30s
+    halfOpenMaxAttempts: 3    // Allow 3 test attempts when half-open
+);
+
+// Execute operations through the circuit breaker
+var result = await GetUser(userId)
+    .BindWithCircuitBreakerAsync(
+        user => CallExternalServiceAsync(user),
+        policy
+    );
+
+// Circuit breaker states:
+// 🟢 Closed - Normal operation, requests flow through
+// 🔴 Open - Too many failures, requests immediately fail with CircuitBreakerOpenError
+// 🟡 HalfOpen - Testing if service recovered, limited attempts allowed
+
+// Check circuit state
+if (policy.State == CircuitBreakerState.Open)
+{
+    _logger.LogWarning("Circuit breaker is open, service unavailable");
+}
+
+// Manual reset if needed
+policy.Reset();
+```
+
+**Key features:**
+- 🛡️ Prevents cascading failures across distributed systems
+- ⚡ Fast-fail when service is down (no wasted retries)
+- 🔄 Automatic recovery testing via half-open state
+- 🧵 Thread-safe with SemaphoreSlim for async operations
+- 📝 Preserves last error context via `CircuitBreakerOpenError(lastError)`
+- 🎯 Returns `ErrorType.CircuitBreakerOpen` when circuit is open
+- 🔎 **Only counts infrastructure errors** (Unavailable, Timeout, Database, Unexpected)
+- ✅ **Ignores business errors** (Validation, NotFound, Permission, Business, Conflict)
+
+**When to use Circuit Breaker:**
+- ✅ External API/service calls that may fail
+- ✅ Database operations during outages
+- ✅ Microservice communication
+- ✅ Any operation where cascading failures must be prevented
+- 💡 Combine with Retry for comprehensive resilience
+
+**When to use Retry:**
+- ✅ Network calls with temporary failures
+- ✅ Database operations during brief unavailability
+- ✅ API calls that may be rate-limited or temporarily down
+- ❌ NOT for permanent errors (Validation, NotFound)
+- 💡 For cascading failure prevention, use Circuit Breaker from Voyager.Common.Resilience
 
 ### Map - Value Transformations
 

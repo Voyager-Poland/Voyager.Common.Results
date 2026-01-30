@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`TapErrorAsync` extensions for `Result<T>`**: Execute async side effects on failure without modifying the result
+  - `Task<Result<T>>.TapErrorAsync(Action<Error>)` - sync action on async result
+  - `Result<T>.TapErrorAsync(Func<Error, Task>)` - async action on sync result
+  - `Task<Result<T>>.TapErrorAsync(Func<Error, Task>)` - async action on async result
+  - Instance method proxy `Result<T>.TapErrorAsync(Func<Error, Task>)` for fluent usage
+  - Example: `.TapErrorAsync(async error => await _alertService.SendAsync($"Failed: {error.Message}"))`
+
+- **NEW LIBRARY: Voyager.Common.Resilience** - Separate package for advanced resilience patterns
+  - **Circuit Breaker pattern**: Prevents cascading failures by temporarily blocking calls to failing operations
+    - `CircuitBreakerPolicy` - Thread-safe implementation with 3-state model (Closed/Open/HalfOpen)
+    - `BindWithCircuitBreakerAsync(func, policy)` extension methods for Result&lt;T&gt; integration
+    - Configurable thresholds: failure threshold, open timeout, half-open max attempts
+    - Automatic state transitions based on success/failure patterns
+    - **Smart error filtering**: Only infrastructure errors (Unavailable, Timeout, Database, Unexpected) open the circuit
+    - **Business errors ignored**: Validation, NotFound, Permission, Business, Conflict errors do NOT affect circuit state
+    - ErrorType.CircuitBreakerOpen with last error preservation for context
+    - See [ADR-0004](docs/adr/ADR-0004-circuit-breaker-pattern-for-resilience.md) for architectural rationale
+  - **NuGet dependency**: Resilience library depends on Voyager.Common.Results package
+  - **Installation**: `dotnet add package Voyager.Common.Resilience`
+
+- **Retry extensions for transient failures**: Lightweight retry functionality without external dependencies
+  - `BindWithRetryAsync(func, policy)` - Executes operations with configurable retry logic
+  - `RetryPolicy` delegate for flexible retry strategies
+  - `RetryPolicies.TransientErrors()` - Default policy retrying only `Unavailable` and `Timeout` errors with exponential backoff
+  - `RetryPolicies.Custom()` - Build custom retry policies with predicates and delay strategies
+  - `RetryPolicies.Default()` - Convenient default (3 attempts, 1s base delay)
+  - **CRITICAL**: Always preserves original error context - never replaces with generic "max retries exceeded"
+  - Task&lt;Result&gt; overload for async result chains
+  - See [ADR-0003](docs/adr/ADR-0003-retry-extensions-for-transient-failures.md) for design rationale
+
+- **ErrorType.CircuitBreakerOpen**: New error type for circuit breaker open state
+  - `CircuitBreakerOpenError(lastError)` - Preserves context from original failure
+  - HTTP mapping: 503 Service Unavailable
+
+## [1.5.0] - 2026-01-27
+
+### Added
+- **`Bind(Func<TValue, Result>)` overload for `Result<T>`**: Chains `Result<T>` with operations returning void `Result`
+  - Enables natural composition: `Result<T>` → `Result` → `Result<T>` → ...
+  - Propagates errors from void operations (unlike `Tap`)
+  - Example: `.Bind(user => SendNotification(user))` safely chains operations that can fail
+  - Completes the monad pattern for void operations
+
+## [1.4.0] - 2025-12-15
+
 ### Changed
 - **README improvements**: Updated documentation for clarity and accuracy
   - Removed hardcoded test counts in Testing section (now generic descriptions)
@@ -305,7 +351,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - .NET Framework 4.8
 - .NET 8.0
 
-[Unreleased]: https://github.com/Voyager-Poland/Voyager.Common.Results/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/Voyager-Poland/Voyager.Common.Results/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/Voyager-Poland/Voyager.Common.Results/releases/tag/v1.5.0
+[1.4.0]: https://github.com/Voyager-Poland/Voyager.Common.Results/releases/tag/v1.4.0
 [1.3.0]: https://github.com/Voyager-Poland/Voyager.Common.Results/releases/tag/v1.3.0
 [1.2.0]: https://github.com/Voyager-Poland/Voyager.Common.Results/releases/tag/v1.2.0
 [1.1.0]: https://github.com/Voyager-Poland/Voyager.Common.Results/releases/tag/v1.1.0

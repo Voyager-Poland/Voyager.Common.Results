@@ -221,6 +221,28 @@ namespace Voyager.Common.Results
 		}
 
 		/// <summary>
+		/// Bind - chains the result with a Result-returning function that produces no value (void Result)
+		/// </summary>
+		/// <remarks>
+		/// Useful for composing operations where the current value is used to perform an operation
+		/// that can fail but doesn't produce a new value. Unlike Tap, Bind propagates errors from the operation.
+		/// </remarks>
+		/// <example>
+		/// GetUser(userId)
+		///     .Bind(user => ValidateAge(user))        // Result&lt;User&gt; → Result&lt;User&gt;
+		///     .Bind(user => SendNotification(user))   // Result&lt;User&gt; → Result (void)
+		///     .Map(() => "Success");
+		/// </example>
+		/// <param name="binder">Binder function returning Result (void operation).</param>
+		/// <returns>Result produced by binder or propagates error.</returns>
+		public Result Bind(Func<TValue, Result> binder)
+		{
+			return IsSuccess
+					? binder(Value!)
+					: Result.Failure(Error!);
+		}
+
+		/// <summary>
 		/// Tap - performs an action on the value without changing the Result (side effect)
 		/// </summary>
 		/// <param name="action">Action to perform on the success value.</param>
@@ -344,6 +366,20 @@ namespace Voyager.Common.Results
 		/// <returns>Original result unchanged.</returns>
 		public Task<Result<TValue>> TapAsync(Func<TValue, Task> action) =>
 			Extensions.TaskResultExtensions.TapAsync(this, action);
+
+		/// <summary>
+		/// TapErrorAsync - executes an async side effect if the result is a failure
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// var result = await GetUser(id)
+		///     .TapErrorAsync(async error => await _alertService.SendAsync($"Failed: {error.Message}"));
+		/// </code>
+		/// </example>
+		/// <param name="action">Async action to execute on error.</param>
+		/// <returns>Original result unchanged.</returns>
+		public Task<Result<TValue>> TapErrorAsync(Func<Error, Task> action) =>
+			Extensions.TaskResultExtensions.TapErrorAsync(this, action);
 
 		/// <summary>
 		/// OrElseAsync - provides an async fallback if the result is a failure

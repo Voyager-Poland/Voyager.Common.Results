@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+		<!-- NuGet Package Metadata -->
+		<Title>Voyager Common Resilience</Title>
+		<Description>Resilience patterns (Circuit Breaker) for Railway Oriented Programming - extends
+			Voyager.Common.Results with stateful fault tolerance patterns</Description>
+		<PackageTags>
+			result;monad;railway;functional;csharp;error-handling;circuit-breaker;resilience;fault-tolerance;reliability</PackageTags>
+
+		<!-- Include README in NuGet package (NuGet 5.10+) -->
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<!-- Include README in NuGet package -->
+		<None Include="README.md" Pack="true" PackagePath="\" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<!-- Use ProjectReference during development/compilation for debugging and faster builds -->
+		<!-- PrivateAssets="All" prevents project reference from flowing to consuming packages -->
+		<ProjectReference Include="..\Voyager.Common.Results\Voyager.Common.Results.csproj"
+			PrivateAssets="All" />
+
+		<!-- Explicitly add PackageReference for published NuGet package -->
+		<!-- This ensures consumers get the NuGet package dependency, not a project reference -->
+		<PackageReference Include="Voyager.Common.Results" Version="*" />
+	</ItemGroup>
+</Project>

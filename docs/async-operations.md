@@ -74,6 +74,297 @@ public async Task<Result<WeatherData>> GetWeatherAsync(
 }
 ```
 
+## Retry - Transient Failure Handling
+
+Handle temporary failures (network issues, service unavailability, timeouts) with automatic retry logic and exponential backoff.
+
+### Why Retry?
+
+In distributed systems, transient failures are common:
+- Network hiccups
+- Database connection pools temporarily exhausted
+- Services briefly unavailable during deployments
+- Rate limiting (429 responses)
+- Temporary deadlocks
+
+Retry logic automatically handles these scenarios without cluttering your business logic.
+
+### Basic Usage
+
+**Signatures:**
+```csharp
+// Retry with policy
+Task<Result<TOut>> BindWithRetryAsync<TIn, TOut>(
+    this Result<TIn> result,
+    Func<TIn, Task<Result<TOut>>> func,
+    RetryPolicy policy
+)
+
+// Task<Result> overload
+Task<Result<TOut>> BindWithRetryAsync<TIn, TOut>(
+    this Task<Result<TIn>> resultTask,
+    Func<TIn, Task<Result<TOut>>> func,
+    RetryPolicy policy
+)
+
+// RetryPolicy delegate
+public delegate Result<int> RetryPolicy(int attemptNumber, Error error);
+```
+
+**Default Policy - TransientErrors:**
+
+```csharp
+using Voyager.Common.Results.Extensions;
+
+// Retry with defaults (3 attempts, exponential backoff)
+var result = await GetDatabaseConnection()
+    .BindWithRetryAsync(
+        conn => ExecuteQuery(conn),
+        RetryPolicies.TransientErrors()
+    );
+
+// Custom configuration
+var result = await FetchDataAsync()
+    .BindWithRetryAsync(
+        data => ProcessData(data),
+        RetryPolicies.TransientErrors(maxAttempts: 5, baseDelayMs: 500)
+    );
+```
+
+**What Gets Retried?**
+
+By default, only **transient errors**:
+- ✅ `ErrorType.Unavailable` - Service down, network issues, deadlocks
+- ✅ `ErrorType.Timeout` - Operation exceeded time limit
+- ❌ `ErrorType.Validation` - Permanent, don't retry
+- ❌ `ErrorType.NotFound` - Permanent, don't retry
+- ❌ `ErrorType.Permission` - Permanent, don't retry
+- ❌ All other error types - Permanent by default
+
+**Exponential Backoff:**
+
+Delays grow exponentially to avoid overwhelming failing services:
+
+| Attempt | Delay (baseDelayMs=1000) |
+|---------|--------------------------|
+| 1 → 2   | 1000ms (1s)             |
+| 2 → 3   | 2000ms (2s)             |
+| 3 → 4   | 4000ms (4s)             |
+| 4 → 5   | 8000ms (8s)             |
+
+Formula: `baseDelayMs * 2^(attempt-1)`
+
+### Custom Retry Policies
+
+**Custom predicate and delay strategy:**
+
+```csharp
+// Retry specific errors with linear backoff
+var policy = RetryPolicies.Custom(
+    maxAttempts: 10,
+    shouldRetry: e => e.Type == ErrorType.Unavailable || e.Code == "RATE_LIMIT",
+    delayStrategy: attempt => 500 * attempt // 500ms, 1000ms, 1500ms...
+);
+
+var result = await apiCall.BindWithRetryAsync(ProcessResponse, policy);
+```
+
+**Advanced: Jitter for distributed systems:**
+
+```csharp
+private static readonly Random _random = new Random();
+
+var policy = RetryPolicies.Custom(
+    maxAttempts: 5,
+    shouldRetry: e => e.Type == ErrorType.Unavailable,
+    delayStrategy: attempt =>
+    {
+        int exponential = 1000 * (int)Math.Pow(2, attempt - 1);
+        int jitter = _random.Next(0, 500); // Add randomness
+        return exponential + jitter;
+    }
+);
+```
+
+### Critical: Error Preservation
+
+**Retry ALWAYS preserves the original error** - it never replaces it with generic messages:
+
+```csharp
+var result = await GetDatabaseConnection()
+    .BindWithRetryAsync(
+        conn => ExecuteQuery(conn),
+        RetryPolicies.TransientErrors(maxAttempts: 3)
+    );
+
+// If all retries fail:
+// ✅ result.Error = original error (e.g., "Database connection timeout")
+// ❌ NOT "Max retries exceeded" - preserves context for debugging
+```
+
+This is **critical** for Railway-Oriented Programming - errors must carry business context, not infrastructure noise.
+
+### Real-World Examples
+
+**Database operations with retry:**
+
+```csharp
+public async Task<Result<User>> GetUserWithRetryAsync(int userId)
+{
+    return await Result<int>.Success(userId)
+        .BindWithRetryAsync(
+            async id =>
+            {
+                return await Result<User>.TryAsync(async () =>
+                {
+                    using var conn = await _db.OpenConnectionAsync();
+                    return await conn.QuerySingleOrDefaultAsync<User>(
+                        "SELECT * FROM Users WHERE Id = @id",
+                        new { id });
+                });
+            },
+            RetryPolicies.TransientErrors(maxAttempts: 5, baseDelayMs: 1000)
+        )
+        .Ensure(user => user != null, Error.NotFoundError($"User {userId} not found"));
+}
+```
+
+**HTTP API with retry and fallback:**
+
+```csharp
+public async Task<Result<WeatherData>> GetWeatherWithResilienceAsync(string city)
+{
+    return await Result<string>.Success(city)
+        .BindWithRetryAsync(
+            async c => await Result<WeatherData>.TryAsync(
+                async () => await _primaryApi.GetWeatherAsync(c)),
+            RetryPolicies.TransientErrors(maxAttempts: 3)
+        )
+        .OrElseAsync(async () =>
+            await Result<string>.Success(city)
+                .BindWithRetryAsync(
+                    async c => await Result<WeatherData>.TryAsync(
+                        async () => await _secondaryApi.GetWeatherAsync(c)),
+                    RetryPolicies.TransientErrors(maxAttempts: 3)
+                )
+        )
+        .TapAsync(data => _cache.SetAsync($"weather:{city}", data));
+}
+```
+
+**Rate-limited API:**
+
+```csharp
+public async Task<Result<ApiResponse>> CallRateLimitedApiAsync(ApiRequest request)
+{
+    var retryPolicy = RetryPolicies.Custom(
+        maxAttempts: 10,
+        shouldRetry: e => 
+            e.Type == ErrorType.Unavailable || 
+            e.Code == "RATE_LIMIT" ||
+            e.Code == "429",
+        delayStrategy: attempt => 
+        {
+            // Respect Retry-After header if available
+            if (attempt == 1 && TryGetRetryAfter(e, out var retryAfter))
+                return retryAfter;
+            
+            // Otherwise exponential backoff with cap
+            return Math.Min(30000, 2000 * (int)Math.Pow(2, attempt - 1));
+        }
+    );
+
+    return await Result<ApiRequest>.Success(request)
+        .BindWithRetryAsync(
+            async req => await CallApiAsync(req),
+            retryPolicy
+        );
+}
+```
+
+**Complex chain with retry at specific points:**
+
+```csharp
+public async Task<Result<OrderConfirmation>> ProcessOrderAsync(CreateOrderDto dto)
+{
+    return await ValidateOrderItems(dto.Items)  // No retry - validation
+        .BindAsync(items => CreateOrderAsync(items))  // No retry - creation
+        .BindWithRetryAsync(  // Retry payment - external service
+            order => ChargePaymentAsync(order),
+            RetryPolicies.TransientErrors(maxAttempts: 3)
+        )
+        .TapAsync(order => _logger.LogInformationAsync($"Payment completed: {order.Id}"))
+        .BindWithRetryAsync(  // Retry notification - external service
+            order => SendConfirmationEmailAsync(order),
+            RetryPolicies.TransientErrors(maxAttempts: 5, baseDelayMs: 500)
+        )
+        .MapAsync(order => new OrderConfirmation(order.Id, order.Total));
+}
+```
+
+### When NOT to Use Retry
+
+**Don't retry permanent failures:**
+```csharp
+// ❌ BAD - retrying validation makes no sense
+var result = await ValidateInput(input)
+    .BindWithRetryAsync(
+        valid => ProcessData(valid),
+        RetryPolicies.TransientErrors()  // Validation won't fix itself!
+    );
+
+// ✅ GOOD - only retry the operation that might be transient
+var result = await ValidateInput(input)
+    .BindWithRetryAsync(
+        valid => SaveToDatabase(valid),  // Database might be temporarily down
+        RetryPolicies.TransientErrors()
+    );
+```
+
+**Use Circuit Breaker for cascading failures:**
+
+Retry is for **isolated transient failures**. If you need to detect and prevent cascading failures, use a circuit breaker pattern (Polly or separate library).
+
+```csharp
+// Retry = "This specific call failed, try again"
+// Circuit Breaker = "This service is unhealthy, stop calling it"
+```
+
+### Best Practices
+
+1. **Default to TransientErrors()** - covers 90% of cases
+2. **Log retry attempts** - use `TapError` for observability:
+   ```csharp
+   .BindWithRetryAsync(op, RetryPolicies.TransientErrors())
+   .TapError(e => _logger.LogWarning("Operation failed after retries: {Error}", e))
+   ```
+3. **Set reasonable max attempts** - balance resilience vs latency
+4. **Use jitter in distributed systems** - prevents thundering herd
+5. **Respect rate limits** - parse `Retry-After` headers
+6. **Don't retry everything** - only operations with transient failures
+7. **Test failure scenarios** - ensure retries work as expected
+
+### Alternatives
+
+**For advanced resilience features:**
+- Circuit Breaker: Use Polly or create separate `Voyager.Common.Resilience` package
+- Bulkhead Isolation: Polly
+- Fallback chains: Use `OrElse`/`OrElseAsync` (already in library)
+- Timeout policies: Combine with `CancellationToken`
+
+**Polly integration:**
+
+While Polly is exception-centric, it supports `HandleResult<T>`:
+```csharp
+var policy = Policy<Result<User>>
+    .HandleResult(r => r.IsFailure && r.Error.Type == ErrorType.Unavailable)
+    .WaitAndRetryAsync(3, i => TimeSpan.FromSeconds(Math.Pow(2, i)));
+
+var result = await policy.ExecuteAsync(async () => await GetUserAsync(id));
+```
+
+For simple retry scenarios, `BindWithRetryAsync` is lighter and more idiomatic.
+
 ## Core Async Operators
 
 ### MapAsync - Transform Async Results
@@ -250,6 +541,72 @@ public async Task<Result<Order>> PlaceOrderAsync(CreateOrderDto dto)
         .TapAsync(order => SendConfirmationEmailAsync(order.UserId, order))
         .TapAsync(order => UpdateInventoryAsync(order.Items))
         .TapAsync(order => _eventBus.PublishAsync(new OrderPlacedEvent(order)));
+}
+```
+
+### TapErrorAsync - Async Error Side Effects
+
+Execute async side effects when the result is a failure, without changing the Result.
+
+**Signatures:**
+```csharp
+// Async action on async result
+Task<Result<T>> TapErrorAsync(
+    this Task<Result<T>> resultTask,
+    Func<Error, Task> asyncAction
+)
+
+// Sync action on async result
+Task<Result<T>> TapErrorAsync(
+    this Task<Result<T>> resultTask,
+    Action<Error> action
+)
+
+// Async action on sync result
+Task<Result<T>> TapErrorAsync(
+    this Result<T> result,
+    Func<Error, Task> asyncAction
+)
+```
+
+**Examples:**
+
+```csharp
+// Log errors to external service
+var result = await GetUserAsync(123)
+    .TapErrorAsync(async error => await _logger.LogErrorAsync($"Failed: {error.Message}"))
+    .TapErrorAsync(async error => await _alertService.SendAsync($"User lookup failed: {error.Code}"));
+
+// Sync error handling on async result
+var result = await GetUserAsync(123)
+    .TapErrorAsync(error => Console.WriteLine($"Error: {error.Message}"));
+
+// Async error handling on sync result
+var result = GetUser(123)
+    .TapErrorAsync(async error => await _metrics.IncrementAsync("user_lookup_failures"));
+```
+
+**Real-world example:**
+
+```csharp
+public async Task<Result<PaymentConfirmation>> ProcessPaymentAsync(PaymentRequest request)
+{
+    return await ValidatePaymentRequest(request)
+        .BindAsync(req => ChargeCardAsync(req))
+        .TapAsync(confirmation => _logger.LogInformationAsync($"Payment {confirmation.Id} succeeded"))
+        .TapErrorAsync(async error => await _alertService.NotifyPaymentFailureAsync(request.UserId, error))
+        .TapErrorAsync(async error => await _metrics.RecordPaymentFailureAsync(error.Code));
+}
+```
+
+**Combining TapAsync and TapErrorAsync:**
+
+```csharp
+public async Task<Result<User>> GetUserWithAuditAsync(int userId)
+{
+    return await GetUserAsync(userId)
+        .TapAsync(user => _auditLog.LogAccessAsync(userId, "success"))
+        .TapErrorAsync(error => _auditLog.LogAccessAsync(userId, $"failed: {error.Code}"));
 }
 ```
 

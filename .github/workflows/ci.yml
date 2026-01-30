@@ -57,7 +57,9 @@ jobs:
 
     - name: Pack (only on dotnet 8)
       if: matrix.dotnet-version == '8.0.x'
-      run: dotnet pack --no-restore --no-build -c Release src/Voyager.Common.Results/Voyager.Common.Results.csproj
+      run: |
+        dotnet pack --no-restore --no-build -c Release src/Voyager.Common.Results/Voyager.Common.Results.csproj
+        dotnet pack --no-restore --no-build -c Release src/Voyager.Common.Resilience/Voyager.Common.Resilience.csproj
 
     - name: Upload artifacts (only on dotnet 8)
       if: matrix.dotnet-version == '8.0.x'
