@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-01-30
+
 ### Added
 - **`TapErrorAsync` extensions for `Result<T>`**: Execute async side effects on failure without modifying the result
   - `Task<Result<T>>.TapErrorAsync(Action<Error>)` - sync action on async result
