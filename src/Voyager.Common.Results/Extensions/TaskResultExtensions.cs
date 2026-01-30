@@ -339,6 +339,42 @@ namespace Voyager.Common.Results.Extensions
 			return await result.TapAsync(action).ConfigureAwait(false);
 		}
 
+		// ========== TAP ERROR ASYNC ==========
+
+		/// <summary>
+		/// TapError for Task&lt;Result&lt;TValue&gt;&gt; with a synchronous action
+		/// </summary>
+		public static async Task<Result<TValue>> TapErrorAsync<TValue>(
+			this Task<Result<TValue>> resultTask,
+			Action<Error> action)
+		{
+			var result = await resultTask.ConfigureAwait(false);
+			return result.TapError(action);
+		}
+
+		/// <summary>
+		/// TapError for Result&lt;TValue&gt; with an asynchronous action
+		/// </summary>
+		public static async Task<Result<TValue>> TapErrorAsync<TValue>(
+			this Result<TValue> result,
+			Func<Error, Task> action)
+		{
+			if (result.IsFailure)
+				await action(result.Error!).ConfigureAwait(false);
+			return result;
+		}
+
+		/// <summary>
+		/// TapError for Task&lt;Result&lt;TValue&gt;&gt; with an asynchronous action
+		/// </summary>
+		public static async Task<Result<TValue>> TapErrorAsync<TValue>(
+			this Task<Result<TValue>> resultTask,
+			Func<Error, Task> action)
+		{
+			var result = await resultTask.ConfigureAwait(false);
+			return await result.TapErrorAsync(action).ConfigureAwait(false);
+		}
+
 		// ========== MATCH ASYNC ==========
 
 		/// <summary>

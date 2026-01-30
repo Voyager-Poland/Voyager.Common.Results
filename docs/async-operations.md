@@ -544,6 +544,72 @@ public async Task<Result<Order>> PlaceOrderAsync(CreateOrderDto dto)
 }
 ```
 
+### TapErrorAsync - Async Error Side Effects
+
+Execute async side effects when the result is a failure, without changing the Result.
+
+**Signatures:**
+```csharp
+// Async action on async result
+Task<Result<T>> TapErrorAsync(
+    this Task<Result<T>> resultTask,
+    Func<Error, Task> asyncAction
+)
+
+// Sync action on async result
+Task<Result<T>> TapErrorAsync(
+    this Task<Result<T>> resultTask,
+    Action<Error> action
+)
+
+// Async action on sync result
+Task<Result<T>> TapErrorAsync(
+    this Result<T> result,
+    Func<Error, Task> asyncAction
+)
+```
+
+**Examples:**
+
+```csharp
+// Log errors to external service
+var result = await GetUserAsync(123)
+    .TapErrorAsync(async error => await _logger.LogErrorAsync($"Failed: {error.Message}"))
+    .TapErrorAsync(async error => await _alertService.SendAsync($"User lookup failed: {error.Code}"));
+
+// Sync error handling on async result
+var result = await GetUserAsync(123)
+    .TapErrorAsync(error => Console.WriteLine($"Error: {error.Message}"));
+
+// Async error handling on sync result
+var result = GetUser(123)
+    .TapErrorAsync(async error => await _metrics.IncrementAsync("user_lookup_failures"));
+```
+
+**Real-world example:**
+
+```csharp
+public async Task<Result<PaymentConfirmation>> ProcessPaymentAsync(PaymentRequest request)
+{
+    return await ValidatePaymentRequest(request)
+        .BindAsync(req => ChargeCardAsync(req))
+        .TapAsync(confirmation => _logger.LogInformationAsync($"Payment {confirmation.Id} succeeded"))
+        .TapErrorAsync(async error => await _alertService.NotifyPaymentFailureAsync(request.UserId, error))
+        .TapErrorAsync(async error => await _metrics.RecordPaymentFailureAsync(error.Code));
+}
+```
+
+**Combining TapAsync and TapErrorAsync:**
+
+```csharp
+public async Task<Result<User>> GetUserWithAuditAsync(int userId)
+{
+    return await GetUserAsync(userId)
+        .TapAsync(user => _auditLog.LogAccessAsync(userId, "success"))
+        .TapErrorAsync(error => _auditLog.LogAccessAsync(userId, $"failed: {error.Code}"));
+}
+```
+
 ### EnsureAsync - Async Validation
 
 Validate with async predicates.

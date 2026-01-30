@@ -368,6 +368,20 @@ namespace Voyager.Common.Results
 			Extensions.TaskResultExtensions.TapAsync(this, action);
 
 		/// <summary>
+		/// TapErrorAsync - executes an async side effect if the result is a failure
+		/// </summary>
+		/// <example>
+		/// <code>
+		/// var result = await GetUser(id)
+		///     .TapErrorAsync(async error => await _alertService.SendAsync($"Failed: {error.Message}"));
+		/// </code>
+		/// </example>
+		/// <param name="action">Async action to execute on error.</param>
+		/// <returns>Original result unchanged.</returns>
+		public Task<Result<TValue>> TapErrorAsync(Func<Error, Task> action) =>
+			Extensions.TaskResultExtensions.TapErrorAsync(this, action);
+
+		/// <summary>
 		/// OrElseAsync - provides an async fallback if the result is a failure
 		/// </summary>
 		/// <example>

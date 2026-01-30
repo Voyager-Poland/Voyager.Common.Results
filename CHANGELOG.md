@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`TapErrorAsync` extensions for `Result<T>`**: Execute async side effects on failure without modifying the result
+  - `Task<Result<T>>.TapErrorAsync(Action<Error>)` - sync action on async result
+  - `Result<T>.TapErrorAsync(Func<Error, Task>)` - async action on sync result
+  - `Task<Result<T>>.TapErrorAsync(Func<Error, Task>)` - async action on async result
+  - Instance method proxy `Result<T>.TapErrorAsync(Func<Error, Task>)` for fluent usage
+  - Example: `.TapErrorAsync(async error => await _alertService.SendAsync($"Failed: {error.Message}"))`
+
 - **NEW LIBRARY: Voyager.Common.Resilience** - Separate package for advanced resilience patterns
   - **Circuit Breaker pattern**: Prevents cascading failures by temporarily blocking calls to failing operations
     - `CircuitBreakerPolicy` - Thread-safe implementation with 3-state model (Closed/Open/HalfOpen)
