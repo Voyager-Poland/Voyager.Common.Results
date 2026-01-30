@@ -594,6 +594,52 @@ public class ResultTTests
 		Assert.False(actionExecuted);
 	}
 
+	// ========== TAP ERROR ASYNC PROXY TESTS ==========
+
+	[Fact]
+	public async Task TapErrorAsync_Proxy_OnFailure_ExecutesAction()
+	{
+		// Arrange
+		var error = Error.NotFoundError("Not found");
+		var result = Result<int>.Failure(error);
+		var actionExecuted = false;
+		Error? capturedError = null;
+
+		// Act
+		var tapped = await result.TapErrorAsync(async e =>
+		{
+			await Task.Delay(1);
+			actionExecuted = true;
+			capturedError = e;
+		});
+
+		// Assert
+		Assert.True(tapped.IsFailure);
+		Assert.Equal(error, tapped.Error);
+		Assert.True(actionExecuted);
+		Assert.Equal(error, capturedError);
+	}
+
+	[Fact]
+	public async Task TapErrorAsync_Proxy_OnSuccess_DoesNotExecuteAction()
+	{
+		// Arrange
+		var result = Result<int>.Success(42);
+		var actionExecuted = false;
+
+		// Act
+		var tapped = await result.TapErrorAsync(async e =>
+		{
+			await Task.Delay(1);
+			actionExecuted = true;
+		});
+
+		// Assert
+		Assert.True(tapped.IsSuccess);
+		Assert.Equal(42, tapped.Value);
+		Assert.False(actionExecuted);
+	}
+
 	// ========== ORELSE ASYNC PROXY TESTS ==========
 
 	[Fact]
