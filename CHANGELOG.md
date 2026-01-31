@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Error Classification Extensions (ADR-005)**: Methods for classifying errors for resilience patterns
+  - `ErrorType.TooManyRequests` - New error type for rate limiting (HTTP 429)
+  - `Error.TooManyRequestsError(message)` - Factory method with default code "RateLimit.Exceeded"
+  - `Error.TooManyRequestsError(code, message)` - Factory method with custom code
+  - `ErrorTypeExtensions.IsTransient()` - Returns true for retryable errors (Timeout, Unavailable, CircuitBreakerOpen, TooManyRequests)
+  - `ErrorTypeExtensions.IsBusinessError()` - Returns true for business errors (Validation, NotFound, Permission, etc.)
+  - `ErrorTypeExtensions.IsInfrastructureError()` - Returns true for infrastructure errors (Database, Unexpected)
+  - `ErrorTypeExtensions.ShouldCountForCircuitBreaker()` - Returns true if error should count toward CB threshold
+  - `ErrorTypeExtensions.ShouldRetry()` - Returns true if operation should be retried
+  - `ErrorTypeExtensions.ToHttpStatusCode()` - Maps ErrorType to HTTP status code
+  - See [ADR-0005](docs/adr/ADR-0005-error-classification-for-resilience.md) for design rationale
+
+- **Error Chaining for Distributed Systems (ADR-006)**: Track error origin across service calls
+  - `Error.InnerError` - Optional inner error property (like Exception.InnerException)
+  - `Error.WithInner(error)` - Creates copy with inner error attached
+  - `Error.GetRootCause()` - Traverses chain to find original error
+  - `Error.HasInChain(predicate)` - Checks if any error in chain matches predicate
+  - `Result<T>.WrapError(factory)` - Wraps error with new error, preserving original as InnerError
+  - `Result<T>.AddErrorContext(serviceName, operation)` - Adds service context while preserving error type
+  - Async versions: `WrapErrorAsync()`, `AddErrorContextAsync()`
+  - See [ADR-0006](docs/adr/ADR-0006-error-chaining-for-distributed-systems.md) for design rationale
+  - Example:
+    ```csharp
+    var result = await _productService.GetAsync(id)
+        .AddErrorContextAsync("ProductService", "GetProduct");
+
+    // Access root cause
+    var rootCause = result.Error.GetRootCause();
+    ```
+
 ## [1.6.0] - 2026-01-30
 
 ### Added

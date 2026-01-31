@@ -14,6 +14,45 @@ namespace Voyager.Common.Results
 		/// </summary>
 		public static readonly Error None = new(ErrorType.None, string.Empty, string.Empty);
 
+		/// <summary>
+		/// Inner error that caused this error (similar to Exception.InnerException).
+		/// Used for error chaining in distributed systems.
+		/// </summary>
+		public Error? InnerError { get; init; }
+
+		/// <summary>
+		/// Creates a copy of this error with an inner error attached.
+		/// </summary>
+		public Error WithInner(Error inner) => this with { InnerError = inner };
+
+		/// <summary>
+		/// Gets the root cause error by traversing the InnerError chain.
+		/// </summary>
+		public Error GetRootCause()
+		{
+			var current = this;
+			while (current.InnerError is not null)
+			{
+				current = current.InnerError;
+			}
+			return current;
+		}
+
+		/// <summary>
+		/// Returns true if any error in the chain matches the predicate.
+		/// </summary>
+		public bool HasInChain(Func<Error, bool> predicate)
+		{
+			var current = this;
+			while (current is not null)
+			{
+				if (predicate(current))
+					return true;
+				current = current.InnerError;
+			}
+			return false;
+		}
+
 		// ========== FACTORY METHODS ==========
 
 		/// <summary>
@@ -174,5 +213,17 @@ namespace Voyager.Common.Results
 		/// </summary>
 		public static Error FromException(Exception exception) =>
 				new(ErrorType.Unexpected, "Exception", exception.Message);
+
+		/// <summary>
+		/// Creates a too many requests error (rate limiting)
+		/// </summary>
+		public static Error TooManyRequestsError(string code, string message) =>
+				new(ErrorType.TooManyRequests, code, message);
+
+		/// <summary>
+		/// Creates a too many requests error with a default code
+		/// </summary>
+		public static Error TooManyRequestsError(string message) =>
+				new(ErrorType.TooManyRequests, "RateLimit.Exceeded", message);
 	}
 }
