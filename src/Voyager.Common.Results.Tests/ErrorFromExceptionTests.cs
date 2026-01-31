@@ -303,6 +303,7 @@ public class ErrorFromExceptionTests
 	public void ToDetailedString_TruncatesLongStackTrace()
 	{
 		// Arrange - create deeply nested call to get long stack trace
+		// Using 50 levels to ensure we exceed 10 lines on all platforms including .NET 4.8
 		Exception caught = null!;
 		static void RecursiveThrow(int depth)
 		{
@@ -310,7 +311,7 @@ public class ErrorFromExceptionTests
 				throw new InvalidOperationException("Deep exception");
 			RecursiveThrow(depth - 1);
 		}
-		try { RecursiveThrow(20); }
+		try { RecursiveThrow(50); }
 		catch (Exception ex) { caught = ex; }
 		var error = Error.FromException(caught);
 
