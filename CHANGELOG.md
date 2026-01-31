@@ -72,6 +72,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     //     [Unavailable] Exception.SocketException: Network unreachable
     ```
 
+- **Circuit Breaker State Change Callbacks (ADR-008)**: Get notified when circuit breaker state changes
+  - `CircuitBreakerPolicy.OnStateChanged` - Callback invoked on state transitions
+  - Parameters: `(CircuitState oldState, CircuitState newState, int failureCount, Error? lastError)`
+  - Triggered on: Closed→Open, Open→HalfOpen, HalfOpen→Closed, HalfOpen→Open, Reset
+  - Use cases: logging, alerting, metrics integration
+  - See [ADR-0008](docs/adr/ADR-0008-circuit-breaker-state-change-callbacks.md) for design rationale
+  - Example:
+    ```csharp
+    var circuitBreaker = new CircuitBreakerPolicy(failureThreshold: 5);
+    circuitBreaker.OnStateChanged = (oldState, newState, failures, lastError) =>
+    {
+        _logger.LogWarning("Circuit breaker: {Old} → {New}, failures: {Count}",
+            oldState, newState, failures);
+
+        if (newState == CircuitState.Open)
+            _alertService.SendAlert($"Circuit OPEN: {lastError?.Message}");
+    };
+    ```
+
 ## [1.6.0] - 2026-01-30
 
 ### Added

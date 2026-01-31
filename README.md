@@ -376,6 +376,27 @@ policy.Reset();
 - 🎯 Returns `ErrorType.CircuitBreakerOpen` when circuit is open
 - 🔎 **Only counts infrastructure errors** (Unavailable, Timeout, Database, Unexpected)
 - ✅ **Ignores business errors** (Validation, NotFound, Permission, Business, Conflict)
+- 🔔 **State change callbacks** for logging, alerting, and metrics
+
+**State Change Callbacks:**
+
+```csharp
+var policy = new CircuitBreakerPolicy(failureThreshold: 5);
+
+// Subscribe to state changes
+policy.OnStateChanged = (oldState, newState, failureCount, lastError) =>
+{
+    _logger.LogWarning(
+        "Circuit breaker: {OldState} → {NewState}, failures: {Count}",
+        oldState, newState, failureCount);
+
+    if (newState == CircuitState.Open)
+    {
+        _alertService.SendAlert($"Circuit OPEN: {lastError?.Message}");
+        _metrics.IncrementCounter("circuit_breaker_opened");
+    }
+};
+```
 
 **When to use Circuit Breaker:**
 - ✅ External API/service calls that may fail

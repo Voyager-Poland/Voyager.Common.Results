@@ -1,6 +1,6 @@
 # ADR-0008: Callbacki zmiany stanu Circuit Breaker
 
-**Status:** Propozycja
+**Status:** Zaakceptowano
 **Data:** 2026-01-31
 **Kontekst:** Voyager.Common.Proxy (ADR-008 Diagnostics Strategy)
 
@@ -342,12 +342,13 @@ public class CircuitBreakerCallbackTests
 
 ## Implementacja
 
-- [ ] Dodać `OnStateChanged` property do `CircuitBreakerPolicy`
-- [ ] Wywołać callback w `RecordFailureAsync()` gdy stan się zmieni
-- [ ] Wywołać callback w `RecordSuccessAsync()` gdy stan się zmieni
-- [ ] Wywołać callback w `ShouldAllowRequestAsync()` gdy Open → HalfOpen
-- [ ] Testy jednostkowe
-- [ ] Dokumentacja
+- [x] Dodać `OnStateChanged` property do `CircuitBreakerPolicy`
+- [x] Wywołać callback w `RecordFailureAsync()` gdy stan się zmieni
+- [x] Wywołać callback w `RecordSuccessAsync()` gdy stan się zmieni
+- [x] Wywołać callback w `ShouldAllowRequestAsync()` gdy Open → HalfOpen
+- [x] Wywołać callback w `ResetAsync()` gdy stan się zmieni
+- [x] Testy jednostkowe (9 nowych testów)
+- [x] Dokumentacja
 - [ ] Wydać jako wersję 1.8.0
 
 ## Kompatybilność wsteczna
