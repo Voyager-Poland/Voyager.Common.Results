@@ -1,3 +1,4 @@
+using System.Linq;
 using Voyager.Common.Results;
 
 namespace Voyager.Common.Results.Tests;
@@ -302,18 +303,14 @@ public class ErrorFromExceptionTests
 	[Fact]
 	public void ToDetailedString_TruncatesLongStackTrace()
 	{
-		// Arrange - create deeply nested call to get long stack trace
-		// Using 50 levels to ensure we exceed 10 lines on all platforms including .NET 4.8
-		Exception caught = null!;
-		static void RecursiveThrow(int depth)
+		// Arrange - create an error with a long stack trace directly
+		// (recursive exceptions can be optimized away in Release mode)
+		var longStackTrace = string.Join("\n", Enumerable.Range(1, 20).Select(i => $"   at Method{i}() in File.cs:line {i * 10}"));
+		var error = new Error(ErrorType.Business, "Test.Error", "Test message")
 		{
-			if (depth <= 0)
-				throw new InvalidOperationException("Deep exception");
-			RecursiveThrow(depth - 1);
-		}
-		try { RecursiveThrow(50); }
-		catch (Exception ex) { caught = ex; }
-		var error = Error.FromException(caught);
+			StackTrace = longStackTrace,
+			ExceptionType = "System.InvalidOperationException"
+		};
 
 		// Act
 		var detailed = error.ToDetailedString();
