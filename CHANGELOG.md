@@ -38,6 +38,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     var rootCause = result.Error.GetRootCause();
     ```
 
+- **Exception Details Preservation (ADR-007)**: Enhanced `FromException()` with full diagnostic information
+  - `Error.StackTrace` - Stack trace preserved as string (GC-safe, no reference to Exception)
+  - `Error.ExceptionType` - Full type name (e.g., "System.InvalidOperationException")
+  - `Error.Source` - Source assembly/module name
+  - `Error.FromException(exception)` - Now auto-maps exception types to ErrorType:
+    - `OperationCanceledException` → `Cancelled`
+    - `TimeoutException` → `Timeout`
+    - `ArgumentException` → `Validation`
+    - `InvalidOperationException` → `Business`
+    - `KeyNotFoundException` → `NotFound`
+    - `UnauthorizedAccessException` → `Permission`
+    - `*Sql*/*Db*` exceptions → `Database`
+    - `HttpRequestException`/`*Socket*`/`WebException` → `Unavailable`
+  - `Error.FromException(exception, errorType)` - Override auto-mapping with custom type
+  - `Error.ToDetailedString()` - Returns formatted error with stack trace and chain
+  - Automatically chains `InnerException` to `InnerError`
+  - See [ADR-0007](docs/adr/ADR-0007-exception-details-preservation.md) for design rationale
+  - Example:
+    ```csharp
+    try { /* ... */ }
+    catch (Exception ex)
+    {
+        var error = Error.FromException(ex);
+        _logger.LogError(error.ToDetailedString());
+    }
+    // Output:
+    // [Database] Exception.SqlException: Connection failed
+    //   Exception: System.Data.SqlClient.SqlException
+    //   Stack Trace:
+    //     at Repository.Query() in Repository.cs:line 42
+    //   Caused by:
+    //     [Unavailable] Exception.SocketException: Network unreachable
+    ```
+
 ## [1.6.0] - 2026-01-30
 
 ### Added

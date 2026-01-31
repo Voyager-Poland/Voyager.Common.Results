@@ -1,6 +1,8 @@
 ﻿#if NET48
 using System;
+using System.Collections.Generic;
 #endif
+using System.Text;
 
 namespace Voyager.Common.Results
 {
@@ -19,6 +21,22 @@ namespace Voyager.Common.Results
 		/// Used for error chaining in distributed systems.
 		/// </summary>
 		public Error? InnerError { get; init; }
+
+		/// <summary>
+		/// Stack trace from the original exception.
+		/// Copied as string - original Exception can be garbage collected.
+		/// </summary>
+		public string? StackTrace { get; init; }
+
+		/// <summary>
+		/// Full type name of the original exception (e.g., "System.Data.SqlClient.SqlException").
+		/// </summary>
+		public string? ExceptionType { get; init; }
+
+		/// <summary>
+		/// Source of the exception (assembly/module name).
+		/// </summary>
+		public string? Source { get; init; }
 
 		/// <summary>
 		/// Creates a copy of this error with an inner error attached.
@@ -51,6 +69,57 @@ namespace Voyager.Common.Results
 				current = current.InnerError;
 			}
 			return false;
+		}
+
+		/// <summary>
+		/// Returns detailed error information including stack trace and inner errors.
+		/// Useful for logging and debugging.
+		/// </summary>
+		public string ToDetailedString()
+		{
+			var sb = new StringBuilder();
+			AppendErrorDetails(sb, this, depth: 0);
+			return sb.ToString();
+		}
+
+		private static void AppendErrorDetails(StringBuilder sb, Error error, int depth)
+		{
+			var indent = new string(' ', depth * 2);
+
+			sb.AppendLine($"{indent}[{error.Type}] {error.Code}: {error.Message}");
+
+			if (error.ExceptionType is not null)
+				sb.AppendLine($"{indent}  Exception: {error.ExceptionType}");
+
+			if (error.Source is not null)
+				sb.AppendLine($"{indent}  Source: {error.Source}");
+
+			if (error.StackTrace is not null)
+			{
+				sb.AppendLine($"{indent}  Stack Trace:");
+				var lines = error.StackTrace.Split('\n');
+				var lineCount = 0;
+				foreach (var line in lines)
+				{
+					if (lineCount >= 10)
+					{
+						sb.AppendLine($"{indent}    ... ({lines.Length - 10} more lines)");
+						break;
+					}
+					var trimmed = line.Trim();
+					if (!string.IsNullOrEmpty(trimmed))
+					{
+						sb.AppendLine($"{indent}    {trimmed}");
+						lineCount++;
+					}
+				}
+			}
+
+			if (error.InnerError is not null)
+			{
+				sb.AppendLine($"{indent}  Caused by:");
+				AppendErrorDetails(sb, error.InnerError, depth + 1);
+			}
 		}
 
 		// ========== FACTORY METHODS ==========
@@ -209,10 +278,66 @@ namespace Voyager.Common.Results
 				new(ErrorType.Unexpected, "Unexpected.Error", message);
 
 		/// <summary>
-		/// Creates an error from an exception
+		/// Creates an error from an exception, preserving diagnostic information as strings.
+		/// The original Exception is NOT stored - only string copies are kept,
+		/// allowing GC to collect the Exception immediately.
 		/// </summary>
-		public static Error FromException(Exception exception) =>
-				new(ErrorType.Unexpected, "Exception", exception.Message);
+		public static Error FromException(Exception exception)
+		{
+			var errorType = MapExceptionToErrorType(exception);
+			var code = $"Exception.{exception.GetType().Name}";
+
+			return new Error(errorType, code, exception.Message)
+			{
+				StackTrace = exception.StackTrace,
+				ExceptionType = exception.GetType().FullName,
+				Source = exception.Source,
+				InnerError = exception.InnerException is not null
+					? FromException(exception.InnerException)
+					: null
+			};
+		}
+
+		/// <summary>
+		/// Creates an error from an exception with a custom error type.
+		/// </summary>
+		public static Error FromException(Exception exception, ErrorType errorType)
+		{
+			var code = $"Exception.{exception.GetType().Name}";
+
+			return new Error(errorType, code, exception.Message)
+			{
+				StackTrace = exception.StackTrace,
+				ExceptionType = exception.GetType().FullName,
+				Source = exception.Source,
+				InnerError = exception.InnerException is not null
+					? FromException(exception.InnerException)
+					: null
+			};
+		}
+
+		/// <summary>
+		/// Maps common exception types to appropriate ErrorType.
+		/// </summary>
+		private static ErrorType MapExceptionToErrorType(Exception exception)
+		{
+			return exception switch
+			{
+				OperationCanceledException => ErrorType.Cancelled,
+				TimeoutException => ErrorType.Timeout,
+				UnauthorizedAccessException => ErrorType.Permission,
+				ArgumentException => ErrorType.Validation,
+				InvalidOperationException => ErrorType.Business,
+				KeyNotFoundException => ErrorType.NotFound,
+				// Check by name to avoid hard dependencies on specific assemblies
+				_ when exception.GetType().Name.Contains("Sql") => ErrorType.Database,
+				_ when exception.GetType().Name.Contains("Db") => ErrorType.Database,
+				_ when exception.GetType().Name == "HttpRequestException" => ErrorType.Unavailable,
+				_ when exception.GetType().Name.Contains("Socket") => ErrorType.Unavailable,
+				_ when exception.GetType().Name.Contains("WebException") => ErrorType.Unavailable,
+				_ => ErrorType.Unexpected
+			};
+		}
 
 		/// <summary>
 		/// Creates a too many requests error (rate limiting)
