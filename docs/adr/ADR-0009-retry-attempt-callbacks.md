@@ -1,6 +1,6 @@
 # ADR-0009: Callbacki prób retry
 
-**Status:** Propozycja
+**Status:** Zaakceptowano
 **Data:** 2026-01-31
 **Kontekst:** Voyager.Common.Proxy (ADR-008 Diagnostics Strategy)
 
@@ -302,10 +302,10 @@ public class RetryCallbackTests
 
 ## Implementacja
 
-- [ ] Dodać przeciążenie `BindWithRetryAsync` z parametrem `onRetryAttempt`
-- [ ] Zachować istniejące przeciążenie bez callbacka (backward compatibility)
-- [ ] Testy jednostkowe
-- [ ] Dokumentacja XML
+- [x] Dodać przeciążenie `BindWithRetryAsync` z parametrem `onRetryAttempt`
+- [x] Zachować istniejące przeciążenie bez callbacka (backward compatibility)
+- [x] Testy jednostkowe (7 nowych testów)
+- [x] Dokumentacja XML
 - [ ] Wydać jako część wersji 1.8.0
 
 ## Kompatybilność wsteczna

@@ -321,6 +321,23 @@ var result = await apiCall.BindWithRetryAsync(ProcessResponse, policy);
 - 📝 **Always preserves original error** - never generic "max retries exceeded"
 - ⚡ Zero external dependencies
 - 🔧 Fully customizable via `RetryPolicies.Custom()`
+- 🔔 **Retry attempt callbacks** for logging and metrics
+
+**Retry Attempt Callbacks:**
+
+```csharp
+var result = await operation.BindWithRetryAsync(
+    async value => await _httpClient.GetAsync(value),
+    RetryPolicies.TransientErrors(maxAttempts: 3),
+    onRetryAttempt: (attempt, error, delayMs) =>
+    {
+        _logger.LogWarning(
+            "Attempt {Attempt} failed: {Error}. Retrying in {Delay}ms",
+            attempt, error.Message, delayMs);
+
+        _metrics.IncrementRetryCounter(error.Type.ToString());
+    });
+```
 
 **When to use Retry:**
 - ✅ Network calls with temporary failures

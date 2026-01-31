@@ -91,6 +91,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     };
     ```
 
+- **Retry Attempt Callbacks (ADR-009)**: Get notified on each retry attempt
+  - `BindWithRetryAsync(..., onRetryAttempt)` - New overload with callback parameter
+  - Parameters: `(int attemptNumber, Error error, int delayMs)`
+  - `delayMs > 0`: retry will happen after this delay
+  - `delayMs = 0`: no more retries (max attempts reached)
+  - Use cases: logging, metrics, debugging slow operations
+  - See [ADR-0009](docs/adr/ADR-0009-retry-attempt-callbacks.md) for design rationale
+  - Example:
+    ```csharp
+    var result = await operation.BindWithRetryAsync(
+        async value => await _httpClient.GetAsync(value),
+        RetryPolicies.TransientErrors(maxAttempts: 3),
+        onRetryAttempt: (attempt, error, delayMs) =>
+        {
+            _logger.LogWarning("Attempt {Attempt} failed: {Error}. Retrying in {Delay}ms",
+                attempt, error.Message, delayMs);
+        });
+    ```
+
 ## [1.6.0] - 2026-01-30
 
 ### Added

@@ -92,10 +92,50 @@ namespace Voyager.Common.Results.Extensions
 		///     );
 		/// </code>
 		/// </example>
-		public static async Task<Result<TOut>> BindWithRetryAsync<TIn, TOut>(
+		public static Task<Result<TOut>> BindWithRetryAsync<TIn, TOut>(
 			this Result<TIn> result,
 			Func<TIn, Task<Result<TOut>>> func,
 			RetryPolicy policy)
+		{
+			return result.BindWithRetryAsync(func, policy, onRetryAttempt: null);
+		}
+
+		/// <summary>
+		/// Executes an operation with retry logic for transient failures with callback notification
+		/// </summary>
+		/// <typeparam name="TIn">Type of the input value</typeparam>
+		/// <typeparam name="TOut">Type of the output value</typeparam>
+		/// <param name="result">Input result to bind</param>
+		/// <param name="func">Function to execute that may fail transiently</param>
+		/// <param name="policy">Retry policy that determines when and how to retry</param>
+		/// <param name="onRetryAttempt">
+		/// Callback invoked after each failed attempt. Parameters: (attemptNumber, error, delayMs).
+		/// Called with delayMs=0 when no more retries will be attempted.
+		/// </param>
+		/// <returns>Result from the operation, preserving the original error from the last attempt if all retries fail</returns>
+		/// <remarks>
+		/// CRITICAL: This method ALWAYS preserves the original error from the last failed attempt.
+		/// The callback is called synchronously - keep handler fast and non-blocking.
+		/// </remarks>
+		/// <example>
+		/// <code>
+		/// var result = await GetDatabaseConnection()
+		///     .BindWithRetryAsync(
+		///         conn => ExecuteQuery(conn),
+		///         RetryPolicies.TransientErrors(maxAttempts: 5),
+		///         onRetryAttempt: (attempt, error, delayMs) =>
+		///         {
+		///             _logger.LogWarning("Attempt {Attempt} failed: {Error}. Retrying in {Delay}ms",
+		///                 attempt, error.Message, delayMs);
+		///         }
+		///     );
+		/// </code>
+		/// </example>
+		public static async Task<Result<TOut>> BindWithRetryAsync<TIn, TOut>(
+			this Result<TIn> result,
+			Func<TIn, Task<Result<TOut>>> func,
+			RetryPolicy policy,
+			Action<int, Error, int>? onRetryAttempt)
 		{
 			if (result.IsFailure)
 				return Result<TOut>.Failure(result.Error);
@@ -114,12 +154,25 @@ namespace Voyager.Common.Results.Extensions
 
 				var retryDecision = policy(attempt, lastOutcome.Error);
 
-				// Stop retrying - return the ORIGINAL error, never replace it
+				// Stop retrying - return the ORIGINAL error
 				if (retryDecision.IsFailure)
+				{
+					// Only notify if we actually attempted retries (attempt > 1)
+					// For non-transient errors on first attempt, no callback
+					if (attempt > 1)
+					{
+						onRetryAttempt?.Invoke(attempt, lastOutcome.Error, 0);
+					}
 					return lastOutcome;
+				}
+
+				var delayMs = retryDecision.Value;
+
+				// Notify about retry before delay
+				onRetryAttempt?.Invoke(attempt, lastOutcome.Error, delayMs);
 
 				// Wait before next attempt
-				await Task.Delay(retryDecision.Value).ConfigureAwait(false);
+				await Task.Delay(delayMs).ConfigureAwait(false);
 				attempt++;
 			}
 		}
@@ -148,7 +201,41 @@ namespace Voyager.Common.Results.Extensions
 			RetryPolicy policy)
 		{
 			var result = await resultTask.ConfigureAwait(false);
-			return await result.BindWithRetryAsync(func, policy).ConfigureAwait(false);
+			return await result.BindWithRetryAsync(func, policy, onRetryAttempt: null).ConfigureAwait(false);
+		}
+
+		/// <summary>
+		/// Executes an operation with retry logic for transient failures with callback notification (Task&lt;Result&gt; overload)
+		/// </summary>
+		/// <typeparam name="TIn">Type of the input value</typeparam>
+		/// <typeparam name="TOut">Type of the output value</typeparam>
+		/// <param name="resultTask">Task returning the input result to bind</param>
+		/// <param name="func">Function to execute that may fail transiently</param>
+		/// <param name="policy">Retry policy that determines when and how to retry</param>
+		/// <param name="onRetryAttempt">
+		/// Callback invoked after each failed attempt. Parameters: (attemptNumber, error, delayMs).
+		/// Called with delayMs=0 when no more retries will be attempted.
+		/// </param>
+		/// <returns>Result from the operation, preserving the original error from the last attempt if all retries fail</returns>
+		/// <example>
+		/// <code>
+		/// var result = await GetDatabaseConnectionAsync()
+		///     .BindWithRetryAsync(
+		///         conn => ExecuteQuery(conn),
+		///         RetryPolicies.TransientErrors(),
+		///         onRetryAttempt: (attempt, error, delayMs) =>
+		///             _logger.LogWarning("Retry {Attempt}: {Error}", attempt, error.Message)
+		///     );
+		/// </code>
+		/// </example>
+		public static async Task<Result<TOut>> BindWithRetryAsync<TIn, TOut>(
+			this Task<Result<TIn>> resultTask,
+			Func<TIn, Task<Result<TOut>>> func,
+			RetryPolicy policy,
+			Action<int, Error, int>? onRetryAttempt)
+		{
+			var result = await resultTask.ConfigureAwait(false);
+			return await result.BindWithRetryAsync(func, policy, onRetryAttempt).ConfigureAwait(false);
 		}
 	}
 
