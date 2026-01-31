@@ -304,7 +304,7 @@ public class ErrorFromExceptionTests
 	{
 		// Arrange - create deeply nested call to get long stack trace
 		Exception caught = null!;
-		void RecursiveThrow(int depth)
+		static void RecursiveThrow(int depth)
 		{
 			if (depth <= 0)
 				throw new InvalidOperationException("Deep exception");
