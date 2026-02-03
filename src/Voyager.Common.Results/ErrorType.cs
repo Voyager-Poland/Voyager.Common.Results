@@ -66,6 +66,11 @@
 		/// <summary>
 		/// Circuit breaker is open (protection mechanism active)
 		/// </summary>
-		CircuitBreakerOpen
+		CircuitBreakerOpen,
+
+		/// <summary>
+		/// Rate limiting - too many requests (HTTP 429)
+		/// </summary>
+		TooManyRequests
 	}
 }

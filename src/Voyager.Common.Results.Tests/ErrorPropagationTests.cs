@@ -334,10 +334,10 @@ public class ErrorPropagationTests
     #region Try Error Creation
 
     [Fact]
-    public void Try_WithException_CreatesUnexpectedError()
+    public void Try_WithException_MapsExceptionType()
     {
-        // Arrange & Act
-        var result = Result<int>.Try(() => throw new InvalidOperationException("Test exception"));
+        // Arrange & Act - use NotSupportedException which maps to Unexpected
+        var result = Result<int>.Try(() => throw new NotSupportedException("Test exception"));
 
         // Assert
         Assert.True(result.IsFailure);
