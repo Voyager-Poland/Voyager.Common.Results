@@ -641,15 +641,28 @@ result.Switch(
 
 ### ❌ Pitfall 2: Not Handling Results
 
-```csharp
-GetUser(id);  // ❌ Result ignored!
+When a method returns `Result` or `Result<T>`, the return value **must be consumed**. Ignoring it silently discards potential errors - the whole reason you're using the Result pattern instead of exceptions.
 
-// ✅ GOOD
+The built-in Roslyn analyzer **VCR0010** catches this at compile time:
+
+```csharp
+GetUser(id);  // ⚠️ VCR0010: Result of 'GetUser' must be checked
+await SendEmailAsync(email);  // ⚠️ VCR0010: Result of 'SendEmailAsync' must be checked
+
+// ✅ GOOD - handle the result
 var result = GetUser(id);
 result.Switch(
     onSuccess: user => ProcessUser(user),
     onFailure: error => LogError(error)
 );
+
+// ✅ Also fine - chain operations
+GetUser(id)
+    .Bind(user => SendNotification(user))
+    .Tap(() => _logger.LogInfo("Done"));
+
+// ✅ Explicitly discard if you truly don't care
+_ = FireAndForgetOperation();
 ```
 
 ### ❌ Pitfall 3: Using try-catch for control flow

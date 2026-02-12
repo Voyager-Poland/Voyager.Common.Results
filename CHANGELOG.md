@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Roslyn Analyzer VCR0010 — Result must be consumed**: Warns when `Result`/`Result<T>` return values are silently discarded
+  - Detects unconsumed results from method calls, factory methods, and awaited `Task<Result>`
+  - Two code fixes: "Discard result" (`_ = ...`) and "Assign to variable" (`var result = ...`)
+  - Bundled in the NuGet package under `analyzers/dotnet/cs` — no extra install needed
+  - See [ADR-0010](docs/adr/ADR-0010-result-consumption-analyzer.md) for design rationale
+
+### Fixed
+- **`.editorconfig` naming rules**: `private const` and `private static readonly` fields now correctly require PascalCase instead of `_camelCase`
+
 ## [1.6.0] - 2026-01-30
 
 ### Added

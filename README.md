@@ -21,6 +21,7 @@ A lightweight, functional **Result Pattern** implementation for .NET that enable
 - 📚 **Comprehensive XML documentation**
 - 🧪 **Fully tested** with high code coverage
 - 🎨 **Implicit conversions** for ergonomic API
+- 🔬 **Built-in Roslyn analyzer** warns when Result is not consumed
 - 🤖 **Automated publishing** via GitHub Actions
 
 ## 📦 Installation
@@ -525,6 +526,28 @@ var (successes, failures) = results.Partition();
 // Get only successful values
 List<int> values = results.GetSuccessValues();
 ```
+
+### Analyzer - Result Must Be Consumed (VCR0010)
+
+The package includes a built-in Roslyn analyzer that warns when a `Result` or `Result<T>` return value is silently discarded. This prevents a common mistake where errors are lost because nobody checked the result:
+
+```csharp
+GetUser(id);                  // ⚠️ VCR0010: Result of 'GetUser' must be checked
+await SendEmailAsync(email);  // ⚠️ VCR0010: Result of 'SendEmailAsync' must be checked
+Result.Success();             // ⚠️ VCR0010: Result of 'Success' must be checked
+
+// ✅ All of these are fine - result is consumed:
+var result = GetUser(id);           // Assigned to variable
+_ = GetUser(id);                    // Explicitly discarded
+if (GetUser(id).IsSuccess) { }     // Used in condition
+return GetUser(id);                 // Returned
+Log(GetUser(id));                   // Passed as argument
+GetUser(id).Match(...);             // Used in method chain
+```
+
+The analyzer is bundled in the NuGet package - no extra installation needed. Two quick-fixes are available:
+- **Discard result** (`_ = ...`) - when you intentionally want to ignore the result
+- **Assign to variable** (`var result = ...`) - when you want to handle it later
 
 ## 📚 More Examples
 

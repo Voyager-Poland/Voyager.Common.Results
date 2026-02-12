@@ -284,12 +284,113 @@ public class ResultMustBeConsumedAnalyzerTests
 
 ## Implementacja
 
-- [ ] Utworzyć projekt `Voyager.Common.Results.Analyzers` (netstandard2.0)
-- [ ] Zaimplementować `ResultMustBeConsumedAnalyzer`
-- [ ] Zaimplementować `ResultMustBeConsumedCodeFixProvider`
-- [ ] Testy z `Microsoft.CodeAnalysis.CSharp.Analyzer.Testing`
-- [ ] Skonfigurować pakowanie analyzera w `Voyager.Common.Results.csproj`
+- [x] Utworzyć projekt `Voyager.Common.Results.Analyzers` (netstandard2.0)
+- [x] Zaimplementować `ResultMustBeConsumedAnalyzer`
+- [x] Zaimplementować `ResultMustBeConsumedCodeFixProvider`
+- [x] Testy z `Microsoft.CodeAnalysis.CSharp.Analyzer.Testing`
+- [x] Skonfigurować pakowanie analyzera w `Voyager.Common.Results.csproj`
 - [ ] Wydać jako część kolejnej wersji
+- [ ] VCR0020: Value accessed without success check
+- [ ] VCR0030: Nested `Result<Result<T>>`
+- [ ] VCR0040: `GetValueOrThrow` in railway chain
+- [ ] VCR0050: `Failure(Error.None)`
+- [ ] VCR0060: Prefer Match/Switch
+
+## Planowane rozszerzenia (kolejne analizatory)
+
+### VCR0020: Value accessed without success check (Warning)
+
+Dostęp do `Result<T>.Value` bez uprzedniego sprawdzenia `IsSuccess`/`IsFailure` — analogia do Rust'owego zakazu bezpośredniego dostępu do `Option<T>` bez `unwrap`/`match`:
+
+```csharp
+// ⚠ VCR0020 — Value może być default/null gdy IsFailure
+var result = GetUser(id);
+Console.WriteLine(result.Value.Name);
+
+// ✅ Sprawdzenie przed dostępem
+var result = GetUser(id);
+if (result.IsSuccess)
+    Console.WriteLine(result.Value.Name);
+
+// ✅ Match wymusza obsługę obu ścieżek
+GetUser(id).Match(
+    user => user.Name,
+    error => "unknown");
+```
+
+**Implementacja:** Rejestracja na `OperationKind.PropertyReference` dla `.Value`, sprawdzenie czy w enclosing block istnieje wcześniejszy branch na `IsSuccess`/`IsFailure`. Code fix: zaproponuj `Match` lub dodaj guard `if (result.IsSuccess)`.
+
+### VCR0030: Nested `Result<Result<T>>` (Warning)
+
+Podwójne owinięcie wynika prawie zawsze z użycia `Map` zamiast `Bind`:
+
+```csharp
+// ⚠ VCR0030 — Result<Result<Order>>
+var nested = userId.Map(id => GetOrder(id));
+
+// ✅ Bind spłaszcza strukturę
+var flat = userId.Bind(id => GetOrder(id));
+```
+
+**Implementacja:** Rejestracja na `OperationKind.Invocation` dla metod `Map`/`MapAsync`. Sprawdzenie czy typ zwracany to `Result<Result<T>>`. Code fix: zamień `Map` na `Bind`.
+
+### VCR0040: `GetValueOrThrow` in railway chain (Info)
+
+Użycie `GetValueOrThrow()` przywraca semantykę wyjątków, niwelując sens Result pattern:
+
+```csharp
+// ⚠ VCR0040 — przywraca wyjątki w środku łańcucha
+var user = GetUser(id).GetValueOrThrow();
+var order = GetOrder(user.Id).GetValueOrThrow();
+
+// ✅ Railway — błędy propagują się automatycznie
+var order = GetUser(id)
+    .Bind(user => GetOrder(user.Id));
+```
+
+**Severity:** `Info` — na granicach systemu (kontrolery, handlery) `GetValueOrThrow` bywa uzasadniony.
+
+### VCR0050: `Failure` with `Error.None` (Error)
+
+Semantyczny nonsens — tworzenie failure bez błędu:
+
+```csharp
+// ⚠ VCR0050 — failure z Error.None nie ma sensu
+return Result.Failure(Error.None);
+return Result<User>.Failure(Error.None);
+```
+
+**Implementacja:** Rejestracja na `OperationKind.Invocation` dla metod `Failure`. Sprawdzenie czy argument to `Error.None`. Severity: `Error` — to zawsze bug.
+
+### VCR0060: Prefer `Match`/`Switch` over `IsSuccess` branching (Suggestion, domyślnie wyłączony)
+
+Wskazówka stylistyczna promująca functional approach:
+
+```csharp
+// OK ale mniej idiomatyczne
+if (result.IsSuccess)
+    DoA(result.Value);
+else
+    DoB(result.Error);
+
+// ✅ Idiomatyczne — exhaustive, kompilator wymusza oba ramiona
+result.Switch(
+    value => DoA(value),
+    error => DoB(error));
+```
+
+**Severity:** `Suggestion`, `isEnabledByDefault: false` — to preferencja stylistyczna, nie bug.
+
+### Podsumowanie planowanych reguł
+
+| ID | Nazwa | Severity | Priorytet |
+|---|---|---|---|
+| VCR0010 | Result must be consumed | Warning | ✅ Zaimplementowany |
+| VCR0020 | Value accessed without success check | Warning | Wysoki |
+| VCR0030 | Nested `Result<Result<T>>` | Warning | Średni |
+| VCR0040 | `GetValueOrThrow` in railway chain | Info | Średni |
+| VCR0050 | `Failure(Error.None)` | Error | Średni |
+| VCR0060 | Prefer Match/Switch | Suggestion | Niski |
 
 ## Kompatybilność wsteczna
 
