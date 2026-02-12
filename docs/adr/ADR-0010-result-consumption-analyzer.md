@@ -290,11 +290,11 @@ public class ResultMustBeConsumedAnalyzerTests
 - [x] Testy z `Microsoft.CodeAnalysis.CSharp.Analyzer.Testing`
 - [x] Skonfigurować pakowanie analyzera w `Voyager.Common.Results.csproj`
 - [ ] Wydać jako część kolejnej wersji
-- [ ] VCR0020: Value accessed without success check
-- [ ] VCR0030: Nested `Result<Result<T>>`
-- [ ] VCR0040: `GetValueOrThrow` in railway chain
-- [ ] VCR0050: `Failure(Error.None)`
-- [ ] VCR0060: Prefer Match/Switch
+- [x] VCR0020: Value accessed without success check
+- [x] VCR0030: Nested `Result<Result<T>>`
+- [x] VCR0040: `GetValueOrThrow` in railway chain
+- [x] VCR0050: `Failure(Error.None)`
+- [x] VCR0060: Prefer Match/Switch
 
 ## Planowane rozszerzenia (kolejne analizatory)
 
@@ -386,11 +386,11 @@ result.Switch(
 | ID | Nazwa | Severity | Priorytet |
 |---|---|---|---|
 | VCR0010 | Result must be consumed | Warning | ✅ Zaimplementowany |
-| VCR0020 | Value accessed without success check | Warning | Wysoki |
-| VCR0030 | Nested `Result<Result<T>>` | Warning | Średni |
-| VCR0040 | `GetValueOrThrow` in railway chain | Info | Średni |
-| VCR0050 | `Failure(Error.None)` | Error | Średni |
-| VCR0060 | Prefer Match/Switch | Suggestion | Niski |
+| VCR0020 | Value accessed without success check | Warning | ✅ Zaimplementowany |
+| VCR0030 | Nested `Result<Result<T>>` | Warning | ✅ Zaimplementowany |
+| VCR0040 | `GetValueOrThrow` in railway chain | Info | ✅ Zaimplementowany |
+| VCR0050 | `Failure(Error.None)` | Error | ✅ Zaimplementowany |
+| VCR0060 | Prefer Match/Switch | Suggestion | ✅ Zaimplementowany |
 
 ## Kompatybilność wsteczna
 

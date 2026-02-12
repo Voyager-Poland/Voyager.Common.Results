@@ -549,6 +549,36 @@ The analyzer is bundled in the NuGet package - no extra installation needed. Two
 - **Discard result** (`_ = ...`) - when you intentionally want to ignore the result
 - **Assign to variable** (`var result = ...`) - when you want to handle it later
 
+### Additional Analyzers
+
+The package includes a full suite of Roslyn analyzers that catch common Result pattern mistakes:
+
+| ID | Severity | Description |
+|---|---|---|
+| VCR0010 | Warning | Result must be consumed — unconsumed `Result` / `Result<T>` return values |
+| VCR0020 | Warning | Value accessed without success check — `result.Value` without `IsSuccess` guard |
+| VCR0030 | Warning | Nested `Result<Result<T>>` — use `Bind` instead of `Map` |
+| VCR0040 | Info | `GetValueOrThrow` defeats Result pattern — prefer `Match`/`Bind`/`Map` |
+| VCR0050 | Error | `Failure(Error.None)` — failure without error is always a bug |
+| VCR0060 | Disabled | Prefer `Match`/`Switch` over `if (IsSuccess)` branching (opt-in style rule) |
+
+```csharp
+var result = GetUser(id);
+result.Value.Name;                     // ⚠️ VCR0020: Access 'Value' without checking 'IsSuccess'
+
+result.Map(x => GetOrder(x.Id));       // ⚠️ VCR0030: Nested Result<Result<Order>>, use Bind
+
+GetUser(id).GetValueOrThrow();         // ℹ️ VCR0040: Consider Match/Bind instead
+
+Result.Failure(Error.None);            // ❌ VCR0050: Failure with Error.None is a bug
+```
+
+All analyzers are configurable via `.editorconfig`:
+```ini
+dotnet_diagnostic.VCR0040.severity = none      # Disable
+dotnet_diagnostic.VCR0060.severity = warning   # Enable opt-in rule
+```
+
 ## 📚 More Examples
 
 See the [full documentation](./src/Voyager.Common.Results/README.md) for detailed examples and best practices.

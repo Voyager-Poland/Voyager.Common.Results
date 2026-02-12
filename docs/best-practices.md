@@ -159,8 +159,10 @@ if (userResult.IsSuccess)
 
 ### ❌ DON'T: Use Map for operations that return Result
 
+The built-in analyzer **VCR0030** catches this at compile time:
+
 ```csharp
-// ❌ BAD: Returns Result<Result<User>>
+// ⚠️ VCR0030: 'Map' produces nested Result<Result<User>>. Use 'Bind' instead.
 result.Map(user => SaveUser(user))
 
 // ✅ GOOD: Returns Result<User>
@@ -628,15 +630,25 @@ public void CreateUser_Success_ReturnsUser()
 
 ### ❌ Pitfall 1: Accessing Value on Failure
 
+The built-in analyzer **VCR0020** catches this at compile time:
+
 ```csharp
 var result = GetUser(id);
-var name = result.Value.Name;  // ❌ Throws if IsFailure!
+var name = result.Value.Name;  // ⚠️ VCR0020: Access to 'Value' without checking 'IsSuccess'
 
-// ✅ GOOD
+// ✅ GOOD: Guard with IsSuccess
+if (result.IsSuccess)
+    Console.WriteLine(result.Value.Name);
+
+// ✅ GOOD: Use Match/Switch
 result.Switch(
     onSuccess: user => Console.WriteLine(user.Name),
     onFailure: error => Console.WriteLine(error.Message)
 );
+
+// ✅ GOOD: Early return
+if (result.IsFailure) return;
+Console.WriteLine(result.Value.Name);
 ```
 
 ### ❌ Pitfall 2: Not Handling Results

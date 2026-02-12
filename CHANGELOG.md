@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Two code fixes: "Discard result" (`_ = ...`) and "Assign to variable" (`var result = ...`)
   - Bundled in the NuGet package under `analyzers/dotnet/cs` — no extra install needed
   - See [ADR-0010](docs/adr/ADR-0010-result-consumption-analyzer.md) for design rationale
+- **Roslyn Analyzer VCR0020 — Value accessed without success check**: Warns when `Result<T>.Value` is accessed without checking `IsSuccess`/`IsFailure`
+  - Detects guarded patterns: `if (IsSuccess)`, early-return, ternary, `&&` short-circuit
+- **Roslyn Analyzer VCR0030 — Nested `Result<Result<T>>`**: Warns when `Map` produces nested Result (should use `Bind`)
+- **Roslyn Analyzer VCR0040 — `GetValueOrThrow` defeats Result pattern**: Info-level hint to use `Match`/`Bind`/`Map` instead
+- **Roslyn Analyzer VCR0050 — `Failure(Error.None)`**: Error-level diagnostic for creating failure without an error
+- **Roslyn Analyzer VCR0060 — Prefer Match/Switch**: Disabled-by-default suggestion to use `Match`/`Switch` over `if/else` branching on `IsSuccess`
 
 ### Fixed
 - **`.editorconfig` naming rules**: `private const` and `private static readonly` fields now correctly require PascalCase instead of `_camelCase`
