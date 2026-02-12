@@ -23,6 +23,111 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **`.editorconfig` naming rules**: `private const` and `private static readonly` fields now correctly require PascalCase instead of `_camelCase`
 
+## [1.7.1] - 2026-02-03
+
+### Added
+- **Error Classification Extensions (ADR-005)**: Methods for classifying errors for resilience patterns
+  - `ErrorType.TooManyRequests` - New error type for rate limiting (HTTP 429)
+  - `Error.TooManyRequestsError(message)` - Factory method with default code "RateLimit.Exceeded"
+  - `Error.TooManyRequestsError(code, message)` - Factory method with custom code
+  - `ErrorTypeExtensions.IsTransient()` - Returns true for retryable errors (Timeout, Unavailable, CircuitBreakerOpen, TooManyRequests)
+  - `ErrorTypeExtensions.IsBusinessError()` - Returns true for business errors (Validation, NotFound, Permission, etc.)
+  - `ErrorTypeExtensions.IsInfrastructureError()` - Returns true for infrastructure errors (Database, Unexpected)
+  - `ErrorTypeExtensions.ShouldCountForCircuitBreaker()` - Returns true if error should count toward CB threshold
+  - `ErrorTypeExtensions.ShouldRetry()` - Returns true if operation should be retried
+  - `ErrorTypeExtensions.ToHttpStatusCode()` - Maps ErrorType to HTTP status code
+  - See [ADR-0005](docs/adr/ADR-0005-error-classification-for-resilience.md) for design rationale
+
+- **Error Chaining for Distributed Systems (ADR-006)**: Track error origin across service calls
+  - `Error.InnerError` - Optional inner error property (like Exception.InnerException)
+  - `Error.WithInner(error)` - Creates copy with inner error attached
+  - `Error.GetRootCause()` - Traverses chain to find original error
+  - `Error.HasInChain(predicate)` - Checks if any error in chain matches predicate
+  - `Result<T>.WrapError(factory)` - Wraps error with new error, preserving original as InnerError
+  - `Result<T>.AddErrorContext(serviceName, operation)` - Adds service context while preserving error type
+  - Async versions: `WrapErrorAsync()`, `AddErrorContextAsync()`
+  - See [ADR-0006](docs/adr/ADR-0006-error-chaining-for-distributed-systems.md) for design rationale
+  - Example:
+    ```csharp
+    var result = await _productService.GetAsync(id)
+        .AddErrorContextAsync("ProductService", "GetProduct");
+
+    // Access root cause
+    var rootCause = result.Error.GetRootCause();
+    ```
+
+- **Exception Details Preservation (ADR-007)**: Enhanced `FromException()` with full diagnostic information
+  - `Error.StackTrace` - Stack trace preserved as string (GC-safe, no reference to Exception)
+  - `Error.ExceptionType` - Full type name (e.g., "System.InvalidOperationException")
+  - `Error.Source` - Source assembly/module name
+  - `Error.FromException(exception)` - Now auto-maps exception types to ErrorType:
+    - `OperationCanceledException` → `Cancelled`
+    - `TimeoutException` → `Timeout`
+    - `ArgumentException` → `Validation`
+    - `InvalidOperationException` → `Business`
+    - `KeyNotFoundException` → `NotFound`
+    - `UnauthorizedAccessException` → `Permission`
+    - `*Sql*/*Db*` exceptions → `Database`
+    - `HttpRequestException`/`*Socket*`/`WebException` → `Unavailable`
+  - `Error.FromException(exception, errorType)` - Override auto-mapping with custom type
+  - `Error.ToDetailedString()` - Returns formatted error with stack trace and chain
+  - Automatically chains `InnerException` to `InnerError`
+  - See [ADR-0007](docs/adr/ADR-0007-exception-details-preservation.md) for design rationale
+  - Example:
+    ```csharp
+    try { /* ... */ }
+    catch (Exception ex)
+    {
+        var error = Error.FromException(ex);
+        _logger.LogError(error.ToDetailedString());
+    }
+    // Output:
+    // [Database] Exception.SqlException: Connection failed
+    //   Exception: System.Data.SqlClient.SqlException
+    //   Stack Trace:
+    //     at Repository.Query() in Repository.cs:line 42
+    //   Caused by:
+    //     [Unavailable] Exception.SocketException: Network unreachable
+    ```
+
+- **Circuit Breaker State Change Callbacks (ADR-008)**: Get notified when circuit breaker state changes
+  - `CircuitBreakerPolicy.OnStateChanged` - Callback invoked on state transitions
+  - Parameters: `(CircuitState oldState, CircuitState newState, int failureCount, Error? lastError)`
+  - Triggered on: Closed→Open, Open→HalfOpen, HalfOpen→Closed, HalfOpen→Open, Reset
+  - Use cases: logging, alerting, metrics integration
+  - See [ADR-0008](docs/adr/ADR-0008-circuit-breaker-state-change-callbacks.md) for design rationale
+  - Example:
+    ```csharp
+    var circuitBreaker = new CircuitBreakerPolicy(failureThreshold: 5);
+    circuitBreaker.OnStateChanged = (oldState, newState, failures, lastError) =>
+    {
+        _logger.LogWarning("Circuit breaker: {Old} → {New}, failures: {Count}",
+            oldState, newState, failures);
+
+        if (newState == CircuitState.Open)
+            _alertService.SendAlert($"Circuit OPEN: {lastError?.Message}");
+    };
+    ```
+
+- **Retry Attempt Callbacks (ADR-009)**: Get notified on each retry attempt
+  - `BindWithRetryAsync(..., onRetryAttempt)` - New overload with callback parameter
+  - Parameters: `(int attemptNumber, Error error, int delayMs)`
+  - `delayMs > 0`: retry will happen after this delay
+  - `delayMs = 0`: no more retries (max attempts reached)
+  - Use cases: logging, metrics, debugging slow operations
+  - See [ADR-0009](docs/adr/ADR-0009-retry-attempt-callbacks.md) for design rationale
+  - Example:
+    ```csharp
+    var result = await operation.BindWithRetryAsync(
+        async value => await _httpClient.GetAsync(value),
+        RetryPolicies.TransientErrors(maxAttempts: 3),
+        onRetryAttempt: (attempt, error, delayMs) =>
+        {
+            _logger.LogWarning("Attempt {Attempt} failed: {Error}. Retrying in {Delay}ms",
+                attempt, error.Message, delayMs);
+        });
+    ```
+
 ## [1.6.0] - 2026-01-30
 
 ### Added
@@ -369,7 +474,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - .NET Framework 4.8
 - .NET 8.0
 
-[Unreleased]: https://github.com/Voyager-Poland/Voyager.Common.Results/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/Voyager-Poland/Voyager.Common.Results/compare/v1.7.1...HEAD
+[1.7.1]: https://github.com/Voyager-Poland/Voyager.Common.Results/releases/tag/v1.7.1
+[1.6.0]: https://github.com/Voyager-Poland/Voyager.Common.Results/releases/tag/v1.6.0
 [1.5.0]: https://github.com/Voyager-Poland/Voyager.Common.Results/releases/tag/v1.5.0
 [1.4.0]: https://github.com/Voyager-Poland/Voyager.Common.Results/releases/tag/v1.4.0
 [1.3.0]: https://github.com/Voyager-Poland/Voyager.Common.Results/releases/tag/v1.3.0

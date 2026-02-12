@@ -102,9 +102,62 @@ Error.BusinessError("Cannot cancel paid order")
 Error.UnavailableError("Service temporarily unavailable")
 Error.TimeoutError("Request timed out")
 Error.CancelledError("Operation was cancelled")
-Error.CircuitBreakerOpenError(lastError) // Circuit breaker open (from Resilience library)
+Error.TooManyRequestsError("Rate limit exceeded")  // HTTP 429
+Error.CircuitBreakerOpenError(lastError) // Circuit breaker open
 Error.UnexpectedError("Something went wrong")
-Error.FromException(exception)
+Error.FromException(exception) // Auto-maps exception type to ErrorType
+```
+
+### Error Classification (ADR-005)
+
+Use extension methods to classify errors for resilience patterns:
+
+```csharp
+using Voyager.Common.Results.Extensions;
+
+error.Type.IsTransient()      // Timeout, Unavailable, TooManyRequests, CircuitBreakerOpen
+error.Type.IsBusinessError()  // Validation, NotFound, Permission, etc.
+error.Type.ShouldRetry()      // Same as IsTransient
+error.Type.ToHttpStatusCode() // Maps to HTTP status code
+```
+
+### Error Chaining (ADR-006)
+
+Track error origin across distributed service calls:
+
+```csharp
+// Chain errors (like InnerException)
+var error = Error.UnavailableError("Order failed")
+    .WithInner(productServiceError);
+
+// Find root cause
+var rootCause = error.GetRootCause();
+
+// Check chain for specific error type
+if (error.HasInChain(e => e.Type == ErrorType.NotFound)) { }
+
+// Add context when calling external services
+var result = await _productService.GetAsync(id)
+    .AddErrorContextAsync("ProductService", "GetProduct");
+```
+
+### Enhanced FromException (ADR-007)
+
+`FromException` now preserves full diagnostic info and auto-maps exception types:
+
+```csharp
+var error = Error.FromException(exception);
+// Auto-maps: TimeoutException → Timeout, ArgumentException → Validation, etc.
+// Preserves: StackTrace, ExceptionType, Source, InnerException chain
+
+// Override auto-mapping
+var error = Error.FromException(exception, ErrorType.Database);
+
+// Detailed logging output
+_logger.LogError(error.ToDetailedString());
+// [Database] Exception.SqlException: Connection failed
+//   Stack Trace: at Repository.Query() in Repository.cs:line 42
+//   Caused by: [Unavailable] Exception.SocketException: Network unreachable
 ```
 
 ### Railway Oriented Programming
@@ -269,6 +322,23 @@ var result = await apiCall.BindWithRetryAsync(ProcessResponse, policy);
 - 📝 **Always preserves original error** - never generic "max retries exceeded"
 - ⚡ Zero external dependencies
 - 🔧 Fully customizable via `RetryPolicies.Custom()`
+- 🔔 **Retry attempt callbacks** for logging and metrics
+
+**Retry Attempt Callbacks:**
+
+```csharp
+var result = await operation.BindWithRetryAsync(
+    async value => await _httpClient.GetAsync(value),
+    RetryPolicies.TransientErrors(maxAttempts: 3),
+    onRetryAttempt: (attempt, error, delayMs) =>
+    {
+        _logger.LogWarning(
+            "Attempt {Attempt} failed: {Error}. Retrying in {Delay}ms",
+            attempt, error.Message, delayMs);
+
+        _metrics.IncrementRetryCounter(error.Type.ToString());
+    });
+```
 
 **When to use Retry:**
 - ✅ Network calls with temporary failures
@@ -324,6 +394,27 @@ policy.Reset();
 - 🎯 Returns `ErrorType.CircuitBreakerOpen` when circuit is open
 - 🔎 **Only counts infrastructure errors** (Unavailable, Timeout, Database, Unexpected)
 - ✅ **Ignores business errors** (Validation, NotFound, Permission, Business, Conflict)
+- 🔔 **State change callbacks** for logging, alerting, and metrics
+
+**State Change Callbacks:**
+
+```csharp
+var policy = new CircuitBreakerPolicy(failureThreshold: 5);
+
+// Subscribe to state changes
+policy.OnStateChanged = (oldState, newState, failureCount, lastError) =>
+{
+    _logger.LogWarning(
+        "Circuit breaker: {OldState} → {NewState}, failures: {Count}",
+        oldState, newState, failureCount);
+
+    if (newState == CircuitState.Open)
+    {
+        _alertService.SendAlert($"Circuit OPEN: {lastError?.Message}");
+        _metrics.IncrementCounter("circuit_breaker_opened");
+    }
+};
+```
 
 **When to use Circuit Breaker:**
 - ✅ External API/service calls that may fail

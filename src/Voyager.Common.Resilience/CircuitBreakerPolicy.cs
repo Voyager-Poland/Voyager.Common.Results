@@ -46,6 +46,15 @@ namespace Voyager.Common.Resilience
 		private Error? _lastError;
 
 		/// <summary>
+		/// Callback invoked when circuit breaker state changes.
+		/// Called synchronously within the lock - keep handler fast and non-blocking.
+		/// </summary>
+		/// <remarks>
+		/// Parameters: (oldState, newState, failureCount, lastError)
+		/// </remarks>
+		public Action<CircuitState, CircuitState, int, Error?>? OnStateChanged { get; set; }
+
+		/// <summary>
 		/// Creates a new circuit breaker policy
 		/// </summary>
 		/// <param name="failureThreshold">Number of consecutive failures before opening circuit (default: 5)</param>
@@ -91,6 +100,8 @@ namespace Voyager.Common.Resilience
 			await _lock.WaitAsync().ConfigureAwait(false);
 			try
 			{
+				var oldState = _state;
+
 				switch (_state)
 				{
 					case CircuitState.Closed:
@@ -102,6 +113,10 @@ namespace Voyager.Common.Resilience
 						{
 							_state = CircuitState.HalfOpen;
 							_halfOpenAttempts = 0;
+
+							// Notify state change
+							OnStateChanged?.Invoke(oldState, _state, _failureCount, _lastError);
+
 							return Result<bool>.Success(true);
 						}
 
@@ -120,6 +135,10 @@ namespace Voyager.Common.Resilience
 						// Exceeded half-open attempts - reopen circuit
 						_state = CircuitState.Open;
 						_openedAt = DateTime.UtcNow;
+
+						// Notify state change
+						OnStateChanged?.Invoke(oldState, _state, _failureCount, _lastError);
+
 						return _lastError != null
 							? Result<bool>.Failure(Error.CircuitBreakerOpenError(_lastError))
 							: Result<bool>.Failure(Error.CircuitBreakerOpenError("Circuit breaker reopened after half-open failures"));
@@ -142,6 +161,7 @@ namespace Voyager.Common.Resilience
 			await _lock.WaitAsync().ConfigureAwait(false);
 			try
 			{
+				var oldState = _state;
 				_failureCount = 0;
 				_lastError = null;
 
@@ -150,6 +170,12 @@ namespace Voyager.Common.Resilience
 					// Success in half-open state - close circuit
 					_state = CircuitState.Closed;
 					_halfOpenAttempts = 0;
+				}
+
+				// Notify if state changed
+				if (oldState != _state)
+				{
+					OnStateChanged?.Invoke(oldState, _state, _failureCount, null);
 				}
 			}
 			finally
@@ -175,6 +201,7 @@ namespace Voyager.Common.Resilience
 			await _lock.WaitAsync().ConfigureAwait(false);
 			try
 			{
+				var oldState = _state;
 				_failureCount++;
 				_lastError = error;
 
@@ -190,6 +217,12 @@ namespace Voyager.Common.Resilience
 					// Exceeded threshold - open circuit
 					_state = CircuitState.Open;
 					_openedAt = DateTime.UtcNow;
+				}
+
+				// Notify if state changed
+				if (oldState != _state)
+				{
+					OnStateChanged?.Invoke(oldState, _state, _failureCount, _lastError);
 				}
 			}
 			finally
@@ -217,11 +250,18 @@ namespace Voyager.Common.Resilience
 			await _lock.WaitAsync().ConfigureAwait(false);
 			try
 			{
+				var oldState = _state;
 				_state = CircuitState.Closed;
 				_failureCount = 0;
 				_halfOpenAttempts = 0;
 				_lastError = null;
 				_openedAt = DateTime.MinValue;
+
+				// Notify if state changed
+				if (oldState != _state)
+				{
+					OnStateChanged?.Invoke(oldState, _state, _failureCount, null);
+				}
 			}
 			finally
 			{

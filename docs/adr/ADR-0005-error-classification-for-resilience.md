@@ -1,6 +1,6 @@
 # ADR-0005: Klasyfikacja Błędów dla Wzorców Resilience
 
-**Status:** Propozycja
+**Status:** Zaakceptowano
 **Data:** 2026-01-31
 **Kontekst:** Voyager.Common.Proxy (ADR-007, ADR-008)
 
@@ -23,7 +23,7 @@ Istniejące wartości w `ErrorType`:
 
 ## Decyzja
 
-### 1. Nowe wartości ErrorType
+### 1. Nowa wartość ErrorType
 
 ```csharp
 public enum ErrorType
@@ -33,14 +33,11 @@ public enum ErrorType
     /// <summary>
     /// Rate limiting - too many requests (HTTP 429)
     /// </summary>
-    TooManyRequests,
-
-    /// <summary>
-    /// Feature not implemented (HTTP 501)
-    /// </summary>
-    NotImplemented
+    TooManyRequests
 }
 ```
+
+> **Decyzja:** Nie dodajemy `NotImplemented` - brak konkretnego use case w projekcie.
 
 ### 2. Extension methods - ErrorTypeExtensions.cs
 
@@ -89,15 +86,20 @@ namespace Voyager.Common.Results
         {
             return errorType is
                 ErrorType.Database or
-                ErrorType.Unexpected or
-                ErrorType.NotImplemented;
+                ErrorType.Unexpected;
         }
 
         /// <summary>
         /// Should circuit breaker count this error toward failure threshold?
+        /// CircuitBreakerOpen is excluded - it's a protection mechanism, not a real failure.
         /// </summary>
         public static bool ShouldCountForCircuitBreaker(this ErrorType errorType)
         {
+            // CircuitBreakerOpen is transient (can retry later) but should NOT
+            // count toward circuit breaker threshold - it's already a protection mechanism
+            if (errorType == ErrorType.CircuitBreakerOpen)
+                return false;
+
             return IsTransient(errorType) || IsInfrastructureError(errorType);
         }
 
@@ -130,7 +132,6 @@ namespace Voyager.Common.Results
                 ErrorType.CircuitBreakerOpen => 503,
                 ErrorType.Database => 500,
                 ErrorType.Unexpected => 500,
-                ErrorType.NotImplemented => 501,
                 _ => 500
             };
         }
@@ -138,7 +139,7 @@ namespace Voyager.Common.Results
 }
 ```
 
-### 3. Factory methods dla nowych ErrorType
+### 3. Factory methods dla TooManyRequests
 
 ```csharp
 // W klasie Error - dodać:
@@ -148,12 +149,6 @@ public static Error TooManyRequestsError(string code, string message) =>
 
 public static Error TooManyRequestsError(string message) =>
     new(ErrorType.TooManyRequests, "RateLimit.Exceeded", message);
-
-public static Error NotImplementedError(string code, string message) =>
-    new(ErrorType.NotImplemented, code, message);
-
-public static Error NotImplementedError(string message) =>
-    new(ErrorType.NotImplemented, "NotImplemented", message);
 ```
 
 ## Klasyfikacja błędów
@@ -170,10 +165,11 @@ public static Error NotImplementedError(string message) =>
 | `TooManyRequests` | 429 | Transient | ✅ | ✅ |
 | `Timeout` | 504 | Transient | ✅ | ✅ |
 | `Unavailable` | 503 | Transient | ✅ | ✅ |
-| `CircuitBreakerOpen` | 503 | Transient | ✅ | ✅ |
+| `CircuitBreakerOpen` | 503 | Transient | ✅ | ❌ * |
 | `Database` | 500 | Infrastructure | ❌ | ✅ |
 | `Unexpected` | 500 | Infrastructure | ❌ | ✅ |
-| `NotImplemented` | 501 | Infrastructure | ❌ | ✅ |
+
+> \* `CircuitBreakerOpen` jest transient (można retry), ale NIE liczy się do progu CB - to mechanizm ochronny, nie prawdziwy błąd.
 
 ## Testy jednostkowe
 
@@ -206,6 +202,7 @@ public class ErrorTypeExtensionsTests
     [InlineData(ErrorType.Timeout, true)]
     [InlineData(ErrorType.Database, true)]
     [InlineData(ErrorType.Validation, false)]
+    [InlineData(ErrorType.CircuitBreakerOpen, false)] // Protection mechanism, not a real failure
     public void ShouldCountForCircuitBreaker_ReturnsCorrectValue(ErrorType type, bool expected)
     {
         type.ShouldCountForCircuitBreaker().Should().Be(expected);
@@ -217,7 +214,6 @@ public class ErrorTypeExtensionsTests
     [InlineData(ErrorType.Timeout, 504)]
     [InlineData(ErrorType.Unavailable, 503)]
     [InlineData(ErrorType.TooManyRequests, 429)]
-    [InlineData(ErrorType.NotImplemented, 501)]
     public void ToHttpStatusCode_ReturnsCorrectCode(ErrorType type, int expected)
     {
         type.ToHttpStatusCode().Should().Be(expected);
@@ -227,11 +223,10 @@ public class ErrorTypeExtensionsTests
 
 ## Implementacja
 
-- [ ] Dodać `TooManyRequests` do `ErrorType`
-- [ ] Dodać `NotImplemented` do `ErrorType`
-- [ ] Utworzyć `ErrorTypeExtensions.cs`
-- [ ] Dodać factory methods do `Error`
-- [ ] Testy jednostkowe
+- [x] Dodać `TooManyRequests` do `ErrorType`
+- [x] Utworzyć `ErrorTypeExtensions.cs`
+- [x] Dodać factory methods `TooManyRequestsError` do `Error`
+- [x] Testy jednostkowe
 - [ ] Wydać jako wersję 1.7.0
 
 ## Wpływ na Voyager.Common.Proxy

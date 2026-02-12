@@ -132,13 +132,13 @@ public class ResultTests
 	[Fact]
 	public void Try_WithExceptionThrowingAction_ReturnsFailure()
 	{
-		// Act
-		var result = Result.Try(() => throw new InvalidOperationException("Test exception"));
+		// Act - use NotSupportedException which maps to Unexpected
+		var result = Result.Try(() => throw new NotSupportedException("Test exception"));
 
 		// Assert
 		Assert.False(result.IsSuccess);
 		Assert.Equal(ErrorType.Unexpected, result.Error.Type);
-		Assert.Equal("Exception", result.Error.Code);
+		Assert.Equal("Exception.NotSupportedException", result.Error.Code);
 		Assert.Equal("Test exception", result.Error.Message);
 	}
 

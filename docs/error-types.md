@@ -273,46 +273,110 @@ catch (Exception ex)
 
 ### FromException
 
-Converts an exception to an error.
+Converts an exception to an error with automatic type mapping and full diagnostic details.
 
 ```csharp
-try
-{
-    // risky operation
-}
-catch (TimeoutException ex)
-{
-    return Error.TimeoutError("Operation timed out", ex);
-}
-catch (HttpRequestException ex)
-{
-    return Error.UnavailableError("Service unavailable", ex);
-}
-catch (Exception ex)
-{
-    return Error.FromException(ex);
-}
+// Automatic mapping - exception type determines ErrorType
+var error = Error.FromException(new TimeoutException("Query timeout"));
+// error.Type == ErrorType.Timeout
+// error.Code == "Exception.TimeoutException"
+// error.StackTrace, error.ExceptionType, error.Source are preserved
+// error.InnerError is set from exception.InnerException
 
-// Preserves exception type in error message
-// TimeoutException → "TimeoutException: Operation timed out"
+// Override automatic mapping
+var error = Error.FromException(exception, ErrorType.Database);
+
+// Exception type → ErrorType mapping:
+// OperationCanceledException    → Cancelled
+// TimeoutException              → Timeout
+// ArgumentException             → Validation
+// InvalidOperationException     → Business
+// KeyNotFoundException          → NotFound
+// UnauthorizedAccessException   → Permission
+// *Sql*/*Db* exceptions         → Database
+// HttpRequestException/Socket   → Unavailable
+// Other                         → Unexpected
+```
+
+**GC-Safe:** `FromException` copies exception data as strings. The original `Exception` object is NOT stored, allowing GC to collect it immediately.
+
+```csharp
+// ✅ Safe - no memory leak
+var errors = new List<Error>();
+foreach (var item in items)
+{
+    try { Process(item); }
+    catch (Exception ex)
+    {
+        errors.Add(Error.FromException(ex));
+        // Exception can be garbage collected
+    }
+}
 ```
 
 **When to use:**
 - Converting exceptions to Results
-- Logging and error tracking
-- Preserving exception details
+- Preserving stack trace and exception details
+- Automatic error type classification
 
 ## Error Properties
 
 Every error has these properties:
 
 ```csharp
-public class Error
+public sealed record Error
 {
-    public ErrorType Type { get; }      // Category of error
-    public string Code { get; }         // Optional error code
-    public string Message { get; }      // Human-readable message
+    public ErrorType Type { get; }       // Category of error
+    public string Code { get; }          // Error code for localization/handling
+    public string Message { get; }       // Human-readable message
+
+    // Error chaining (ADR-006)
+    public Error? InnerError { get; }    // Inner error (like InnerException)
+
+    // Exception details (ADR-007) - only set by FromException()
+    public string? StackTrace { get; }   // Stack trace as string
+    public string? ExceptionType { get; } // Full exception type name
+    public string? Source { get; }       // Source assembly/module
 }
+```
+
+### Error Chaining
+
+Chain errors to track origin across service calls:
+
+```csharp
+// Create error chain
+var inner = Error.NotFoundError("Product.NotFound", "Product 123 not found");
+var outer = Error.UnavailableError("Order.Failed", "Cannot process order")
+    .WithInner(inner);
+
+// Access chain
+outer.InnerError           // → inner error
+outer.GetRootCause()       // → finds deepest error in chain
+outer.HasInChain(e => e.Type == ErrorType.NotFound) // → true
+
+// Add context when calling external services
+var result = await _productService.GetAsync(id)
+    .AddErrorContextAsync("ProductService", "GetProduct");
+```
+
+### Detailed Logging
+
+Get formatted error output with stack trace:
+
+```csharp
+var error = Error.FromException(exception);
+Console.WriteLine(error.ToDetailedString());
+
+// Output:
+// [Database] Exception.SqlException: Connection failed
+//   Exception: System.Data.SqlClient.SqlException
+//   Source: MyApp.DataAccess
+//   Stack Trace:
+//     at Repository.Query() in Repository.cs:line 42
+//     at Service.GetData() in Service.cs:line 18
+//   Caused by:
+//     [Unavailable] Exception.SocketException: Network unreachable
 ```
 
 ### Error Type Enum
@@ -320,17 +384,115 @@ public class Error
 ```csharp
 public enum ErrorType
 {
-    None,          // No error (success state)
-    Validation,    // Input validation errors
-    Permission,    // Authorization failures
-    Database,      // Database errors
-    Business,      // Business logic violations
-    NotFound,      // Resource not found
-    Conflict,      // Duplicate or conflict
-    Unavailable,   // Temporary unavailability
-    Timeout,       // Operation timeout
-    Unexpected     // Unexpected errors
+    None,              // No error (success state)
+    Validation,        // Input validation errors
+    Permission,        // Authorization failures (403)
+    Unauthorized,      // Not authenticated (401)
+    Database,          // Database errors
+    Business,          // Business logic violations
+    NotFound,          // Resource not found (404)
+    Conflict,          // Duplicate or conflict (409)
+    Unavailable,       // Temporary unavailability (503)
+    Timeout,           // Operation timeout (504)
+    Cancelled,         // Operation cancelled
+    Unexpected,        // Unexpected errors (500)
+    CircuitBreakerOpen, // Circuit breaker is open (503)
+    TooManyRequests    // Rate limiting (429)
 }
+```
+
+### TooManyRequestsError
+
+Used specifically for rate limiting scenarios (HTTP 429).
+
+```csharp
+Error.TooManyRequestsError("API rate limit exceeded")
+Error.TooManyRequestsError("RateLimit.Exceeded", "Too many requests. Retry after 60 seconds")
+
+// Common use cases
+Error.TooManyRequestsError("Daily API quota exceeded")
+Error.TooManyRequestsError("Request.Throttled", "Request throttled - max 100 requests per minute")
+```
+
+**When to use:**
+- API rate limiting (429 Too Many Requests)
+- Request throttling
+- Quota exceeded
+
+**HTTP Status Code:** 429 Too Many Requests
+
+### CircuitBreakerOpenError
+
+Used when circuit breaker is in open state, protecting the system from cascading failures.
+
+```csharp
+Error.CircuitBreakerOpenError("Service protection active - too many recent failures")
+Error.CircuitBreakerOpenError(lastError) // Preserves context from last failure
+
+// Common use cases - typically created by CircuitBreakerPolicy
+var result = await operation.BindWithCircuitBreakerAsync(func, policy);
+// If circuit is open: result.Error.Type == ErrorType.CircuitBreakerOpen
+```
+
+**When to use:**
+- Circuit breaker pattern implementation
+- Service protection from cascading failures
+- Fail-fast when downstream service is known to be down
+
+**HTTP Status Code:** 503 Service Unavailable
+
+## Error Type Extensions (ADR-005)
+
+Extension methods for error classification in resilience patterns:
+
+```csharp
+using Voyager.Common.Results.Extensions;
+
+// Classification methods
+errorType.IsTransient()         // Timeout, Unavailable, CircuitBreakerOpen, TooManyRequests
+errorType.IsBusinessError()     // Validation, NotFound, Permission, Business, Conflict, Cancelled
+errorType.IsInfrastructureError() // Database, Unexpected
+
+// Resilience decisions
+errorType.ShouldRetry()         // Same as IsTransient()
+errorType.ShouldCountForCircuitBreaker() // Transient + Infrastructure (excludes CircuitBreakerOpen)
+
+// HTTP mapping
+errorType.ToHttpStatusCode()    // Returns appropriate HTTP status code
+```
+
+### Error Classification Table
+
+| ErrorType | Transient | Business | Infrastructure | Retry? | CB Counts? | HTTP |
+|-----------|:---------:|:--------:|:--------------:|:------:|:----------:|:----:|
+| Validation | | ✅ | | ❌ | ❌ | 400 |
+| Business | | ✅ | | ❌ | ❌ | 400 |
+| NotFound | | ✅ | | ❌ | ❌ | 404 |
+| Permission | | ✅ | | ❌ | ❌ | 403 |
+| Unauthorized | | ✅ | | ❌ | ❌ | 401 |
+| Conflict | | ✅ | | ❌ | ❌ | 409 |
+| Cancelled | | ✅ | | ❌ | ❌ | 499 |
+| Timeout | ✅ | | | ✅ | ✅ | 504 |
+| Unavailable | ✅ | | | ✅ | ✅ | 503 |
+| TooManyRequests | ✅ | | | ✅ | ✅ | 429 |
+| CircuitBreakerOpen | ✅ | | | ✅ | ❌* | 503 |
+| Database | | | ✅ | ❌ | ✅ | 500 |
+| Unexpected | | | ✅ | ❌ | ✅ | 500 |
+
+\* CircuitBreakerOpen is transient but doesn't count for circuit breaker (it's a protection mechanism).
+
+### Usage in Resilience Patterns
+
+```csharp
+// Instead of manual checks
+if (error.Type == ErrorType.Timeout || error.Type == ErrorType.Unavailable) { /* retry */ }
+
+// Use extension methods
+if (error.Type.ShouldRetry()) { /* retry */ }
+if (error.Type.ShouldCountForCircuitBreaker()) { /* record failure */ }
+
+// HTTP response
+return StatusCode(error.Type.ToHttpStatusCode(), new { error.Message });
 ```
 
 ## Using Error Codes
@@ -561,6 +723,25 @@ public class CircuitBreakerService
 
 ## Mapping Errors to HTTP Status Codes
 
+Using `ToHttpStatusCode()` extension method (recommended):
+
+```csharp
+using Voyager.Common.Results.Extensions;
+
+public IActionResult ToHttpResult<T>(Result<T> result)
+{
+    return result.Match<IActionResult>(
+        onSuccess: value => Ok(value),
+        onFailure: error => StatusCode(
+            error.Type.ToHttpStatusCode(),
+            new { error.Code, error.Message }
+        )
+    );
+}
+```
+
+Or with more control:
+
 ```csharp
 public IActionResult ToHttpResult<T>(Result<T> result)
 {
@@ -571,14 +752,13 @@ public IActionResult ToHttpResult<T>(Result<T> result)
             ErrorType.Validation => BadRequest(new { error.Message, error.Code }),
             ErrorType.NotFound => NotFound(new { error.Message, error.Code }),
             ErrorType.Permission => Forbid(),
+            ErrorType.Unauthorized => Unauthorized(),
             ErrorType.Conflict => Conflict(new { error.Message, error.Code }),
-            ErrorType.Unavailable => error.Code?.Contains("RateLimit") == true
-                ? StatusCode(429, new { error.Message, error.Code, RetryAfter = "60" })
-                : StatusCode(503, new { error.Message, error.Code }),
-            ErrorType.Timeout => error.Code?.Contains("Gateway") == true
-                ? StatusCode(504, new { error.Message, error.Code })
-                : StatusCode(408, new { error.Message, error.Code }),
-            ErrorType.Database => StatusCode(503, new { error.Message }),
+            ErrorType.TooManyRequests => StatusCode(429, new { error.Message, error.Code }),
+            ErrorType.Unavailable => StatusCode(503, new { error.Message, error.Code }),
+            ErrorType.CircuitBreakerOpen => StatusCode(503, new { error.Message, error.Code }),
+            ErrorType.Timeout => StatusCode(504, new { error.Message, error.Code }),
+            ErrorType.Database => StatusCode(500, new { error.Message }),
             ErrorType.Business => BadRequest(new { error.Message, error.Code }),
             ErrorType.Unexpected => StatusCode(500, new { error.Message }),
             _ => StatusCode(500, new { error.Message })
@@ -665,25 +845,34 @@ Is the error expected in normal business flow?
    └─ Unknown/unexpected? → UnexpectedError
 ```
 
-## Common Exception to Error Mappings
+## Exception to Error Mappings (Automatic)
 
-| Exception Type | Recommended Error Type | Example |
-|---------------|----------------------|---------|
-| `ArgumentException` | `ValidationError` | Invalid input parameters |
-| `ArgumentNullException` | `ValidationError` | Required parameter missing |
-| `InvalidOperationException` | `BusinessError` | Operation not allowed in current state |
-| `UnauthorizedAccessException` | `PermissionError` | Access denied |
-| `FileNotFoundException` | `NotFoundError` | File not found |
-| `DbUpdateException` (duplicate key) | `ConflictError` | Unique constraint violation |
-| `DbUpdateException` (other) | `DatabaseError` | Database update failed |
-| `SqlException` | `DatabaseError` | SQL error |
-| `TimeoutException` | `TimeoutError` | Operation timed out |
-| `OperationCanceledException` | `TimeoutError` | Cancellation due to timeout |
-| `HttpRequestException` (503) | `UnavailableError` | Service unavailable |
-| `HttpRequestException` (429) | `UnavailableError` | Rate limit exceeded |
-| `HttpRequestException` (408) | `TimeoutError` | Request timeout |
-| `HttpRequestException` (504) | `TimeoutError` | Gateway timeout |
-| `Exception` (unknown) | `UnexpectedError` | Catch-all for unexpected errors |
+`Error.FromException()` automatically maps exception types:
+
+| Exception Type | Auto-Mapped ErrorType | Code |
+|---------------|----------------------|------|
+| `OperationCanceledException` | `Cancelled` | Exception.OperationCanceledException |
+| `TimeoutException` | `Timeout` | Exception.TimeoutException |
+| `ArgumentException` | `Validation` | Exception.ArgumentException |
+| `ArgumentNullException` | `Validation` | Exception.ArgumentNullException |
+| `InvalidOperationException` | `Business` | Exception.InvalidOperationException |
+| `KeyNotFoundException` | `NotFound` | Exception.KeyNotFoundException |
+| `UnauthorizedAccessException` | `Permission` | Exception.UnauthorizedAccessException |
+| `*Sql*Exception` | `Database` | Exception.SqlException |
+| `*Db*Exception` | `Database` | Exception.DbException |
+| `HttpRequestException` | `Unavailable` | Exception.HttpRequestException |
+| `*Socket*Exception` | `Unavailable` | Exception.SocketException |
+| `WebException` | `Unavailable` | Exception.WebException |
+| Other exceptions | `Unexpected` | Exception.{TypeName} |
+
+**Note:** You can override automatic mapping:
+```csharp
+// Use automatic mapping
+var error = Error.FromException(exception);
+
+// Override with custom type
+var error = Error.FromException(exception, ErrorType.Database);
+```
 
 ## See Also
 

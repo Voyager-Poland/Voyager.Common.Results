@@ -297,5 +297,216 @@ namespace Voyager.Common.Resilience.Tests
 			// Assert
 			Assert.Equal(CircuitState.Closed, policy.State);
 		}
+
+		// ==================== OnStateChanged Callback Tests ====================
+
+		[Fact]
+		public async Task OnStateChanged_CalledWhenCircuitOpens()
+		{
+			// Arrange
+			CircuitState? capturedOldState = null;
+			CircuitState? capturedNewState = null;
+			int? capturedFailureCount = null;
+			Error? capturedError = null;
+
+			var policy = new CircuitBreakerPolicy(failureThreshold: 2);
+			policy.OnStateChanged = (oldState, newState, failures, error) =>
+			{
+				capturedOldState = oldState;
+				capturedNewState = newState;
+				capturedFailureCount = failures;
+				capturedError = error;
+			};
+
+			var testError = Error.UnavailableError("Service unavailable");
+
+			// Act
+			await policy.RecordFailureAsync(testError);
+			await policy.RecordFailureAsync(testError);
+
+			// Assert
+			Assert.Equal(CircuitState.Closed, capturedOldState);
+			Assert.Equal(CircuitState.Open, capturedNewState);
+			Assert.Equal(2, capturedFailureCount);
+			Assert.Equal(testError, capturedError);
+		}
+
+		[Fact]
+		public async Task OnStateChanged_CalledWhenCircuitClosesFromHalfOpen()
+		{
+			// Arrange
+			var policy = new CircuitBreakerPolicy(
+				failureThreshold: 2,
+				openTimeout: TimeSpan.FromMilliseconds(50));
+			var error = Error.UnavailableError("Service unavailable");
+
+			await policy.RecordFailureAsync(error);
+			await policy.RecordFailureAsync(error);
+			await Task.Delay(100);
+			await policy.ShouldAllowRequestAsync(); // Transition to HalfOpen
+
+			CircuitState? capturedOldState = null;
+			CircuitState? capturedNewState = null;
+			policy.OnStateChanged = (oldState, newState, _, _) =>
+			{
+				capturedOldState = oldState;
+				capturedNewState = newState;
+			};
+
+			// Act
+			await policy.RecordSuccessAsync();
+
+			// Assert
+			Assert.Equal(CircuitState.HalfOpen, capturedOldState);
+			Assert.Equal(CircuitState.Closed, capturedNewState);
+		}
+
+		[Fact]
+		public async Task OnStateChanged_CalledWhenTransitioningToHalfOpen()
+		{
+			// Arrange
+			var policy = new CircuitBreakerPolicy(
+				failureThreshold: 2,
+				openTimeout: TimeSpan.FromMilliseconds(50));
+			var error = Error.UnavailableError("Service unavailable");
+
+			await policy.RecordFailureAsync(error);
+			await policy.RecordFailureAsync(error);
+			await Task.Delay(100);
+
+			CircuitState? capturedOldState = null;
+			CircuitState? capturedNewState = null;
+			policy.OnStateChanged = (oldState, newState, _, _) =>
+			{
+				capturedOldState = oldState;
+				capturedNewState = newState;
+			};
+
+			// Act
+			await policy.ShouldAllowRequestAsync();
+
+			// Assert
+			Assert.Equal(CircuitState.Open, capturedOldState);
+			Assert.Equal(CircuitState.HalfOpen, capturedNewState);
+		}
+
+		[Fact]
+		public async Task OnStateChanged_CalledWhenHalfOpenReopens()
+		{
+			// Arrange
+			var policy = new CircuitBreakerPolicy(
+				failureThreshold: 2,
+				openTimeout: TimeSpan.FromMilliseconds(50));
+			var error = Error.UnavailableError("Service unavailable");
+
+			await policy.RecordFailureAsync(error);
+			await policy.RecordFailureAsync(error);
+			await Task.Delay(100);
+			await policy.ShouldAllowRequestAsync(); // Transition to HalfOpen
+
+			CircuitState? capturedOldState = null;
+			CircuitState? capturedNewState = null;
+			policy.OnStateChanged = (oldState, newState, _, _) =>
+			{
+				capturedOldState = oldState;
+				capturedNewState = newState;
+			};
+
+			// Act
+			await policy.RecordFailureAsync(error);
+
+			// Assert
+			Assert.Equal(CircuitState.HalfOpen, capturedOldState);
+			Assert.Equal(CircuitState.Open, capturedNewState);
+		}
+
+		[Fact]
+		public async Task OnStateChanged_NotCalledForBusinessErrors()
+		{
+			// Arrange
+			var callCount = 0;
+			var policy = new CircuitBreakerPolicy(failureThreshold: 1);
+			policy.OnStateChanged = (_, _, _, _) => callCount++;
+
+			// Act - business errors should not affect state
+			await policy.RecordFailureAsync(Error.ValidationError("Invalid input"));
+			await policy.RecordFailureAsync(Error.NotFoundError("Not found"));
+			await policy.RecordFailureAsync(Error.BusinessError("Business error"));
+
+			// Assert
+			Assert.Equal(0, callCount);
+			Assert.Equal(CircuitState.Closed, policy.State);
+		}
+
+		[Fact]
+		public async Task OnStateChanged_NotCalledWhenStateDoesNotChange()
+		{
+			// Arrange
+			var callCount = 0;
+			var policy = new CircuitBreakerPolicy(failureThreshold: 5);
+			policy.OnStateChanged = (_, _, _, _) => callCount++;
+
+			// Act - failures below threshold don't change state
+			await policy.RecordFailureAsync(Error.UnavailableError("Error 1"));
+			await policy.RecordFailureAsync(Error.UnavailableError("Error 2"));
+
+			// Assert
+			Assert.Equal(0, callCount);
+			Assert.Equal(CircuitState.Closed, policy.State);
+		}
+
+		[Fact]
+		public async Task OnStateChanged_CalledOnReset()
+		{
+			// Arrange
+			var policy = new CircuitBreakerPolicy(failureThreshold: 2);
+			var error = Error.UnavailableError("Service unavailable");
+
+			await policy.RecordFailureAsync(error);
+			await policy.RecordFailureAsync(error);
+
+			CircuitState? capturedOldState = null;
+			CircuitState? capturedNewState = null;
+			policy.OnStateChanged = (oldState, newState, _, _) =>
+			{
+				capturedOldState = oldState;
+				capturedNewState = newState;
+			};
+
+			// Act
+			await policy.ResetAsync();
+
+			// Assert
+			Assert.Equal(CircuitState.Open, capturedOldState);
+			Assert.Equal(CircuitState.Closed, capturedNewState);
+		}
+
+		[Fact]
+		public async Task OnStateChanged_NotCalledOnResetWhenAlreadyClosed()
+		{
+			// Arrange
+			var callCount = 0;
+			var policy = new CircuitBreakerPolicy(failureThreshold: 5);
+			policy.OnStateChanged = (_, _, _, _) => callCount++;
+
+			// Act
+			await policy.ResetAsync();
+
+			// Assert
+			Assert.Equal(0, callCount);
+		}
+
+		[Fact]
+		public async Task OnStateChanged_NullCallback_NoException()
+		{
+			// Arrange
+			var policy = new CircuitBreakerPolicy(failureThreshold: 2);
+			policy.OnStateChanged = null;
+
+			// Act & Assert - should not throw
+			await policy.RecordFailureAsync(Error.UnavailableError("Error 1"));
+			await policy.RecordFailureAsync(Error.UnavailableError("Error 2"));
+			Assert.Equal(CircuitState.Open, policy.State);
+		}
 	}
 }

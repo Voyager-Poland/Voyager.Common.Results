@@ -173,7 +173,7 @@ public class ErrorTests
 	}
 
 	[Fact]
-	public void FromException_CreatesUnexpectedError()
+	public void FromException_MapsExceptionTypeAndPreservesDetails()
 	{
 		// Arrange
 		var exception = new InvalidOperationException("Test exception");
@@ -181,9 +181,25 @@ public class ErrorTests
 		// Act
 		var error = Error.FromException(exception);
 
+		// Assert - InvalidOperationException maps to Business
+		Assert.Equal(ErrorType.Business, error.Type);
+		Assert.Equal("Exception.InvalidOperationException", error.Code);
+		Assert.Equal("Test exception", error.Message);
+		Assert.Equal("System.InvalidOperationException", error.ExceptionType);
+	}
+
+	[Fact]
+	public void FromException_UnknownExceptionMapsToUnexpected()
+	{
+		// Arrange
+		var exception = new NotSupportedException("Test exception");
+
+		// Act
+		var error = Error.FromException(exception);
+
 		// Assert
 		Assert.Equal(ErrorType.Unexpected, error.Type);
-		Assert.Equal("Exception", error.Code);
+		Assert.Equal("Exception.NotSupportedException", error.Code);
 		Assert.Equal("Test exception", error.Message);
 	}
 

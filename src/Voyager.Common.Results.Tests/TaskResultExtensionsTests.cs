@@ -31,11 +31,11 @@ public class TaskResultExtensionsTests
 		// Arrange
 		var exceptionMessage = "Test exception";
 
-		// Act
+		// Act - use NotSupportedException which maps to Unexpected
 		var result = await TaskResultExtensions.TryAsync(async () =>
 		{
 			await Task.Delay(10);
-			throw new InvalidOperationException(exceptionMessage);
+			throw new NotSupportedException(exceptionMessage);
 		});
 
 		// Assert
@@ -117,11 +117,11 @@ public class TaskResultExtensionsTests
 		// Arrange
 		var exceptionMessage = "Test exception";
 
-		// Act
+		// Act - use NotSupportedException which maps to Unexpected
 		var result = await TaskResultExtensions.TryAsync<int>(async () =>
 		{
 			await Task.Delay(10);
-			throw new InvalidOperationException(exceptionMessage);
+			throw new NotSupportedException(exceptionMessage);
 		});
 
 		// Assert
@@ -284,9 +284,9 @@ public class TaskResultExtensionsTests
 			await Task.Delay(100, cts.Token);
 		});
 
-		// Assert
+		// Assert - OperationCanceledException now maps to Cancelled
 		Assert.True(result.IsFailure);
-		Assert.Equal(ErrorType.Unexpected, result.Error.Type);
+		Assert.Equal(ErrorType.Cancelled, result.Error.Type);
 	}
 
 	// ========== TRY ASYNC WITH CANCELLATION TOKEN TESTS ==========
@@ -335,11 +335,11 @@ public class TaskResultExtensionsTests
 		// Arrange
 		using var cts = new CancellationTokenSource();
 
-		// Act
+		// Act - use NotSupportedException which maps to Unexpected
 		var result = await TaskResultExtensions.TryAsync(async ct =>
 		{
 			await Task.Delay(10, ct);
-			throw new InvalidOperationException("Test exception");
+			throw new NotSupportedException("Test exception");
 		}, cts.Token);
 
 		// Assert
@@ -432,11 +432,11 @@ public class TaskResultExtensionsTests
 		// Arrange
 		using var cts = new CancellationTokenSource();
 
-		// Act
+		// Act - use NotSupportedException which maps to Unexpected
 		var result = await TaskResultExtensions.TryAsync<int>(async ct =>
 		{
 			await Task.Delay(10, ct);
-			throw new InvalidOperationException("Func exception");
+			throw new NotSupportedException("Func exception");
 		}, cts.Token);
 
 		// Assert

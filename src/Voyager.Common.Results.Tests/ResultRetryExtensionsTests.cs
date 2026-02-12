@@ -474,4 +474,189 @@ public class ResultRetryExtensionsTests
 		Assert.True(outcome.IsSuccess);
 		Assert.Equal(3, callCount);
 	}
+
+	// ==================== OnRetryAttempt Callback Tests ====================
+
+	[Fact]
+	public async Task OnRetryAttempt_CalledForEachFailedAttempt()
+	{
+		// Arrange
+		var attempts = new List<(int attempt, ErrorType errorType, int delay)>();
+		var callCount = 0;
+
+		var result = Result<int>.Success(1);
+
+		// Act
+		var outcome = await result.BindWithRetryAsync(
+			async _ =>
+			{
+				callCount++;
+				await Task.Delay(1);
+				if (callCount < 3)
+					return Result<string>.Failure(Error.UnavailableError("Service down"));
+				return Result<string>.Success("OK");
+			},
+			RetryPolicies.TransientErrors(maxAttempts: 5, baseDelayMs: 10),
+			onRetryAttempt: (attempt, error, delay) =>
+			{
+				attempts.Add((attempt, error.Type, delay));
+			});
+
+		// Assert
+		Assert.True(outcome.IsSuccess);
+		Assert.Equal(2, attempts.Count); // 2 failures before success
+		Assert.Equal(1, attempts[0].attempt);
+		Assert.Equal(ErrorType.Unavailable, attempts[0].errorType);
+		Assert.Equal(10, attempts[0].delay); // First delay
+		Assert.Equal(2, attempts[1].attempt);
+		Assert.Equal(20, attempts[1].delay); // Exponential backoff
+	}
+
+	[Fact]
+	public async Task OnRetryAttempt_CalledWithZeroDelay_WhenNoMoreRetries()
+	{
+		// Arrange
+		int? lastDelay = null;
+		int? lastAttempt = null;
+
+		var result = Result<int>.Success(1);
+
+		// Act
+		var outcome = await result.BindWithRetryAsync(
+			async _ =>
+			{
+				await Task.Delay(1);
+				return Result<string>.Failure(Error.UnavailableError("Always fails"));
+			},
+			RetryPolicies.TransientErrors(maxAttempts: 2, baseDelayMs: 10),
+			onRetryAttempt: (attempt, _, delay) =>
+			{
+				lastAttempt = attempt;
+				lastDelay = delay;
+			});
+
+		// Assert
+		Assert.True(outcome.IsFailure);
+		Assert.Equal(2, lastAttempt); // Final attempt
+		Assert.Equal(0, lastDelay); // No more retries
+	}
+
+	[Fact]
+	public async Task OnRetryAttempt_NotCalled_WhenFirstAttemptSucceeds()
+	{
+		// Arrange
+		var called = false;
+		var result = Result<int>.Success(1);
+
+		// Act
+		var outcome = await result.BindWithRetryAsync(
+			async _ =>
+			{
+				await Task.Delay(1);
+				return Result<string>.Success("OK");
+			},
+			RetryPolicies.TransientErrors(),
+			onRetryAttempt: (_, _, _) => called = true);
+
+		// Assert
+		Assert.True(outcome.IsSuccess);
+		Assert.False(called);
+	}
+
+	[Fact]
+	public async Task OnRetryAttempt_NotCalled_ForNonTransientErrors()
+	{
+		// Arrange
+		var called = false;
+		var result = Result<int>.Success(1);
+
+		// Act
+		var outcome = await result.BindWithRetryAsync(
+			async _ =>
+			{
+				await Task.Delay(1);
+				return Result<string>.Failure(Error.ValidationError("Invalid input"));
+			},
+			RetryPolicies.TransientErrors(),
+			onRetryAttempt: (_, _, _) => called = true);
+
+		// Assert
+		Assert.True(outcome.IsFailure);
+		Assert.Equal(ErrorType.Validation, outcome.Error.Type);
+		Assert.False(called); // Non-transient = no retry = no callback
+	}
+
+	[Fact]
+	public async Task OnRetryAttempt_NullCallback_NoException()
+	{
+		// Arrange
+		var result = Result<int>.Success(1);
+		var callCount = 0;
+
+		// Act & Assert - should not throw
+		var outcome = await result.BindWithRetryAsync(
+			async _ =>
+			{
+				callCount++;
+				await Task.Delay(1);
+				if (callCount < 2)
+					return Result<string>.Failure(Error.UnavailableError("Fail"));
+				return Result<string>.Success("OK");
+			},
+			RetryPolicies.TransientErrors(maxAttempts: 3, baseDelayMs: 10),
+			onRetryAttempt: null);
+
+		Assert.True(outcome.IsSuccess);
+		Assert.Equal(2, callCount);
+	}
+
+	[Fact]
+	public async Task OnRetryAttempt_TaskOverload_CalledCorrectly()
+	{
+		// Arrange
+		var attempts = new List<int>();
+		var callCount = 0;
+		var resultTask = Task.FromResult(Result<int>.Success(1));
+
+		// Act
+		var outcome = await resultTask.BindWithRetryAsync(
+			async _ =>
+			{
+				callCount++;
+				await Task.Delay(1);
+				if (callCount < 3)
+					return Result<string>.Failure(Error.TimeoutError("Timeout"));
+				return Result<string>.Success("OK");
+			},
+			RetryPolicies.TransientErrors(maxAttempts: 5, baseDelayMs: 10),
+			onRetryAttempt: (attempt, _, _) => attempts.Add(attempt));
+
+		// Assert
+		Assert.True(outcome.IsSuccess);
+		Assert.Equal(new[] { 1, 2 }, attempts);
+	}
+
+	[Fact]
+	public async Task OnRetryAttempt_ReceivesCorrectErrorInfo()
+	{
+		// Arrange
+		Error? capturedError = null;
+		var result = Result<int>.Success(1);
+
+		// Act
+		await result.BindWithRetryAsync(
+			async _ =>
+			{
+				await Task.Delay(1);
+				return Result<string>.Failure(Error.TimeoutError("Request.Timeout", "Connection timed out after 30s"));
+			},
+			RetryPolicies.TransientErrors(maxAttempts: 3, baseDelayMs: 10),
+			onRetryAttempt: (_, error, _) => capturedError = error);
+
+		// Assert
+		Assert.NotNull(capturedError);
+		Assert.Equal(ErrorType.Timeout, capturedError!.Type);
+		Assert.Equal("Request.Timeout", capturedError.Code);
+		Assert.Equal("Connection timed out after 30s", capturedError.Message);
+	}
 }

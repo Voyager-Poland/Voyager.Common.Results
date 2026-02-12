@@ -100,7 +100,15 @@ Task<Result<TOut>> BindWithRetryAsync<TIn, TOut>(
     RetryPolicy policy
 )
 
-// Task<Result> overload
+// Retry with policy and callback
+Task<Result<TOut>> BindWithRetryAsync<TIn, TOut>(
+    this Result<TIn> result,
+    Func<TIn, Task<Result<TOut>>> func,
+    RetryPolicy policy,
+    Action<int, Error, int>? onRetryAttempt  // (attempt, error, delayMs)
+)
+
+// Task<Result> overloads (same patterns)
 Task<Result<TOut>> BindWithRetryAsync<TIn, TOut>(
     this Task<Result<TIn>> resultTask,
     Func<TIn, Task<Result<TOut>>> func,
@@ -330,13 +338,41 @@ Retry is for **isolated transient failures**. If you need to detect and prevent 
 // Circuit Breaker = "This service is unhealthy, stop calling it"
 ```
 
+### Retry Attempt Callbacks
+
+Monitor retry attempts for logging, metrics, and debugging:
+
+```csharp
+var result = await operation.BindWithRetryAsync(
+    async value => await _httpClient.GetAsync(value),
+    RetryPolicies.TransientErrors(maxAttempts: 3),
+    onRetryAttempt: (attempt, error, delayMs) =>
+    {
+        _logger.LogWarning(
+            "Attempt {Attempt} failed: {Error}. Retrying in {Delay}ms",
+            attempt, error.Message, delayMs);
+
+        _metrics.IncrementCounter($"retry_{error.Type}");
+    });
+```
+
+**Callback parameters:**
+- `attempt` - 1-based attempt number that just failed
+- `error` - The error from the failed attempt
+- `delayMs` - Delay before next attempt (0 = no more retries)
+
+**Note:** Callback is NOT called for non-transient errors (no retry = no callback).
+
 ### Best Practices
 
 1. **Default to TransientErrors()** - covers 90% of cases
-2. **Log retry attempts** - use `TapError` for observability:
+2. **Use retry callbacks for observability** - instead of `TapError`:
    ```csharp
-   .BindWithRetryAsync(op, RetryPolicies.TransientErrors())
-   .TapError(e => _logger.LogWarning("Operation failed after retries: {Error}", e))
+   .BindWithRetryAsync(
+       op,
+       RetryPolicies.TransientErrors(),
+       onRetryAttempt: (attempt, error, delay) =>
+           _logger.LogWarning("Retry {Attempt}: {Error}", attempt, error.Message))
    ```
 3. **Set reasonable max attempts** - balance resilience vs latency
 4. **Use jitter in distributed systems** - prevents thundering herd
