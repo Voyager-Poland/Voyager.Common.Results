@@ -32,4 +32,12 @@
 	<ItemGroup>
 		<None Include="$(MSBuildThisFileDirectory)..\..\README.md" Pack="true" PackagePath="\" />
 	</ItemGroup>
+
+	<!-- Include Roslyn Analyzer in package (ADR-0010) -->
+	<ItemGroup>
+		<None Include="$(MSBuildThisFileDirectory)..\Voyager.Common.Results.Analyzers\bin\$(Configuration)\netstandard2.0\Voyager.Common.Results.Analyzers.dll"
+					Pack="true"
+					PackagePath="analyzers/dotnet/cs"
+					Visible="false" />
+	</ItemGroup>
 </Project>

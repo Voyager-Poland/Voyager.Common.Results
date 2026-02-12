@@ -1,0 +1,306 @@
+# ADR-0010: Roslyn Analyzer wymuszający konsumpcję Result
+
+**Status:** Zaproponowano
+**Data:** 2026-02-11
+**Kontekst:** Voyager.Common.Results
+
+## Problem
+
+Metoda zwracająca `Result` lub `Result<T>` może zostać wywołana bez sprawdzenia wyniku. W przeciwieństwie do wyjątków, które przerywają wykonanie, zignorowany `Result` powoduje **ciche zgubienie błędu**:
+
+```csharp
+// Wyjątek - nie da się zignorować
+void UpdateUser(User u) { throw new InvalidOperationException("DB error"); }
+UpdateUser(user); // 💥 crash — wiadomo że się nie udało
+
+// Result - łatwo zignorować
+Result UpdateUser(User u) => Result.Failure(Error.DatabaseError("Connection refused"));
+UpdateUser(user); // ✅ kompiluje się — błąd przepadł w ciszy
+```
+
+**Konsekwencje zignorowanego Result:**
+1. Użytkownik nie widzi informacji o błędzie
+2. Dalszy kod operuje na niespójnym stanie (np. zakłada że user został zapisany)
+3. Debugging jest utrudniony — brak śladu po operacji, która się nie powiodła
+4. Podważa sens stosowania wzorca Result zamiast wyjątków
+
+**Problem jest szczególnie groźny przy migracji z void/exception na Result** — programista zmienia sygnaturę metody z `void` na `Result`, ale callsite'y nie są zaktualizowane i kompilują się bez ostrzeżeń.
+
+## Decyzja
+
+Stworzyć Roslyn Analyzer dostarczany jako część pakietu NuGet `Voyager.Common.Results`, który generuje **warning** gdy wartość `Result` lub `Result<T>` nie jest skonsumowana.
+
+### Diagnostyka
+
+| ID | Severity | Komunikat |
+|---|---|---|
+| `VCR0010` | Warning | Result of '{methodName}' must be checked. Ignoring a Result silently discards potential errors. |
+
+### Co jest traktowane jako konsumpcja
+
+Analyzer **NIE** zgłasza warningów w następujących przypadkach:
+
+```csharp
+// 1. Przypisanie do zmiennej
+var result = UpdateUser(user);
+
+// 2. Jawny discard
+_ = UpdateUser(user);
+
+// 3. Użycie w wyrażeniu (method chaining)
+UpdateUser(user).Switch(
+    () => Console.WriteLine("OK"),
+    err => Console.WriteLine(err.Message));
+
+// 4. Przekazanie jako argument
+LogResult(UpdateUser(user));
+
+// 5. Return
+return UpdateUser(user);
+
+// 6. Użycie w warunku
+if (UpdateUser(user).IsSuccess) { ... }
+
+// 7. Await na Task<Result>
+var result = await UpdateUserAsync(user);
+await UpdateUserAsync(user); // ⚠ TO powinno być wykrywane — Task<Result> skonsumowany, ale Result nie
+```
+
+### Co jest traktowane jako niekonsumpcja
+
+```csharp
+// ExpressionStatement, gdzie wyrażenie zwraca Result/Result<T>
+UpdateUser(user);                    // ⚠ VCR0010
+await UpdateUserAsync(user);         // ⚠ VCR0010 (Task skonsumowany, Result nie)
+```
+
+### Struktura projektu
+
+```
+src/
+  Voyager.Common.Results.Analyzers/
+    Voyager.Common.Results.Analyzers.csproj    // netstandard2.0 (wymagane dla Roslyn)
+    ResultMustBeConsumedAnalyzer.cs             // DiagnosticAnalyzer
+    ResultMustBeConsumedCodeFixProvider.cs      // CodeFix: dodaj `_ = ` lub `var result = `
+  Voyager.Common.Results.Analyzers.Tests/
+    Voyager.Common.Results.Analyzers.Tests.csproj
+    ResultMustBeConsumedAnalyzerTests.cs
+```
+
+### Dostarczanie via NuGet
+
+Analyzer jest pakowany razem z biblioteką w `Voyager.Common.Results.csproj`:
+
+```xml
+<ItemGroup>
+  <None Include="..\Voyager.Common.Results.Analyzers\bin\$(Configuration)\netstandard2.0\Voyager.Common.Results.Analyzers.dll"
+        Pack="true"
+        PackagePath="analyzers/dotnet/cs"
+        Visible="false" />
+</ItemGroup>
+```
+
+Dzięki temu każdy konsument pakietu automatycznie otrzymuje analyzer — nie trzeba instalować dodatkowego NuGet.
+
+### Implementacja analyzera (szkic)
+
+```csharp
+[DiagnosticAnalyzer(LanguageNames.CSharp)]
+public sealed class ResultMustBeConsumedAnalyzer : DiagnosticAnalyzer
+{
+    public const string DiagnosticId = "VCR0010";
+
+    private static readonly DiagnosticDescriptor Rule = new(
+        id: DiagnosticId,
+        title: "Result must be consumed",
+        messageFormat: "Result of '{0}' must be checked. Ignoring a Result silently discards potential errors.",
+        category: "Usage",
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: "Methods returning Result or Result<T> must have their return value checked. "
+                   + "Ignoring the result means errors are silently lost.");
+
+    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => [Rule];
+
+    public override void Initialize(AnalysisContext context)
+    {
+        context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
+        context.EnableConcurrentExecution();
+        context.RegisterOperationAction(AnalyzeExpressionStatement, OperationKind.ExpressionStatement);
+    }
+
+    private static void AnalyzeExpressionStatement(OperationAnalysisContext context)
+    {
+        var expressionStatement = (IExpressionStatementOperation)context.Operation;
+        var operation = expressionStatement.Operation;
+
+        // Obsługa await — sprawdź typ wewnętrzny Task<Result>
+        if (operation is IAwaitOperation awaitOp)
+            operation = awaitOp.Operation;
+
+        var returnType = operation switch
+        {
+            IInvocationOperation invocation => invocation.TargetMethod.ReturnType,
+            IPropertyReferenceOperation prop => prop.Type,
+            _ => null
+        };
+
+        if (returnType is null) return;
+
+        // Unwrap Task<T> → T
+        if (returnType is INamedTypeSymbol { IsGenericType: true } namedType
+            && namedType.OriginalDefinition.ToDisplayString() == "System.Threading.Tasks.Task<TResult>")
+        {
+            returnType = namedType.TypeArguments[0];
+        }
+
+        if (!IsResultType(returnType)) return;
+
+        var methodName = operation switch
+        {
+            IInvocationOperation inv => inv.TargetMethod.Name,
+            _ => returnType.Name
+        };
+
+        context.ReportDiagnostic(
+            Diagnostic.Create(Rule, expressionStatement.Syntax.GetLocation(), methodName));
+    }
+
+    private static bool IsResultType(ITypeSymbol? type)
+    {
+        if (type is null) return false;
+
+        // Sprawdź Result i Result<T> z namespace Voyager.Common.Results
+        return type.Name is "Result"
+            && type.ContainingNamespace?.ToDisplayString() == "Voyager.Common.Results";
+    }
+}
+```
+
+### Code Fix Provider
+
+```csharp
+[ExportCodeFixProvider(LanguageNames.CSharp)]
+public sealed class ResultMustBeConsumedCodeFixProvider : CodeFixProvider
+{
+    // Oferuje dwie opcje naprawy:
+    // 1. "Assign to variable" → var result = UpdateUser(user);
+    // 2. "Discard result"     → _ = UpdateUser(user);
+}
+```
+
+## Alternatywy rozważone
+
+### Alternatywa 1: Atrybut `[MustUseReturnValue]` z JetBrains.Annotations
+
+```csharp
+[MustUseReturnValue("Result must be checked")]
+public Result UpdateUser(User u) { ... }
+```
+
+**Odrzucona:**
+- Działa **tylko** w ReSharper/Rider — nie w VS Code, Visual Studio bez ReSharper, ani na CI (`dotnet build`)
+- Wymaga dodania atrybutu na każdej metodzie zwracającej Result (łatwo zapomnieć)
+- Zależność od pakietu JetBrains.Annotations
+
+### Alternatywa 2: Reguła `.editorconfig` CA1806
+
+```ini
+dotnet_diagnostic.CA1806.severity = warning
+```
+
+**Odrzucona:**
+- CA1806 ("Do not ignore method return values") domyślnie dotyczy tylko wybranych metod BCL
+- Konfiguracja typów jest ograniczona i nieelegancka
+- Nie można dostosować komunikatu błędu
+
+### Alternatywa 3: Destruktor/Finalizer w Result
+
+```csharp
+public class Result : IDisposable
+{
+    private bool _consumed;
+    ~Result() { if (!_consumed) Debug.Fail("Result not consumed"); }
+}
+```
+
+**Odrzucona:**
+- Result jest `record` (value semantics) — dodanie finalizer zmienia semantykę
+- Wydajność: finalizer queue, GC pressure
+- Nieprzewidywalny timing (GC non-deterministic)
+- Nie działa w compile-time — błąd dopiero w runtime (i to z opóźnieniem)
+
+### Alternatywa 4: Brak mechanizmu (status quo)
+
+**Odrzucona:**
+- Problem jest realny — ciche gubienie błędów podważa sens wzorca Result
+- Inne ekosystemy rozwiązały to (Rust `#[must_use]`, C++ `[[nodiscard]]`)
+- Koszt implementacji analyzera jest niski, a wartość wysoka
+
+## Konfiguracja
+
+Użytkownicy mogą wyłączyć lub zmienić severity w `.editorconfig`:
+
+```ini
+# Zmień na error (blokuje build)
+dotnet_diagnostic.VCR0010.severity = error
+
+# Wyłącz (niezalecane)
+dotnet_diagnostic.VCR0010.severity = none
+```
+
+Lub per-linia za pomocą pragma:
+
+```csharp
+#pragma warning disable VCR0010
+UpdateUser(user); // Celowo ignorujemy wynik
+#pragma warning restore VCR0010
+```
+
+## Testy
+
+```csharp
+public class ResultMustBeConsumedAnalyzerTests
+{
+    // ✅ Powinien zgłosić warning
+    [Fact] Task ReportsWarning_WhenResultIgnored()
+    [Fact] Task ReportsWarning_WhenResultOfGenericIgnored()
+    [Fact] Task ReportsWarning_WhenAwaitedTaskResultIgnored()
+
+    // ✅ Nie powinien zgłosić warning
+    [Fact] Task NoWarning_WhenAssignedToVariable()
+    [Fact] Task NoWarning_WhenDiscarded()
+    [Fact] Task NoWarning_WhenUsedInMethodChain()
+    [Fact] Task NoWarning_WhenPassedAsArgument()
+    [Fact] Task NoWarning_WhenReturned()
+    [Fact] Task NoWarning_WhenUsedInCondition()
+    [Fact] Task NoWarning_ForNonResultTypes()
+
+    // ✅ Code fix
+    [Fact] Task CodeFix_AddsDiscard()
+    [Fact] Task CodeFix_AddsVariableAssignment()
+}
+```
+
+## Implementacja
+
+- [ ] Utworzyć projekt `Voyager.Common.Results.Analyzers` (netstandard2.0)
+- [ ] Zaimplementować `ResultMustBeConsumedAnalyzer`
+- [ ] Zaimplementować `ResultMustBeConsumedCodeFixProvider`
+- [ ] Testy z `Microsoft.CodeAnalysis.CSharp.Analyzer.Testing`
+- [ ] Skonfigurować pakowanie analyzera w `Voyager.Common.Results.csproj`
+- [ ] Wydać jako część kolejnej wersji
+
+## Kompatybilność wsteczna
+
+- **Nie jest breaking change** — analyzer emituje warning, nie error
+- Istniejący kod, który ignoruje Result, zobaczy nowe warningi
+- Użytkownicy mogą wyłączyć via `.editorconfig` lub `#pragma`
+- Dodanie `_ = ` (jawny discard) jest minimalną zmianą żeby uciszyć warning
+
+---
+
+**Powiązane:**
+- [ADR-0005: Error Classification for Resilience](./ADR-0005-error-classification-for-resilience.md)
+- [Roslyn Analyzer Tutorial](https://learn.microsoft.com/en-us/dotnet/csharp/roslyn-sdk/tutorials/how-to-write-csharp-analyzer-code-fix)
+- Rust `#[must_use]`: https://doc.rust-lang.org/reference/attributes/diagnostics.html#the-must_use-attribute
