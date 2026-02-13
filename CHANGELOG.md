@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Roslyn Analyzer VCR0010 — Result must be consumed**: Warns when `Result`/`Result<T>` return values are silently discarded
+  - Detects unconsumed results from method calls, factory methods, and awaited `Task<Result>`
+  - Two code fixes: "Discard result" (`_ = ...`) and "Assign to variable" (`var result = ...`)
+  - Bundled in the NuGet package under `analyzers/dotnet/cs` — no extra install needed
+  - See [ADR-0010](docs/adr/ADR-0010-result-consumption-analyzer.md) for design rationale
+- **Roslyn Analyzer VCR0020 — Value accessed without success check**: Warns when `Result<T>.Value` is accessed without checking `IsSuccess`/`IsFailure`
+  - Detects guarded patterns: `if (IsSuccess)`, early-return, ternary, `&&` short-circuit
+  - Code fix 1: replaces `.Value` with `.GetValueOrThrow()` (useful in tests, controllers, adapters)
+  - Code fix 2: wraps statement with `if (result.IsSuccess) { ... }` guard
+- **Roslyn Analyzer VCR0030 — Nested `Result<Result<T>>`**: Warns when `Map` produces nested Result (should use `Bind`)
+  - Code fix: replaces `Map` with `Bind` (or `MapAsync` with `BindAsync`)
+- **Roslyn Analyzer VCR0040 — `GetValueOrThrow` defeats Result pattern**: Info-level hint to use `Match`/`Bind`/`Map` instead
+- **Roslyn Analyzer VCR0050 — `Failure(Error.None)`**: Error-level diagnostic for creating failure without an error
+- **Roslyn Analyzer VCR0060 — Prefer Match/Switch**: Disabled-by-default suggestion to use `Match`/`Switch` over `if/else` branching on `IsSuccess`
+
+### Changed
+- **Analyzer internals — extract `ResultTypeHelper`**: Consolidated duplicated `IsResultType`, `IsResultMethod`, `UnwrapTaskType`, and `ResultNamespace` from all 6 analyzers into a shared `internal static class ResultTypeHelper`
+  - Fixes VCR0020 bug: `IsResultType` now traverses base type hierarchy (previously only checked the direct type, missing inherited Result types)
+- **VCR0020 — guard traversal across parent blocks**: Analyzer now searches parent blocks for failure guards, not just the immediate enclosing block (pattern 7: guard in outer `if`/`foreach` protects `.Value` in nested blocks)
+- **VCR0020 — reassignment to Success pattern**: Recognizes `result = Result<T>.Success(...)` as last statement in failure guard as ensuring success after the block (pattern 8)
+- **VCR0020 — `continue`/`break` as guard exit**: `if (result.IsFailure) { continue; }` in loops now recognized as valid guard, same as `return`/`throw` (pattern 9)
+- **ADR-0010**: Documented guard patterns 7, 8, and 9 with examples
+
+### Fixed
+- **`.editorconfig` naming rules**: `private const` and `private static readonly` fields now correctly require PascalCase instead of `_camelCase`
+- **Analyzer .csproj cleanup**: Removed duplicate `TargetFramework`/`TargetFrameworks` in `Voyager.Common.Results.Analyzers.csproj`, removed empty `<TargetFrameworks>` in test project, added comments explaining `Directory.Build.props` override
+
 ## [1.7.1] - 2026-02-03
 
 ### Added

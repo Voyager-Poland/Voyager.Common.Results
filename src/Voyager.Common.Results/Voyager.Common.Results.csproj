@@ -28,8 +28,24 @@
 		</PackageReference>
 	</ItemGroup>
 
-	<!-- Include README in package -->
+	<!-- Include README and icon in package -->
 	<ItemGroup>
 		<None Include="$(MSBuildThisFileDirectory)..\..\README.md" Pack="true" PackagePath="\" />
+		<None Include="$(MSBuildThisFileDirectory)..\..\img\voyager-nugets-ikona-128x128.png" Pack="true" PackagePath="\" />
+	</ItemGroup>
+
+	<!-- Ensure analyzer project builds before packing (no runtime reference) -->
+	<ItemGroup>
+		<ProjectReference Include="..\Voyager.Common.Results.Analyzers\Voyager.Common.Results.Analyzers.csproj"
+					ReferenceOutputAssembly="false"
+					PrivateAssets="All" />
+	</ItemGroup>
+
+	<!-- Include Roslyn Analyzer in package (ADR-0010) -->
+	<ItemGroup>
+		<None Include="$(MSBuildThisFileDirectory)..\Voyager.Common.Results.Analyzers\bin\$(Configuration)\netstandard2.0\Voyager.Common.Results.Analyzers.dll"
+					Pack="true"
+					PackagePath="analyzers/dotnet/cs"
+					Visible="false" />
 	</ItemGroup>
 </Project>

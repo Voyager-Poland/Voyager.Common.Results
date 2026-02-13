@@ -403,6 +403,9 @@ FodyWeavers.xsd
 *.sln.iml
 .idea/
 
+# Claude Code
+.claude/
+
 # macOS
 .DS_Store
 .AppleDouble

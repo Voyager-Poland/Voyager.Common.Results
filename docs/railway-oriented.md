@@ -445,11 +445,16 @@ if (userResult.IsSuccess)
 result.Map(user => SaveUser(user));  // ❌ SaveUser returns Result - use Bind!
 
 // Don't ignore Tap errors
-result.Tap(user => 
+result.Tap(user =>
 {
     throw new Exception();  // ❌ Tap exceptions are not caught!
 });
+
+// Don't ignore Result return values
+GetUser(id);  // ⚠️ VCR0010: Result silently discarded - errors are lost!
 ```
+
+> **Tip:** The built-in Roslyn analyzer **VCR0010** catches unconsumed Result values at compile time. Every `Result` must be assigned, returned, passed as argument, or used in a chain.
 
 ## See Also
 
