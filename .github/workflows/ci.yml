@@ -45,7 +45,14 @@ jobs:
     - name: Test (matrix target only)
       env:
         TARGET_FRAMEWORK: ${{ matrix.dotnet-version == '6.0.x' && 'net6.0' || 'net8.0' }}
-      run: dotnet test --no-build --verbosity normal -c Release -f $TARGET_FRAMEWORK --collect:"XPlat Code Coverage"
+      run: |
+        # Core library tests (multi-target: net48, net6.0, net8.0)
+        dotnet test --no-build --verbosity normal -c Release -f $TARGET_FRAMEWORK --collect:"XPlat Code Coverage" src/Voyager.Common.Results.Tests/Voyager.Common.Results.Tests.csproj
+        dotnet test --no-build --verbosity normal -c Release -f $TARGET_FRAMEWORK --collect:"XPlat Code Coverage" src/Voyager.Common.Resilience.Tests/Voyager.Common.Resilience.Tests.csproj
+        # Analyzer tests (net8.0 only)
+        if [ "$TARGET_FRAMEWORK" = "net8.0" ]; then
+          dotnet test --no-build --verbosity normal -c Release -f net8.0 --collect:"XPlat Code Coverage" src/Voyager.Common.Results.Analyzers.Tests/Voyager.Common.Results.Analyzers.Tests.csproj
+        fi
 
     - name: Upload coverage reports
       uses: codecov/codecov-action@v5
@@ -92,11 +99,17 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore
 
-    - name: Build net48
-      run: dotnet build --no-restore -c Release -f net48
+    - name: Build net48 (exclude analyzer projects — they target netstandard2.0/net8.0)
+      run: |
+        dotnet build --no-restore -c Release -f net48 src/Voyager.Common.Results/Voyager.Common.Results.csproj
+        dotnet build --no-restore -c Release -f net48 src/Voyager.Common.Results.Tests/Voyager.Common.Results.Tests.csproj
+        dotnet build --no-restore -c Release -f net48 src/Voyager.Common.Resilience/Voyager.Common.Resilience.csproj
+        dotnet build --no-restore -c Release -f net48 src/Voyager.Common.Resilience.Tests/Voyager.Common.Resilience.Tests.csproj
 
     - name: Test net48 (no coverage)
-      run: dotnet test --no-build -c Release -f net48
+      run: |
+        dotnet test --no-build -c Release -f net48 src/Voyager.Common.Results.Tests/Voyager.Common.Results.Tests.csproj
+        dotnet test --no-build -c Release -f net48 src/Voyager.Common.Resilience.Tests/Voyager.Common.Resilience.Tests.csproj
 
   deploy:
     runs-on: ubuntu-latest
