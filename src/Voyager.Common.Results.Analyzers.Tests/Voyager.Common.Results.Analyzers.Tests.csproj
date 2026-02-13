@@ -26,7 +26,6 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\Voyager.Common.Results.Analyzers\Voyager.Common.Results.Analyzers.csproj" />
-		<ProjectReference Include="..\Voyager.Common.Results\Voyager.Common.Results.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>
