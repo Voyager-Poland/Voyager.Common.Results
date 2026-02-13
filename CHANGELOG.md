@@ -20,8 +20,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Roslyn Analyzer VCR0050 — `Failure(Error.None)`**: Error-level diagnostic for creating failure without an error
 - **Roslyn Analyzer VCR0060 — Prefer Match/Switch**: Disabled-by-default suggestion to use `Match`/`Switch` over `if/else` branching on `IsSuccess`
 
+### Changed
+- **VCR0020 — guard traversal across parent blocks**: Analyzer now searches parent blocks for failure guards, not just the immediate enclosing block (pattern 7: guard in outer `if`/`foreach` protects `.Value` in nested blocks)
+- **VCR0020 — reassignment to Success pattern**: Recognizes `result = Result<T>.Success(...)` as last statement in failure guard as ensuring success after the block (pattern 8)
+- **ADR-0010**: Documented guard patterns 7 and 8 with examples
+
 ### Fixed
 - **`.editorconfig` naming rules**: `private const` and `private static readonly` fields now correctly require PascalCase instead of `_camelCase`
+- **Analyzer .csproj cleanup**: Removed duplicate `TargetFramework`/`TargetFrameworks` in `Voyager.Common.Results.Analyzers.csproj`, removed empty `<TargetFrameworks>` in test project, added comments explaining `Directory.Build.props` override
 
 ## [1.7.1] - 2026-02-03
 

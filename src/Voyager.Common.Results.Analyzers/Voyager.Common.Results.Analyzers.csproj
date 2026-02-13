@@ -1,9 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<!-- Roslyn analyzers must target netstandard2.0 -->
+		<!-- Roslyn analyzers must target netstandard2.0 (overrides Directory.Build.props TargetFrameworks) -->
 		<TargetFrameworks>netstandard2.0</TargetFrameworks>
-		<TargetFramework>netstandard2.0</TargetFramework>
 		<LangVersion>latest</LangVersion>
 		<IsPackable>false</IsPackable>
 		<EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>

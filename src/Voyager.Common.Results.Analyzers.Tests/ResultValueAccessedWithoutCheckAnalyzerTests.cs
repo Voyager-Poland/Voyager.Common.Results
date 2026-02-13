@@ -244,6 +244,97 @@ class C
 		await RunAnalyzerTest(test);
 	}
 
+	[Fact]
+	public async Task NoWarning_WhenGuardInParentBlock()
+	{
+		var test = ResultStubs + @"
+class C
+{
+	int Test()
+	{
+		var result = Result<int>.Success(42);
+		if (result.IsFailure) return -1;
+		if (result.Value > 0)
+		{
+			return result.Value;
+		}
+		return 0;
+	}
+}
+";
+		await RunAnalyzerTest(test);
+	}
+
+	[Fact]
+	public async Task NoWarning_WhenGuardInParentBlockWithEarlyReturnBlock()
+	{
+		var test = ResultStubs + @"
+class C
+{
+	void Test()
+	{
+		var list = new System.Collections.Generic.List<int>();
+		var result = Result<int>.Success(42);
+		if (result.IsFailure)
+		{
+			return;
+		}
+		if (result.Value > 0)
+		{
+			list.Add(result.Value);
+		}
+	}
+}
+";
+		await RunAnalyzerTest(test);
+	}
+
+	[Fact]
+	public async Task NoWarning_WhenFailureGuardReassignsToSuccess()
+	{
+		var test = ResultStubs + @"
+class C
+{
+	int Test()
+	{
+		var result = Result<int>.Success(42);
+		if (result.IsFailure)
+		{
+			result = Result<int>.Success(0);
+		}
+		var x = result.Value;
+		return x;
+	}
+}
+";
+		await RunAnalyzerTest(test);
+	}
+
+	[Fact]
+	public async Task NoWarning_WhenFailureGuardWithNestedReturnAndReassignment()
+	{
+		var test = ResultStubs + @"
+class C
+{
+	int Test(bool fallback)
+	{
+		var result = Result<int>.Success(42);
+		if (result.IsFailure)
+		{
+			if (!fallback)
+			{
+				return -1;
+			}
+			result = Result<int>.Success(0);
+		}
+		var x = result.Value;
+		return x;
+	}
+}
+";
+		await RunAnalyzerTest(test);
+	}
+
 	#endregion
 
 	#region Helpers

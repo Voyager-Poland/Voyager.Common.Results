@@ -176,40 +176,46 @@ namespace Voyager.Common.Results.Analyzers
 
 		private static bool HasPrecedingGuard(IPropertyReferenceOperation valueAccess, ISymbol receiverSymbol)
 		{
-			var statement = FindEnclosingStatement(valueAccess);
-			if (statement == null)
-				return false;
-
-			var block = statement.Parent as IBlockOperation;
-			if (block == null)
-				return false;
-
-			int statementIndex = -1;
-			for (int i = 0; i < block.Operations.Length; i++)
+			// Traverse current and parent blocks looking for a failure guard
+			var currentOp = (IOperation)valueAccess;
+			while (true)
 			{
-				if (ReferenceEquals(block.Operations[i], statement))
+				var statement = FindEnclosingStatement(currentOp);
+				if (statement == null)
+					return false;
+
+				var block = statement.Parent as IBlockOperation;
+				if (block == null)
+					return false;
+
+				int statementIndex = -1;
+				for (int i = 0; i < block.Operations.Length; i++)
 				{
-					statementIndex = i;
-					break;
+					if (ReferenceEquals(block.Operations[i], statement))
+					{
+						statementIndex = i;
+						break;
+					}
 				}
-			}
 
-			if (statementIndex <= 0)
-				return false;
-
-			// Scan backwards for guard: if (result.IsFailure) return/throw;
-			for (int i = statementIndex - 1; i >= 0; i--)
-			{
-				if (block.Operations[i] is IConditionalOperation guard &&
-					guard.WhenFalse == null &&
-					ContainsReturnOrThrow(guard.WhenTrue) &&
-					IsFailureGuardOnSymbol(guard.Condition, receiverSymbol))
+				if (statementIndex > 0)
 				{
-					return true;
+					// Scan backwards for guard: if (result.IsFailure) return/throw/reassign;
+					for (int i = statementIndex - 1; i >= 0; i--)
+					{
+						if (block.Operations[i] is IConditionalOperation guard &&
+							guard.WhenFalse == null &&
+							GuardEnsuresSuccess(guard.WhenTrue, receiverSymbol) &&
+							IsFailureGuardOnSymbol(guard.Condition, receiverSymbol))
+						{
+							return true;
+						}
+					}
 				}
-			}
 
-			return false;
+				// Continue searching in parent blocks
+				currentOp = block;
+			}
 		}
 
 		private static bool IsFailureGuardOnSymbol(IOperation condition, ISymbol symbol)
@@ -231,22 +237,84 @@ namespace Voyager.Common.Results.Analyzers
 			return null;
 		}
 
-		private static bool ContainsReturnOrThrow(IOperation? body)
+		/// <summary>
+		/// Checks if the guard body guarantees the receiver is success after execution.
+		/// This is true when:
+		/// 1. The body unconditionally returns or throws (early exit), OR
+		/// 2. The last statement reassigns the receiver to Result.Success(...)
+		/// </summary>
+		private static bool GuardEnsuresSuccess(IOperation? body, ISymbol receiverSymbol)
 		{
 			if (body == null)
 				return false;
+
+			// Simple case: direct return/throw
 			if (body is IReturnOperation || body is IThrowOperation)
 				return true;
+
 			if (body is IBlockOperation block)
 			{
+				// Case 1: any direct child is unconditional return/throw
 				foreach (var op in block.Operations)
 				{
 					if (op is IReturnOperation || op is IThrowOperation)
 						return true;
 				}
+
+				// Case 2: last statement reassigns the variable to Result<T>.Success(...)
+				if (block.Operations.Length > 0)
+				{
+					var lastOp = block.Operations[block.Operations.Length - 1];
+					if (IsSuccessReassignment(lastOp, receiverSymbol))
+						return true;
+				}
 			}
 
 			return false;
+		}
+
+		/// <summary>
+		/// Checks if the operation is an assignment of the form:
+		/// receiverSymbol = Result&lt;T&gt;.Success(...);
+		/// </summary>
+		private static bool IsSuccessReassignment(IOperation operation, ISymbol receiverSymbol)
+		{
+			if (operation is not IExpressionStatementOperation exprStatement)
+				return false;
+
+			if (exprStatement.Operation is not ISimpleAssignmentOperation assignment)
+				return false;
+
+			// Check left side matches the receiver symbol
+			var targetSymbol = assignment.Target switch
+			{
+				ILocalReferenceOperation local => (ISymbol)local.Local,
+				IParameterReferenceOperation param => param.Parameter,
+				IFieldReferenceOperation field => field.Field,
+				_ => null
+			};
+
+			if (targetSymbol == null ||
+				!SymbolEqualityComparer.Default.Equals(targetSymbol, receiverSymbol))
+				return false;
+
+			// Check right side is Result<T>.Success(...)
+			if (assignment.Value is IInvocationOperation invocation)
+			{
+				return invocation.TargetMethod.Name == "Success" &&
+					   IsResultType(invocation.TargetMethod.ContainingType);
+			}
+
+			return false;
+		}
+
+		private static bool IsResultType(ITypeSymbol? type)
+		{
+			if (type is not INamedTypeSymbol namedType)
+				return false;
+
+			return namedType.Name == "Result" &&
+				   namedType.ContainingNamespace?.ToDisplayString() == ResultNamespace;
 		}
 	}
 }

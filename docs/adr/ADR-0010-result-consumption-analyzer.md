@@ -318,7 +318,53 @@ GetUser(id).Match(
     error => "unknown");
 ```
 
-**Implementacja:** Rejestracja na `OperationKind.PropertyReference` dla `.Value`, sprawdzenie czy w enclosing block istnieje wcześniejszy branch na `IsSuccess`/`IsFailure`. Code fix: zaproponuj `Match` lub dodaj guard `if (result.IsSuccess)`.
+**Implementacja:** Rejestracja na `OperationKind.PropertyReference` dla `.Value`, sprawdzenie czy w enclosing block (lub blokach nadrzędnych) istnieje wcześniejszy branch na `IsSuccess`/`IsFailure`. Code fix: zaproponuj `Match` lub dodaj guard `if (result.IsSuccess)`.
+
+#### Rozpoznawane wzorce guard (VCR0020)
+
+Analyzer rozpoznaje następujące wzorce jako prawidłowe sprawdzenie przed `.Value`:
+
+```csharp
+// 1. Bezpośredni if (IsSuccess) — .Value w gałęzi true
+if (result.IsSuccess) { var x = result.Value; }
+
+// 2. Negacja IsFailure — .Value w gałęzi true
+if (!result.IsFailure) { var x = result.Value; }
+
+// 3. Else po IsFailure — .Value w gałęzi false
+if (result.IsFailure) { } else { var x = result.Value; }
+
+// 4. Ternary z guardem
+var x = result.IsSuccess ? result.Value : 0;
+
+// 5. Short-circuit && z guardem
+if (result.IsSuccess && result.Value > 0) { }
+
+// 6. Early return (guard clause) — guard i .Value na tym samym poziomie
+if (result.IsFailure) return;
+var x = result.Value;
+
+// 7. Guard w bloku nadrzędnym — .Value zagnieżdżony w wewnętrznym if/foreach/etc.
+if (result.IsFailure) return Result.Failure(result.Error);
+if (result.Value != null)
+{
+    list.Add(result.Value);  // ✅ guard jest w bloku nadrzędnym
+}
+
+// 8. Guard z reassignment do Success — gałąź failure naprawia zmienną
+var result = Compute();
+if (result.IsFailure)
+{
+    var fallback = GetFallback();
+    if (fallback.IsFailure) return Result.Failure(fallback.Error);
+    result = Result<T>.Success(fallback.Value);  // ← ostatnia instrukcja to reassignment
+}
+var x = result.Value;  // ✅ po bloku zmienna gwarantuje success
+```
+
+**Wzorzec 7 (guard w bloku nadrzędnym):** Analyzer przeszukuje nie tylko bezpośrednio otaczający blok, ale traversuje w górę drzewa bloków. Dzięki temu guard `if (x.IsFailure) return;` w bloku `foreach` lub metody chroni `.Value` wewnątrz zagnieżdżonego `if`.
+
+**Wzorzec 8 (reassignment do Success):** Gdy gałąź `IsFailure` nie zawiera bezwarunkowego `return`/`throw`, ale jej **ostatnia instrukcja** to przypisanie `result = Result<T>.Success(...)`, analyzer uznaje to za gwarancję sukcesu po bloku — zmienna jest albo oryginalna (success, bo guard się nie uruchomił) albo nadpisana nową wartością success.
 
 ### VCR0030: Nested `Result<Result<T>>` (Warning)
 
