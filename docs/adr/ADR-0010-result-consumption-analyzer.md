@@ -356,14 +356,6 @@ if (result.Value != null)
     list.Add(result.Value);  // ✅ guard jest w bloku nadrzędnym
 }
 
-// 9. Guard z continue/break w pętli — analogicznie do return/throw
-foreach (var item in items)
-{
-    var result = Process(item);
-    if (result.IsFailure) { errors.Add(result.Error); continue; }
-    list.Add(result.Value);  // ✅ continue gwarantuje wyjście z iteracji
-}
-
 // 8. Guard z reassignment do Success — gałąź failure naprawia zmienną
 var result = Compute();
 if (result.IsFailure)
@@ -373,13 +365,21 @@ if (result.IsFailure)
     result = Result<T>.Success(fallback.Value);  // ← ostatnia instrukcja to reassignment
 }
 var x = result.Value;  // ✅ po bloku zmienna gwarantuje success
-```
 
-**Wzorzec 9 (continue/break w pętli):** Analyzer traktuje `continue` i `break` tak samo jak `return`/`throw` — jako gwarancję wyjścia z bieżącego scope. Guard `if (result.IsFailure) { continue; }` w pętli `foreach`/`for`/`while` chroni dalszy kod w tej iteracji.
+// 9. Guard z continue/break w pętli — analogicznie do return/throw
+foreach (var item in items)
+{
+    var result = Process(item);
+    if (result.IsFailure) { errors.Add(result.Error); continue; }
+    list.Add(result.Value);  // ✅ continue gwarantuje wyjście z iteracji
+}
+```
 
 **Wzorzec 7 (guard w bloku nadrzędnym):** Analyzer przeszukuje nie tylko bezpośrednio otaczający blok, ale traversuje w górę drzewa bloków. Dzięki temu guard `if (x.IsFailure) return;` w bloku `foreach` lub metody chroni `.Value` wewnątrz zagnieżdżonego `if`.
 
 **Wzorzec 8 (reassignment do Success):** Gdy gałąź `IsFailure` nie zawiera bezwarunkowego `return`/`throw`, ale jej **ostatnia instrukcja** to przypisanie `result = Result<T>.Success(...)`, analyzer uznaje to za gwarancję sukcesu po bloku — zmienna jest albo oryginalna (success, bo guard się nie uruchomił) albo nadpisana nową wartością success.
+
+**Wzorzec 9 (continue/break w pętli):** Analyzer traktuje `continue` i `break` tak samo jak `return`/`throw` — jako gwarancję wyjścia z bieżącego scope. Guard `if (result.IsFailure) { continue; }` w pętli `foreach`/`for`/`while` chroni dalszy kod w tej iteracji.
 
 #### Code Fix 1: `GetValueOrThrow()`
 
