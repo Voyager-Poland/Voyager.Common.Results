@@ -43,6 +43,27 @@ namespace Voyager.Common.Results.Analyzers
 					createChangedDocument: ct => ReplaceWithGetValueOrThrowAsync(context.Document, memberAccess, ct),
 					equivalenceKey: "UseGetValueOrThrow"),
 				diagnostic);
+
+			// Find the receiver name for the IsSuccess guard
+			var receiverName = memberAccess.Expression is IdentifierNameSyntax identifier
+				? identifier.Identifier.Text
+				: null;
+
+			if (receiverName != null)
+			{
+				// Find the containing statement to wrap with if guard
+				var containingStatement = memberAccess.FirstAncestorOrSelf<StatementSyntax>();
+				if (containingStatement != null)
+				{
+					context.RegisterCodeFix(
+						CodeAction.Create(
+							title: "Add IsSuccess guard",
+							createChangedDocument: ct => AddIsSuccessGuardAsync(
+								context.Document, containingStatement, receiverName, ct),
+							equivalenceKey: "AddIsSuccessGuard"),
+						diagnostic);
+				}
+			}
 		}
 
 		private static async Task<Document> ReplaceWithGetValueOrThrowAsync(
@@ -61,6 +82,39 @@ namespace Voyager.Common.Results.Analyzers
 				.WithTriviaFrom(memberAccess);
 
 			var newRoot = root.ReplaceNode(memberAccess, invocation);
+			return document.WithSyntaxRoot(newRoot);
+		}
+
+		private static async Task<Document> AddIsSuccessGuardAsync(
+			Document document, StatementSyntax containingStatement,
+			string receiverName, CancellationToken cancellationToken)
+		{
+			var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
+			if (root == null)
+				return document;
+
+			// Extract indentation string from leading trivia
+			var indent = "";
+			foreach (var trivia in containingStatement.GetLeadingTrivia())
+			{
+				if (trivia.IsKind(SyntaxKind.WhitespaceTrivia))
+					indent = trivia.ToString();
+			}
+
+			var eol = "\r\n";
+			var innerIndent = indent + "\t";
+
+			// Build: if (receiver.IsSuccess)\r\n{indent}{\r\n{innerIndent}<statement>\r\n{indent}}
+			var ifText = $"if ({receiverName}.IsSuccess)" + eol +
+				$"{indent}{{" + eol +
+				$"{innerIndent}{containingStatement.WithoutLeadingTrivia().WithoutTrailingTrivia().ToFullString()}" + eol +
+				$"{indent}}}";
+
+			var ifStatement = (IfStatementSyntax)SyntaxFactory.ParseStatement(ifText)
+				.WithLeadingTrivia(containingStatement.GetLeadingTrivia())
+				.WithTrailingTrivia(containingStatement.GetTrailingTrivia());
+
+			var newRoot = root.ReplaceNode(containingStatement, ifStatement);
 			return document.WithSyntaxRoot(newRoot);
 		}
 	}

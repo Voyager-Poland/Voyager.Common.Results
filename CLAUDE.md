@@ -105,8 +105,9 @@ build/                                 # Modular MSBuild (imported via Directory
 | Analyzer | CodeFix | Description |
 |----------|---------|-------------|
 | VCR0010 | `_ = ...` or `var result = ...` | Discard or assign unconsumed Result |
-| VCR0020 | `.Value` → `.GetValueOrThrow()` | Replace unchecked Value access with explicit throw |
-| VCR0030–VCR0060 | — | No CodeFix providers yet |
+| VCR0020 | `.GetValueOrThrow()` / `if (IsSuccess)` guard | Replace unchecked Value or wrap in guard |
+| VCR0030 | `Map` → `Bind` | Replace Map with Bind to flatten nested Result |
+| VCR0040–VCR0060 | — | No CodeFix providers yet |
 
 ## VCR0020 Analyzer — Guard Pattern Recognition
 

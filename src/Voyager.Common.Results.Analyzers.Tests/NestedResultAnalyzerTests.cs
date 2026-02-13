@@ -106,6 +106,42 @@ class C
 
 	#endregion
 
+	#region Code fix tests
+
+	[Fact]
+	public async Task CodeFix_ReplacesMapWithBind()
+	{
+		var test = ResultStubs + @"
+class C
+{
+	Result<string> GetName(int id) => Result<string>.Success(""test"");
+	void Test()
+	{
+		var result = Result<int>.Success(1);
+		var nested = {|#0:result.Map(x => GetName(x))|};
+	}
+}
+";
+		var fixedCode = ResultStubs + @"
+class C
+{
+	Result<string> GetName(int id) => Result<string>.Success(""test"");
+	void Test()
+	{
+		var result = Result<int>.Success(1);
+		var nested = result.Bind(x => GetName(x));
+	}
+}
+";
+		await RunCodeFixTest(test, fixedCode,
+			new DiagnosticResult(NestedResultAnalyzer.DiagnosticId,
+					Microsoft.CodeAnalysis.DiagnosticSeverity.Warning)
+				.WithLocation(0)
+				.WithArguments("Map", "string"));
+	}
+
+	#endregion
+
 	#region Helpers
 
 	private static async Task RunAnalyzerTest(string source, params DiagnosticResult[] expected)
@@ -116,6 +152,19 @@ class C
 			ReferenceAssemblies = ReferenceAssemblies.Net.Net80,
 		};
 		test.ExpectedDiagnostics.AddRange(expected);
+		await test.RunAsync();
+	}
+
+	private static async Task RunCodeFixTest(
+		string source, string fixedSource, DiagnosticResult expected)
+	{
+		var test = new CSharpCodeFixTest<NestedResultAnalyzer, NestedResultCodeFixProvider, DefaultVerifier>
+		{
+			TestCode = source,
+			FixedCode = fixedSource,
+			ReferenceAssemblies = ReferenceAssemblies.Net.Net80,
+		};
+		test.ExpectedDiagnostics.Add(expected);
 		await test.RunAsync();
 	}
 

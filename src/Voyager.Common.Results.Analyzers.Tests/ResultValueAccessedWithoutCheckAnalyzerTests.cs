@@ -444,6 +444,35 @@ class C
 		await RunCodeFixTest(test, fixedCode, Expect("result"));
 	}
 
+	[Fact]
+	public async Task CodeFix_AddsIsSuccessGuard()
+	{
+		var test = ResultStubsWithGetValueOrThrow + @"
+class C
+{
+	void Test()
+	{
+		var result = Result<int>.Success(42);
+		var x = {|#0:result.Value|};
+	}
+}
+";
+		var fixedCode = ResultStubsWithGetValueOrThrow + @"
+class C
+{
+	void Test()
+	{
+		var result = Result<int>.Success(42);
+		if (result.IsSuccess)
+		{
+			var x = result.Value;
+		}
+	}
+}
+";
+		await RunCodeFixTest(test, fixedCode, Expect("result"), codeActionIndex: 1);
+	}
+
 	#endregion
 
 	#region Helpers
@@ -486,13 +515,14 @@ namespace Voyager.Common.Results
 	}
 
 	private static async Task RunCodeFixTest(
-		string source, string fixedSource, DiagnosticResult expected)
+		string source, string fixedSource, DiagnosticResult expected, int codeActionIndex = 0)
 	{
 		var test = new CSharpCodeFixTest<ResultValueAccessedWithoutCheckAnalyzer, ResultValueAccessedWithoutCheckCodeFixProvider, DefaultVerifier>
 		{
 			TestCode = source,
 			FixedCode = fixedSource,
 			ReferenceAssemblies = ReferenceAssemblies.Net.Net80,
+			CodeActionIndex = codeActionIndex,
 		};
 		test.ExpectedDiagnostics.Add(expected);
 		await test.RunAsync();

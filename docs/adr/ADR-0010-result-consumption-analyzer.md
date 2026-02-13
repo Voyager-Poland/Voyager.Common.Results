@@ -83,11 +83,13 @@ src/
     ResultMustBeConsumedAnalyzer.cs                            // VCR0010 DiagnosticAnalyzer
     ResultMustBeConsumedCodeFixProvider.cs                     // VCR0010 CodeFix: `_ = ` lub `var result = `
     ResultValueAccessedWithoutCheckAnalyzer.cs                 // VCR0020 DiagnosticAnalyzer
-    ResultValueAccessedWithoutCheckCodeFixProvider.cs          // VCR0020 CodeFix: `.Value` → `.GetValueOrThrow()`
+    ResultValueAccessedWithoutCheckCodeFixProvider.cs          // VCR0020 CodeFix: `.GetValueOrThrow()` lub `if (IsSuccess)`
+    NestedResultCodeFixProvider.cs                             // VCR0030 CodeFix: `Map` → `Bind`
   Voyager.Common.Results.Analyzers.Tests/
     Voyager.Common.Results.Analyzers.Tests.csproj
     ResultMustBeConsumedAnalyzerTests.cs
     ResultValueAccessedWithoutCheckAnalyzerTests.cs
+    NestedResultAnalyzerTests.cs
 ```
 
 ### Dostarczanie via NuGet
@@ -379,7 +381,7 @@ var x = result.Value;  // ✅ po bloku zmienna gwarantuje success
 
 **Wzorzec 8 (reassignment do Success):** Gdy gałąź `IsFailure` nie zawiera bezwarunkowego `return`/`throw`, ale jej **ostatnia instrukcja** to przypisanie `result = Result<T>.Success(...)`, analyzer uznaje to za gwarancję sukcesu po bloku — zmienna jest albo oryginalna (success, bo guard się nie uruchomił) albo nadpisana nową wartością success.
 
-#### Code Fix: `GetValueOrThrow()`
+#### Code Fix 1: `GetValueOrThrow()`
 
 VCR0020 oferuje Code Fix, który zamienia niesprawdzony `.Value` na `GetValueOrThrow()`:
 
@@ -407,6 +409,25 @@ var len = result.Value.Length;
 var len = result.GetValueOrThrow().Length;
 ```
 
+#### Code Fix 2: Add `IsSuccess` guard
+
+Drugi Code Fix opakowuje instrukcję zawierającą `.Value` w blok `if (result.IsSuccess)`:
+
+```csharp
+// Przed (⚠ VCR0020)
+var x = result.Value;
+
+// Po zastosowaniu code fix (✅ guard chroni dostęp)
+if (result.IsSuccess)
+{
+	var x = result.Value;
+}
+```
+
+**Kiedy guard jest lepszy niż `GetValueOrThrow()`:**
+- **Kod produkcyjny** — gdy chcemy obsłużyć oba przypadki (success + failure)
+- **Railway Oriented Programming** — gdy kod powinien kontynuować łańcuch bez wyjątków
+
 ### VCR0030: Nested `Result<Result<T>>` (Warning)
 
 Podwójne owinięcie wynika prawie zawsze z użycia `Map` zamiast `Bind`:
@@ -419,7 +440,19 @@ var nested = userId.Map(id => GetOrder(id));
 var flat = userId.Bind(id => GetOrder(id));
 ```
 
-**Implementacja:** Rejestracja na `OperationKind.Invocation` dla metod `Map`/`MapAsync`. Sprawdzenie czy typ zwracany to `Result<Result<T>>`. Code fix: zamień `Map` na `Bind`.
+**Implementacja:** Rejestracja na `OperationKind.Invocation` dla metod `Map`/`MapAsync`. Sprawdzenie czy typ zwracany to `Result<Result<T>>`.
+
+#### Code Fix: Replace `Map` with `Bind`
+
+```csharp
+// Przed (⚠ VCR0030)
+var nested = userId.Map(id => GetOrder(id));
+
+// Po zastosowaniu code fix (✅ spłaszczone)
+var flat = userId.Bind(id => GetOrder(id));
+```
+
+Analogicznie `MapAsync` jest zamieniany na `BindAsync`.
 
 ### VCR0040: `GetValueOrThrow` in railway chain (Info)
 
@@ -470,14 +503,14 @@ result.Switch(
 
 ### Podsumowanie planowanych reguł
 
-| ID | Nazwa | Severity | Priorytet |
+| ID | Nazwa | Severity | CodeFix |
 |---|---|---|---|
-| VCR0010 | Result must be consumed | Warning | ✅ Zaimplementowany |
-| VCR0020 | Value accessed without success check | Warning | ✅ Zaimplementowany |
-| VCR0030 | Nested `Result<Result<T>>` | Warning | ✅ Zaimplementowany |
-| VCR0040 | `GetValueOrThrow` in railway chain | Info | ✅ Zaimplementowany |
-| VCR0050 | `Failure(Error.None)` | Error | ✅ Zaimplementowany |
-| VCR0060 | Prefer Match/Switch | Suggestion | ✅ Zaimplementowany |
+| VCR0010 | Result must be consumed | Warning | `_ = ...` / `var result = ...` |
+| VCR0020 | Value accessed without success check | Warning | `.GetValueOrThrow()` / `if (IsSuccess)` guard |
+| VCR0030 | Nested `Result<Result<T>>` | Warning | `Map` → `Bind` |
+| VCR0040 | `GetValueOrThrow` in railway chain | Info | — |
+| VCR0050 | `Failure(Error.None)` | Error | — |
+| VCR0060 | Prefer Match/Switch | Suggestion | — |
 
 ## Kompatybilność wsteczna
 
