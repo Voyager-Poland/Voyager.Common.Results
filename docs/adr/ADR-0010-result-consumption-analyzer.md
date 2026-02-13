@@ -1,6 +1,6 @@
 # ADR-0010: Roslyn Analyzer wymuszający konsumpcję Result
 
-**Status:** Zaproponowano
+**Status:** Zaakceptowane
 **Data:** 2026-02-11
 **Kontekst:** Voyager.Common.Results
 
