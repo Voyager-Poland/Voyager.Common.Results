@@ -146,13 +146,11 @@ namespace Voyager.Common.Results.Analyzers
 			}
 
 			// !result.IsSuccess or !result.IsFailure
-			if (condition is IUnaryOperation { OperatorKind: UnaryOperatorKind.Not } unary)
+			if (condition is IUnaryOperation { OperatorKind: UnaryOperatorKind.Not } unary &&
+				IsSuccessCheckOnSymbol(unary.Operand, symbol, out var inner))
 			{
-				if (IsSuccessCheckOnSymbol(unary.Operand, symbol, out var inner))
-				{
-					checksForSuccess = !inner;
-					return true;
-				}
+				checksForSuccess = !inner;
+				return true;
 			}
 
 			return false;
