@@ -96,6 +96,26 @@ class C
 		await RunAnalyzerTest(test, Expect("result"));
 	}
 
+	[Fact]
+	public async Task ReportsWarning_WhenValueAccessedOnMethodCallWithoutVariable()
+	{
+		var test = ResultStubs + @"
+class C
+{
+	Result<int> GetResult() => Result<int>.Success(42);
+	void Test()
+	{
+		var x = {|#0:GetResult().Value|};
+	}
+}
+";
+		await RunAnalyzerTest(test,
+			new DiagnosticResult(ResultValueAccessedWithoutCheckAnalyzer.DiagnosticId,
+					Microsoft.CodeAnalysis.DiagnosticSeverity.Warning)
+				.WithLocation(0)
+				.WithArguments("GetResult()"));
+	}
+
 	#endregion
 
 	#region No-warning cases
