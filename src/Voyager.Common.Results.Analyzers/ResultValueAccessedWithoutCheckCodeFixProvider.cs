@@ -101,7 +101,17 @@ namespace Voyager.Common.Results.Analyzers
 					indent = trivia.ToString();
 			}
 
-			var eol = "\r\n";
+			// Detect line ending from existing trivia (Linux CI uses \n, Windows uses \r\n)
+			var eol = "\n";
+			foreach (var trivia in containingStatement.GetTrailingTrivia())
+			{
+				if (trivia.IsKind(SyntaxKind.EndOfLineTrivia))
+				{
+					eol = trivia.ToString();
+					break;
+				}
+			}
+
 			var innerIndent = indent + "\t";
 
 			// Build: if (receiver.IsSuccess)\r\n{indent}{\r\n{innerIndent}<statement>\r\n{indent}}
