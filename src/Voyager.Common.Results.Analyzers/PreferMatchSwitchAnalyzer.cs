@@ -55,13 +55,11 @@ namespace Voyager.Common.Results.Analyzers
 		private static string? GetResultCheckProperty(IOperation condition)
 		{
 			// result.IsSuccess or result.IsFailure
-			if (condition is IPropertyReferenceOperation propRef)
+			if (condition is IPropertyReferenceOperation propRef &&
+				(propRef.Property.Name == "IsSuccess" || propRef.Property.Name == "IsFailure") &&
+				ResultTypeHelper.IsResultType(propRef.Property.ContainingType))
 			{
-				if ((propRef.Property.Name == "IsSuccess" || propRef.Property.Name == "IsFailure") &&
-					ResultTypeHelper.IsResultType(propRef.Property.ContainingType))
-				{
-					return propRef.Property.Name;
-				}
+				return propRef.Property.Name;
 			}
 
 			// !result.IsSuccess or !result.IsFailure
