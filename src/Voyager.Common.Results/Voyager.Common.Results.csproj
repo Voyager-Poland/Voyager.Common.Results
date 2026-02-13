@@ -28,9 +28,10 @@
 		</PackageReference>
 	</ItemGroup>
 
-	<!-- Include README in package -->
+	<!-- Include README and icon in package -->
 	<ItemGroup>
 		<None Include="$(MSBuildThisFileDirectory)..\..\README.md" Pack="true" PackagePath="\" />
+		<None Include="$(MSBuildThisFileDirectory)..\..\img\voyager-nugets-ikona-128x128.png" Pack="true" PackagePath="\" />
 	</ItemGroup>
 
 	<!-- Ensure analyzer project builds before packing (no runtime reference) -->
