@@ -10,8 +10,6 @@ namespace Voyager.Common.Results.Analyzers
 	{
 		public const string DiagnosticId = "VCR0030";
 
-		private const string ResultNamespace = "Voyager.Common.Results";
-
 		private static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(
 			id: DiagnosticId,
 			title: "Nested Result<Result<T>> detected",
@@ -42,13 +40,13 @@ namespace Voyager.Common.Results.Analyzers
 				return;
 
 			// Verify the method is on a Result type or is an extension method in the Result namespace
-			if (!IsResultMethod(method))
+			if (!ResultTypeHelper.IsResultMethod(method))
 				return;
 
 			var returnType = (ITypeSymbol)method.ReturnType;
 
 			// Unwrap Task<T> / ValueTask<T>
-			var unwrapped = UnwrapTaskType(returnType);
+			var unwrapped = ResultTypeHelper.UnwrapTaskType(returnType);
 			if (unwrapped != null)
 				returnType = unwrapped;
 
@@ -56,9 +54,9 @@ namespace Voyager.Common.Results.Analyzers
 			if (returnType is INamedTypeSymbol outerResult &&
 				outerResult.IsGenericType &&
 				outerResult.Name == "Result" &&
-				outerResult.ContainingNamespace?.ToDisplayString() == ResultNamespace &&
+				outerResult.ContainingNamespace?.ToDisplayString() == ResultTypeHelper.ResultNamespace &&
 				outerResult.TypeArguments.Length == 1 &&
-				IsResultType(outerResult.TypeArguments[0]))
+				ResultTypeHelper.IsResultType(outerResult.TypeArguments[0]))
 			{
 				var innerTypeName = GetInnerTypeName(outerResult.TypeArguments[0]);
 				context.ReportDiagnostic(
@@ -77,47 +75,5 @@ namespace Voyager.Common.Results.Analyzers
 			return type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
 		}
 
-		private static bool IsResultMethod(IMethodSymbol method)
-		{
-			// Instance method on Result/Result<T>
-			if (IsResultType(method.ContainingType))
-				return true;
-
-			// Extension method in Voyager.Common.Results namespace
-			if (method.IsExtensionMethod &&
-				method.ContainingNamespace?.ToDisplayString()?.StartsWith(ResultNamespace) == true)
-				return true;
-
-			return false;
-		}
-
-		private static ITypeSymbol? UnwrapTaskType(ITypeSymbol type)
-		{
-			if (type is INamedTypeSymbol namedType && namedType.IsGenericType)
-			{
-				var originalDef = namedType.OriginalDefinition.ToDisplayString();
-				if (originalDef == "System.Threading.Tasks.Task<TResult>" ||
-					originalDef == "System.Threading.Tasks.ValueTask<TResult>")
-				{
-					return namedType.TypeArguments[0];
-				}
-			}
-
-			return null;
-		}
-
-		private static bool IsResultType(ITypeSymbol? type)
-		{
-			var current = type;
-			while (current != null)
-			{
-				if (current.Name == "Result" &&
-					current.ContainingNamespace?.ToDisplayString() == ResultNamespace)
-					return true;
-				current = current.BaseType;
-			}
-
-			return false;
-		}
 	}
 }

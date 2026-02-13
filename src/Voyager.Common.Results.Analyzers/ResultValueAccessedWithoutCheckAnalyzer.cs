@@ -10,8 +10,6 @@ namespace Voyager.Common.Results.Analyzers
 	{
 		public const string DiagnosticId = "VCR0020";
 
-		private const string ResultNamespace = "Voyager.Common.Results";
-
 		private static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(
 			id: DiagnosticId,
 			title: "Result value accessed without success check",
@@ -45,7 +43,7 @@ namespace Voyager.Common.Results.Analyzers
 			var containingType = propertyRef.Property.ContainingType;
 			if (containingType == null || !containingType.IsGenericType ||
 				containingType.Name != "Result" ||
-				containingType.ContainingNamespace?.ToDisplayString() != ResultNamespace)
+				containingType.ContainingNamespace?.ToDisplayString() != ResultTypeHelper.ResultNamespace)
 				return;
 
 			// Get the receiver symbol to match against guards
@@ -305,19 +303,11 @@ namespace Voyager.Common.Results.Analyzers
 			if (assignment.Value is IInvocationOperation invocation)
 			{
 				return invocation.TargetMethod.Name == "Success" &&
-					   IsResultType(invocation.TargetMethod.ContainingType);
+					   ResultTypeHelper.IsResultType(invocation.TargetMethod.ContainingType);
 			}
 
 			return false;
 		}
 
-		private static bool IsResultType(ITypeSymbol? type)
-		{
-			if (type is not INamedTypeSymbol namedType)
-				return false;
-
-			return namedType.Name == "Result" &&
-				   namedType.ContainingNamespace?.ToDisplayString() == ResultNamespace;
-		}
 	}
 }

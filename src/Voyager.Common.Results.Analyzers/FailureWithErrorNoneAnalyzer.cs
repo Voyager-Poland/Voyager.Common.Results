@@ -10,8 +10,6 @@ namespace Voyager.Common.Results.Analyzers
 	{
 		public const string DiagnosticId = "VCR0050";
 
-		private const string ResultNamespace = "Voyager.Common.Results";
-
 		private static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(
 			id: DiagnosticId,
 			title: "Failure created with Error.None",
@@ -41,7 +39,7 @@ namespace Voyager.Common.Results.Analyzers
 			if (method.Name != "Failure")
 				return;
 
-			if (!IsResultType(method.ContainingType))
+			if (!ResultTypeHelper.IsResultType(method.ContainingType))
 				return;
 
 			if (invocation.Arguments.Length != 1)
@@ -53,25 +51,12 @@ namespace Voyager.Common.Results.Analyzers
 			if (argValue is IFieldReferenceOperation fieldRef &&
 				fieldRef.Field.Name == "None" &&
 				fieldRef.Field.ContainingType?.Name == "Error" &&
-				fieldRef.Field.ContainingType?.ContainingNamespace?.ToDisplayString() == ResultNamespace)
+				fieldRef.Field.ContainingType?.ContainingNamespace?.ToDisplayString() == ResultTypeHelper.ResultNamespace)
 			{
 				context.ReportDiagnostic(
 					Diagnostic.Create(Rule, invocation.Syntax.GetLocation()));
 			}
 		}
 
-		private static bool IsResultType(ITypeSymbol? type)
-		{
-			var current = type;
-			while (current != null)
-			{
-				if (current.Name == "Result" &&
-					current.ContainingNamespace?.ToDisplayString() == ResultNamespace)
-					return true;
-				current = current.BaseType;
-			}
-
-			return false;
-		}
 	}
 }

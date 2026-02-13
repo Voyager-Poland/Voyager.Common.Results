@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Roslyn Analyzer VCR0060 — Prefer Match/Switch**: Disabled-by-default suggestion to use `Match`/`Switch` over `if/else` branching on `IsSuccess`
 
 ### Changed
+- **Analyzer internals — extract `ResultTypeHelper`**: Consolidated duplicated `IsResultType`, `IsResultMethod`, `UnwrapTaskType`, and `ResultNamespace` from all 6 analyzers into a shared `internal static class ResultTypeHelper`
+  - Fixes VCR0020 bug: `IsResultType` now traverses base type hierarchy (previously only checked the direct type, missing inherited Result types)
 - **VCR0020 — guard traversal across parent blocks**: Analyzer now searches parent blocks for failure guards, not just the immediate enclosing block (pattern 7: guard in outer `if`/`foreach` protects `.Value` in nested blocks)
 - **VCR0020 — reassignment to Success pattern**: Recognizes `result = Result<T>.Success(...)` as last statement in failure guard as ensuring success after the block (pattern 8)
 - **VCR0020 — `continue`/`break` as guard exit**: `if (result.IsFailure) { continue; }` in loops now recognized as valid guard, same as `return`/`throw` (pattern 9)

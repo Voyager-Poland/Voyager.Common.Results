@@ -10,9 +10,6 @@ namespace Voyager.Common.Results.Analyzers
 	{
 		public const string DiagnosticId = "VCR0010";
 
-		private const string ResultTypeName = "Result";
-		private const string ResultNamespace = "Voyager.Common.Results";
-
 		private static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(
 			id: DiagnosticId,
 			title: "Result must be consumed",
@@ -52,11 +49,11 @@ namespace Voyager.Common.Results.Analyzers
 				return;
 
 			// Unwrap Task<T> → T (for non-awaited scenarios)
-			var unwrapped = UnwrapTaskType(returnType);
+			var unwrapped = ResultTypeHelper.UnwrapTaskType(returnType);
 			if (unwrapped != null)
 				returnType = unwrapped;
 
-			if (!IsResultType(returnType))
+			if (!ResultTypeHelper.IsResultType(returnType))
 				return;
 
 			var methodName = GetMethodName(operation, returnType);
@@ -93,38 +90,5 @@ namespace Voyager.Common.Results.Analyzers
 			}
 		}
 
-		private static ITypeSymbol? UnwrapTaskType(ITypeSymbol type)
-		{
-			if (type is INamedTypeSymbol namedType && namedType.IsGenericType)
-			{
-				var originalDef = namedType.OriginalDefinition.ToDisplayString();
-				if (originalDef == "System.Threading.Tasks.Task<TResult>" ||
-					originalDef == "System.Threading.Tasks.ValueTask<TResult>")
-				{
-					return namedType.TypeArguments[0];
-				}
-			}
-
-			return null;
-		}
-
-		private static bool IsResultType(ITypeSymbol? type)
-		{
-			if (type == null)
-				return false;
-
-			// Check the type and all its base types
-			var current = type;
-			while (current != null)
-			{
-				if (current.Name == ResultTypeName &&
-					current.ContainingNamespace?.ToDisplayString() == ResultNamespace)
-					return true;
-
-				current = current.BaseType;
-			}
-
-			return false;
-		}
 	}
 }

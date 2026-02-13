@@ -10,8 +10,6 @@ namespace Voyager.Common.Results.Analyzers
 	{
 		public const string DiagnosticId = "VCR0040";
 
-		private const string ResultNamespace = "Voyager.Common.Results";
-
 		private static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(
 			id: DiagnosticId,
 			title: "GetValueOrThrow defeats Result pattern",
@@ -42,25 +40,12 @@ namespace Voyager.Common.Results.Analyzers
 			if (method.Name != "GetValueOrThrow")
 				return;
 
-			if (!IsResultType(method.ContainingType))
+			if (!ResultTypeHelper.IsResultType(method.ContainingType))
 				return;
 
 			context.ReportDiagnostic(
 				Diagnostic.Create(Rule, invocation.Syntax.GetLocation()));
 		}
 
-		private static bool IsResultType(ITypeSymbol? type)
-		{
-			var current = type;
-			while (current != null)
-			{
-				if (current.Name == "Result" &&
-					current.ContainingNamespace?.ToDisplayString() == ResultNamespace)
-					return true;
-				current = current.BaseType;
-			}
-
-			return false;
-		}
 	}
 }

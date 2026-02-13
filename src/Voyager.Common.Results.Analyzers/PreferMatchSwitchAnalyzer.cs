@@ -11,8 +11,6 @@ namespace Voyager.Common.Results.Analyzers
 	{
 		public const string DiagnosticId = "VCR0060";
 
-		private const string ResultNamespace = "Voyager.Common.Results";
-
 		private static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(
 			id: DiagnosticId,
 			title: "Consider using Match or Switch instead of if/else on IsSuccess",
@@ -60,7 +58,7 @@ namespace Voyager.Common.Results.Analyzers
 			if (condition is IPropertyReferenceOperation propRef)
 			{
 				if ((propRef.Property.Name == "IsSuccess" || propRef.Property.Name == "IsFailure") &&
-					IsResultType(propRef.Property.ContainingType))
+					ResultTypeHelper.IsResultType(propRef.Property.ContainingType))
 				{
 					return propRef.Property.Name;
 				}
@@ -73,18 +71,5 @@ namespace Voyager.Common.Results.Analyzers
 			return null;
 		}
 
-		private static bool IsResultType(ITypeSymbol? type)
-		{
-			var current = type;
-			while (current != null)
-			{
-				if (current.Name == "Result" &&
-					current.ContainingNamespace?.ToDisplayString() == ResultNamespace)
-					return true;
-				current = current.BaseType;
-			}
-
-			return false;
-		}
 	}
 }
