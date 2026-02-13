@@ -335,6 +335,59 @@ class C
 		await RunAnalyzerTest(test);
 	}
 
+	[Fact]
+	public async Task NoWarning_WhenFailureGuardWithContinueInLoop()
+	{
+		var test = ResultStubs + @"
+class C
+{
+	void Test()
+	{
+		var items = new[] { 1, 2, 3 };
+		var list = new System.Collections.Generic.List<int>();
+		foreach (var item in items)
+		{
+			var result = Result<int>.Success(item);
+			if (result.IsFailure)
+			{
+				continue;
+			}
+			list.Add(result.Value);
+		}
+	}
+}
+";
+		await RunAnalyzerTest(test);
+	}
+
+	[Fact]
+	public async Task NoWarning_WhenFailureGuardWithContinueAndNestedAccess()
+	{
+		var test = ResultStubs + @"
+class C
+{
+	void Test()
+	{
+		var items = new[] { 1, 2, 3 };
+		var list = new System.Collections.Generic.List<int>();
+		foreach (var item in items)
+		{
+			var result = Result<int>.Success(item);
+			if (result.IsFailure)
+			{
+				continue;
+			}
+			if (result.Value > 0)
+			{
+				list.Add(result.Value);
+			}
+		}
+	}
+}
+";
+		await RunAnalyzerTest(test);
+	}
+
 	#endregion
 
 	#region Code fix tests

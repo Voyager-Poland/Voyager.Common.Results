@@ -240,7 +240,7 @@ namespace Voyager.Common.Results.Analyzers
 		/// <summary>
 		/// Checks if the guard body guarantees the receiver is success after execution.
 		/// This is true when:
-		/// 1. The body unconditionally returns or throws (early exit), OR
+		/// 1. The body unconditionally exits (return, throw, continue, break), OR
 		/// 2. The last statement reassigns the receiver to Result.Success(...)
 		/// </summary>
 		private static bool GuardEnsuresSuccess(IOperation? body, ISymbol receiverSymbol)
@@ -248,16 +248,16 @@ namespace Voyager.Common.Results.Analyzers
 			if (body == null)
 				return false;
 
-			// Simple case: direct return/throw
-			if (body is IReturnOperation || body is IThrowOperation)
+			// Simple case: direct exit statement
+			if (IsExitStatement(body))
 				return true;
 
 			if (body is IBlockOperation block)
 			{
-				// Case 1: any direct child is unconditional return/throw
+				// Case 1: any direct child is unconditional exit
 				foreach (var op in block.Operations)
 				{
-					if (op is IReturnOperation || op is IThrowOperation)
+					if (IsExitStatement(op))
 						return true;
 				}
 
@@ -272,6 +272,9 @@ namespace Voyager.Common.Results.Analyzers
 
 			return false;
 		}
+
+		private static bool IsExitStatement(IOperation operation) =>
+			operation is IReturnOperation or IThrowOperation or IBranchOperation;
 
 		/// <summary>
 		/// Checks if the operation is an assignment of the form:

@@ -24,7 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **VCR0020 — guard traversal across parent blocks**: Analyzer now searches parent blocks for failure guards, not just the immediate enclosing block (pattern 7: guard in outer `if`/`foreach` protects `.Value` in nested blocks)
 - **VCR0020 — reassignment to Success pattern**: Recognizes `result = Result<T>.Success(...)` as last statement in failure guard as ensuring success after the block (pattern 8)
-- **ADR-0010**: Documented guard patterns 7 and 8 with examples
+- **VCR0020 — `continue`/`break` as guard exit**: `if (result.IsFailure) { continue; }` in loops now recognized as valid guard, same as `return`/`throw` (pattern 9)
+- **ADR-0010**: Documented guard patterns 7, 8, and 9 with examples
 
 ### Fixed
 - **`.editorconfig` naming rules**: `private const` and `private static readonly` fields now correctly require PascalCase instead of `_camelCase`
