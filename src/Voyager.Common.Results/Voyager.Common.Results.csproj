@@ -33,6 +33,13 @@
 		<None Include="$(MSBuildThisFileDirectory)..\..\README.md" Pack="true" PackagePath="\" />
 	</ItemGroup>
 
+	<!-- Ensure analyzer project builds before packing (no runtime reference) -->
+	<ItemGroup>
+		<ProjectReference Include="..\Voyager.Common.Results.Analyzers\Voyager.Common.Results.Analyzers.csproj"
+					ReferenceOutputAssembly="false"
+					PrivateAssets="All" />
+	</ItemGroup>
+
 	<!-- Include Roslyn Analyzer in package (ADR-0010) -->
 	<ItemGroup>
 		<None Include="$(MSBuildThisFileDirectory)..\Voyager.Common.Results.Analyzers\bin\$(Configuration)\netstandard2.0\Voyager.Common.Results.Analyzers.dll"
