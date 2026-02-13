@@ -337,7 +337,83 @@ class C
 
 	#endregion
 
+	#region Code fix tests
+
+	[Fact]
+	public async Task CodeFix_ReplacesValueWithGetValueOrThrow()
+	{
+		var test = ResultStubsWithGetValueOrThrow + @"
+class C
+{
+	void Test()
+	{
+		var result = Result<int>.Success(42);
+		var x = {|#0:result.Value|};
+	}
+}
+";
+		var fixedCode = ResultStubsWithGetValueOrThrow + @"
+class C
+{
+	void Test()
+	{
+		var result = Result<int>.Success(42);
+		var x = result.GetValueOrThrow();
+	}
+}
+";
+		await RunCodeFixTest(test, fixedCode, Expect("result"));
+	}
+
+	[Fact]
+	public async Task CodeFix_ReplacesChainedValueWithGetValueOrThrow()
+	{
+		var test = ResultStubsWithGetValueOrThrow + @"
+class C
+{
+	void Test()
+	{
+		var result = Result<string>.Success(""hello"");
+		var len = {|#0:result.Value|}.Length;
+	}
+}
+";
+		var fixedCode = ResultStubsWithGetValueOrThrow + @"
+class C
+{
+	void Test()
+	{
+		var result = Result<string>.Success(""hello"");
+		var len = result.GetValueOrThrow().Length;
+	}
+}
+";
+		await RunCodeFixTest(test, fixedCode, Expect("result"));
+	}
+
+	#endregion
+
 	#region Helpers
+
+	private const string ResultStubsWithGetValueOrThrow = @"
+using System;
+using Voyager.Common.Results;
+
+namespace Voyager.Common.Results
+{
+	public class Result
+	{
+		public bool IsSuccess { get; }
+		public bool IsFailure => !IsSuccess;
+	}
+	public class Result<T> : Result
+	{
+		public T Value { get; }
+		public T GetValueOrThrow() => default;
+		public static Result<T> Success(T value) => new Result<T>();
+	}
+}
+";
 
 	private static DiagnosticResult Expect(string receiverName) =>
 		new DiagnosticResult(ResultValueAccessedWithoutCheckAnalyzer.DiagnosticId,
@@ -353,6 +429,19 @@ class C
 			ReferenceAssemblies = ReferenceAssemblies.Net.Net80,
 		};
 		test.ExpectedDiagnostics.AddRange(expected);
+		await test.RunAsync();
+	}
+
+	private static async Task RunCodeFixTest(
+		string source, string fixedSource, DiagnosticResult expected)
+	{
+		var test = new CSharpCodeFixTest<ResultValueAccessedWithoutCheckAnalyzer, ResultValueAccessedWithoutCheckCodeFixProvider, DefaultVerifier>
+		{
+			TestCode = source,
+			FixedCode = fixedSource,
+			ReferenceAssemblies = ReferenceAssemblies.Net.Net80,
+		};
+		test.ExpectedDiagnostics.Add(expected);
 		await test.RunAsync();
 	}
 

@@ -79,12 +79,15 @@ await UpdateUserAsync(user);         // ⚠ VCR0010 (Task skonsumowany, Result n
 ```
 src/
   Voyager.Common.Results.Analyzers/
-    Voyager.Common.Results.Analyzers.csproj    // netstandard2.0 (wymagane dla Roslyn)
-    ResultMustBeConsumedAnalyzer.cs             // DiagnosticAnalyzer
-    ResultMustBeConsumedCodeFixProvider.cs      // CodeFix: dodaj `_ = ` lub `var result = `
+    Voyager.Common.Results.Analyzers.csproj                    // netstandard2.0 (wymagane dla Roslyn)
+    ResultMustBeConsumedAnalyzer.cs                            // VCR0010 DiagnosticAnalyzer
+    ResultMustBeConsumedCodeFixProvider.cs                     // VCR0010 CodeFix: `_ = ` lub `var result = `
+    ResultValueAccessedWithoutCheckAnalyzer.cs                 // VCR0020 DiagnosticAnalyzer
+    ResultValueAccessedWithoutCheckCodeFixProvider.cs          // VCR0020 CodeFix: `.Value` → `.GetValueOrThrow()`
   Voyager.Common.Results.Analyzers.Tests/
     Voyager.Common.Results.Analyzers.Tests.csproj
     ResultMustBeConsumedAnalyzerTests.cs
+    ResultValueAccessedWithoutCheckAnalyzerTests.cs
 ```
 
 ### Dostarczanie via NuGet
@@ -365,6 +368,34 @@ var x = result.Value;  // ✅ po bloku zmienna gwarantuje success
 **Wzorzec 7 (guard w bloku nadrzędnym):** Analyzer przeszukuje nie tylko bezpośrednio otaczający blok, ale traversuje w górę drzewa bloków. Dzięki temu guard `if (x.IsFailure) return;` w bloku `foreach` lub metody chroni `.Value` wewnątrz zagnieżdżonego `if`.
 
 **Wzorzec 8 (reassignment do Success):** Gdy gałąź `IsFailure` nie zawiera bezwarunkowego `return`/`throw`, ale jej **ostatnia instrukcja** to przypisanie `result = Result<T>.Success(...)`, analyzer uznaje to za gwarancję sukcesu po bloku — zmienna jest albo oryginalna (success, bo guard się nie uruchomił) albo nadpisana nową wartością success.
+
+#### Code Fix: `GetValueOrThrow()`
+
+VCR0020 oferuje Code Fix, który zamienia niesprawdzony `.Value` na `GetValueOrThrow()`:
+
+```csharp
+// Przed (⚠ VCR0020)
+var x = result.Value;
+
+// Po zastosowaniu code fix (✅ jawna intencja)
+var x = result.GetValueOrThrow();
+```
+
+**Kiedy `GetValueOrThrow()` jest uzasadnione:**
+- **Testy** — w testach chcemy szybko wyciągnąć wartość, a `GetValueOrThrow` daje czytelny stack trace
+- **Kontrolery/Handlery** — na granicy systemu, gdzie i tak obsługujemy wyjątki (middleware)
+- **Top-level code** — skrypty, konsolowe narzędzia, seedy bazy danych
+- **Adaptery** — integracja z kodem, który nie rozumie Result pattern
+
+Code fix zachowuje dalsze wywołania łańcuchowe:
+
+```csharp
+// Przed
+var len = result.Value.Length;
+
+// Po
+var len = result.GetValueOrThrow().Length;
+```
 
 ### VCR0030: Nested `Result<Result<T>>` (Warning)
 
