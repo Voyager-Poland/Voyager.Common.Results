@@ -14,8 +14,9 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<!-- Include README in NuGet package -->
+		<!-- Include README and icon in NuGet package -->
 		<None Include="README.md" Pack="true" PackagePath="\" />
+		<None Include="$(MSBuildThisFileDirectory)..\..\img\voyager-nugets-ikona-128x128.png" Pack="true" PackagePath="\" />
 	</ItemGroup>
 
 	<ItemGroup>
