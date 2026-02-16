@@ -10,7 +10,7 @@ Plan rozwoju komponentu. Priorytety mogą się zmieniać w zależności od potrz
 
 - [x] **VCR0050 CodeFix** — `Failure(Error.None)` → `Failure(Error.UnexpectedError("TODO: provide error message"))`
 - [x] **VCR0020 — rozpoznawanie Assert jako guard** — xUnit `Assert.True/False`, NUnit `Assert.That/IsTrue/IsFalse`, MSTest `Assert.IsTrue/IsFalse`, FluentAssertions `.Should().BeTrue/BeFalse()`
-- [x] **VCR0010 — Switch nie triggeruje** — `.Switch()` zwraca void, więc naturalnie nie triggeruje VCR0010; `.Tap()` poprawnie ostrzega (zwraca Result)
+- [x] **VCR0010 — Switch/Tap zachowanie** — `.Switch()` zwraca void, więc naturalnie nie triggeruje VCR0010; `.Tap()` poprawnie ostrzega (zwraca Result). Oryginalne wymaganie dotyczyło supresji Tap w testach — zdecydowano, że Tap powinien ostrzegać wszędzie (w tym w testach), bo porzucenie wyniku Tap może być bugiem; jeśli trzeba, suprymować przez `_ = result.Tap(...)`
 - [x] **HelpLinkUri + strony dokumentacji** — `helpLinkUri` na wszystkich 6 `DiagnosticDescriptor` (VCR0010-VCR0060) + `docs/analyzers/VCR00xx.md` z opisami reguł
 - [ ] **VCR0040 CodeFix** — `GetValueOrThrow()` → `Match(onSuccess, onFailure)` refactoring (odłożone — transformacja zbyt kontekstowa)
 - [ ] **VCR0060 CodeFix** — `if/else` → `Match/Switch` (odłożone — rekonstrukcja lambd zbyt złożona)
