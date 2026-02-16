@@ -329,21 +329,29 @@ namespace Voyager.Common.Results.Analyzers
 			}
 
 			// result.IsSuccess.Should().BeTrue() — FluentAssertions
-			if (methodName == "BeTrue" && IsFluentAssertionsOnIsSuccessCheck(invocation, receiverSymbol))
+			if (methodName == "BeTrue" &&
+				IsFluentAssertionsShouldCheck(invocation, receiverSymbol, out var fChecks) && fChecks)
 				return true;
 
 			// result.IsFailure.Should().BeFalse() — FluentAssertions
-			if (methodName == "BeFalse" && IsFluentAssertionsOnIsFailureCheck(invocation, receiverSymbol))
+			if (methodName == "BeFalse" &&
+				IsFluentAssertionsShouldCheck(invocation, receiverSymbol, out var fChecks2) && !fChecks2)
 				return true;
 
 			return false;
 		}
 
-		private static bool IsFluentAssertionsOnIsSuccessCheck(
-			IInvocationOperation beTrueCall, ISymbol receiverSymbol)
+		/// <summary>
+		/// Extracts the IsSuccess/IsFailure check from a FluentAssertions Should() chain.
+		/// Returns true if the subject of Should() is an IsSuccess/IsFailure check on the symbol.
+		/// </summary>
+		private static bool IsFluentAssertionsShouldCheck(
+			IInvocationOperation call, ISymbol receiverSymbol, out bool checksForSuccess)
 		{
-			// BeTrue() is called on the result of Should()
-			if (beTrueCall.Instance is not IInvocationOperation shouldCall)
+			checksForSuccess = false;
+
+			// BeTrue()/BeFalse() is called on the result of Should()
+			if (call.Instance is not IInvocationOperation shouldCall)
 				return false;
 
 			if (shouldCall.TargetMethod.Name != "Should")
@@ -351,41 +359,13 @@ namespace Voyager.Common.Results.Analyzers
 
 			// Should() is an extension method — subject is the first argument
 			if (shouldCall.Arguments.Length >= 1)
-			{
 				return IsSuccessCheckOnSymbol(shouldCall.Arguments[0].Value, receiverSymbol,
-					out var checks) && checks;
-			}
+					out checksForSuccess);
 
 			// Should() as instance method — subject is the receiver
 			if (shouldCall.Instance != null)
-			{
 				return IsSuccessCheckOnSymbol(shouldCall.Instance, receiverSymbol,
-					out var checks) && checks;
-			}
-
-			return false;
-		}
-
-		private static bool IsFluentAssertionsOnIsFailureCheck(
-			IInvocationOperation beFalseCall, ISymbol receiverSymbol)
-		{
-			if (beFalseCall.Instance is not IInvocationOperation shouldCall)
-				return false;
-
-			if (shouldCall.TargetMethod.Name != "Should")
-				return false;
-
-			if (shouldCall.Arguments.Length >= 1)
-			{
-				return IsSuccessCheckOnSymbol(shouldCall.Arguments[0].Value, receiverSymbol,
-					out var checks) && !checks;
-			}
-
-			if (shouldCall.Instance != null)
-			{
-				return IsSuccessCheckOnSymbol(shouldCall.Instance, receiverSymbol,
-					out var checks) && !checks;
-			}
+					out checksForSuccess);
 
 			return false;
 		}
