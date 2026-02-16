@@ -5,6 +5,7 @@ namespace Voyager.Common.Results.Analyzers
 	internal static class ResultTypeHelper
 	{
 		internal const string ResultNamespace = "Voyager.Common.Results";
+		internal const string HelpLinkBase = "https://github.com/Voyager-Poland/Voyager.Common.Results/blob/master/docs/analyzers/";
 
 		/// <summary>
 		/// Checks if the type is Result or Result&lt;T&gt; from Voyager.Common.Results,

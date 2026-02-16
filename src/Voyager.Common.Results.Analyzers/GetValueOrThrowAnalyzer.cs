@@ -20,7 +20,8 @@ namespace Voyager.Common.Results.Analyzers
 			description:
 				"GetValueOrThrow converts a Result failure back into an exception, " +
 				"which defeats the purpose of using the Result pattern. " +
-				"Prefer Match, Bind, or Map for composable error handling.");
+				"Prefer Match, Bind, or Map for composable error handling.",
+			helpLinkUri: ResultTypeHelper.HelpLinkBase + "VCR0040.md");
 
 		public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
 			ImmutableArray.Create(Rule);

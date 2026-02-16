@@ -20,7 +20,8 @@ namespace Voyager.Common.Results.Analyzers
 			description:
 				"Accessing Result<T>.Value without first checking IsSuccess may lead to " +
 				"using a default/null value when the operation failed. " +
-				"Use Match, Switch, or check IsSuccess before accessing Value.");
+				"Use Match, Switch, or check IsSuccess before accessing Value.",
+			helpLinkUri: ResultTypeHelper.HelpLinkBase + "VCR0020.md");
 
 		public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
 			ImmutableArray.Create(Rule);
