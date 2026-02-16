@@ -33,7 +33,7 @@ dotnet pack -c Release src/Voyager.Common.Results/Voyager.Common.Results.csproj
 - **ConfigureAwait(false)** on every `await` in library code (ADR-0001, hardcoded, no parameter)
 - **MinVer versioning** — versions from git tags (`v1.2.3`), always `dotnet clean` before rebuild
 - **Strong-named** — signed with `Voyager.Common.Results.snk`
-- **Editorconfig:** tabs (width 2), CRLF, private fields `_camelCase`, interfaces `I` prefix, no `this.` qualifier
+- **Editorconfig:** tabs (width 2), CRLF, `insert_final_newline=true`, private fields `_camelCase`, interfaces `I` prefix, no `this.` qualifier, `csharp_prefer_braces=false` (single-statement if without braces)
 
 ## Architecture
 
@@ -52,6 +52,7 @@ src/
       ErrorTypeExtensions.cs           # IsTransient(), ToHttpStatusCode(), ShouldRetry()
 
   Voyager.Common.Results.Analyzers/    # Roslyn analyzers (netstandard2.0)
+    ResultTypeHelper.cs                        # Shared: IsResultType, IsResultMethod, UnwrapTaskType
     ResultMustBeConsumedAnalyzer.cs             # VCR0010: unconsumed Result
     ResultMustBeConsumedCodeFixProvider.cs      # VCR0010 CodeFix: `_ = ` or `var result = `
     ResultValueAccessedWithoutCheckAnalyzer.cs  # VCR0020: .Value without IsSuccess guard
@@ -117,6 +118,15 @@ The analyzer recognizes `IsFailure` early-return guards (not just `IsSuccess`), 
 - Guard with reassignment: `if (result.IsFailure) { result = Result<T>.Success(...); }` as last statement
 
 **Not recognized:** Test assertion patterns like `Assert.That(result.IsSuccess, Is.True)` — suppress VCR0020 in test `.editorconfig` if needed.
+
+## Roslyn Analyzer Development Constraints
+
+- **Target:** netstandard2.0 (required by Roslyn), `ImplicitUsings=disable`
+- **No LINQ in analyzers** — analyzers run on every keystroke in IDE; `foreach` with early return is preferred over `.Any()`, `.Where()` etc. to avoid delegate allocations on hot paths. CodeFixProviders (on-demand only) are less critical but keep consistent style.
+- **Cross-platform line endings** — CodeFix providers must detect EOL from syntax trivia, never hardcode `\r\n` (CI runs on Linux)
+- **`out var` scoping** — be careful when flattening nested `if` statements: `out var` in a combined `if` condition scopes to the enclosing block, which may conflict with other `out var` declarations in sibling `if` blocks within the same loop
+- **ResultTypeHelper** — shared `IsResultType` (with base type traversal), `IsResultMethod`, `UnwrapTaskType`. All analyzers use this, never duplicate these checks.
+- **Analyzer test project** does NOT reference the core `Voyager.Common.Results` library — tests use inline `ResultStubs` (stub type definitions inside test strings)
 
 ## Testing Conventions
 
