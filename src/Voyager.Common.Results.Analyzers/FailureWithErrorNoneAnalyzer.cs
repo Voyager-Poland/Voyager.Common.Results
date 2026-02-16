@@ -19,7 +19,8 @@ namespace Voyager.Common.Results.Analyzers
 			isEnabledByDefault: true,
 			description:
 				"Result.Failure(Error.None) creates a failure result without an actual error, " +
-				"which is a semantic contradiction. Use a specific error or Result.Success() instead.");
+				"which is a semantic contradiction. Use a specific error or Result.Success() instead.",
+			helpLinkUri: ResultTypeHelper.HelpLinkBase + "VCR0050.md");
 
 		public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
 			ImmutableArray.Create(Rule);

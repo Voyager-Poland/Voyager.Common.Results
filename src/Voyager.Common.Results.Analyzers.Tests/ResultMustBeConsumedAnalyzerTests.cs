@@ -20,6 +20,7 @@ namespace Voyager.Common.Results
 		public static Result Success() => new Result();
 		public static Result Failure() => new Result();
 		public Result Tap(Action action) => this;
+		public void Switch(Action onSuccess, Action onFailure) { }
 		public TResult Match<TResult>(Func<TResult> onSuccess, Func<TResult> onFailure) => onSuccess();
 	}
 	public class Result<T> : Result
@@ -28,6 +29,7 @@ namespace Voyager.Common.Results
 		public static new Result<T> Success(T value) => new Result<T>();
 		public static new Result<T> Failure() => new Result<T>();
 		public Result<T> Ensure(Func<T, bool> predicate) => this;
+		public void Switch(Action<T> onSuccess, Action onFailure) { }
 	}
 }
 ";
@@ -246,6 +248,38 @@ class C
 }
 ";
 		await RunAnalyzerTest(test);
+	}
+
+	[Fact]
+	public async Task NoWarning_WhenSwitchUsedAsStatement()
+	{
+		var test = ResultStubs + @"
+class C
+{
+	void Test()
+	{
+		var result = Result<int>.Success(42);
+		result.Switch(v => { }, () => { });
+	}
+}
+";
+		await RunAnalyzerTest(test);
+	}
+
+	[Fact]
+	public async Task ReportsWarning_WhenTapResultDiscarded()
+	{
+		var test = ResultStubs + @"
+class C
+{
+	void Test()
+	{
+		var result = Result.Success();
+		{|#0:result.Tap(() => { })|};
+	}
+}
+";
+		await RunAnalyzerTest(test, Expect("Tap"));
 	}
 
 	#endregion

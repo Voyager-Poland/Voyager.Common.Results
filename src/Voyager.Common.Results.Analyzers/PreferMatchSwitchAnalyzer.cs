@@ -20,7 +20,8 @@ namespace Voyager.Common.Results.Analyzers
 			isEnabledByDefault: false,
 			description:
 				"When branching on Result.IsSuccess/IsFailure with both if and else, " +
-				"consider using Match or Switch for exhaustive handling of both paths.");
+				"consider using Match or Switch for exhaustive handling of both paths.",
+			helpLinkUri: ResultTypeHelper.HelpLinkBase + "VCR0060.md");
 
 		public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
 			ImmutableArray.Create(Rule);

@@ -19,7 +19,8 @@ namespace Voyager.Common.Results.Analyzers
 			isEnabledByDefault: true,
 			description:
 				"Methods returning Result or Result<T> must have their return value checked. " +
-				"Ignoring the result means errors are silently lost.");
+				"Ignoring the result means errors are silently lost.",
+			helpLinkUri: ResultTypeHelper.HelpLinkBase + "VCR0010.md");
 
 		public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
 			ImmutableArray.Create(Rule);

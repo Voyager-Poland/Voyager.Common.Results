@@ -410,6 +410,223 @@ class C
 
 	#endregion
 
+	#region Assert guard cases
+
+	private const string ResultStubsNoUsing = @"
+namespace Voyager.Common.Results
+{
+	public class Result
+	{
+		public bool IsSuccess { get; }
+		public bool IsFailure => !IsSuccess;
+	}
+	public class Result<T> : Result
+	{
+		public T Value { get; }
+		public static Result<T> Success(T value) => new Result<T>();
+	}
+}
+";
+
+	private const string AssertStubs = @"
+namespace Xunit
+{
+	public static class Assert
+	{
+		public static void True(bool condition) { }
+		public static void False(bool condition) { }
+	}
+}
+namespace NUnit.Framework
+{
+	public static class Assert
+	{
+		public static void That(bool condition, object constraint) { }
+		public static void IsTrue(bool condition) { }
+		public static void IsFalse(bool condition) { }
+	}
+	public static class Is
+	{
+		public static object True => null;
+	}
+}
+namespace FluentAssertions
+{
+	public static class AssertionExtensions
+	{
+		public static BooleanAssertions Should(this bool value) => new();
+	}
+	public class BooleanAssertions
+	{
+		public void BeTrue() { }
+		public void BeFalse() { }
+	}
+}
+";
+
+	[Fact]
+	public async Task NoWarning_WhenPrecededByXunitAssertTrue()
+	{
+		var test = @"
+using Xunit;
+using Voyager.Common.Results;
+" + AssertStubs + ResultStubsNoUsing + @"
+class C
+{
+	void Test()
+	{
+		var result = Result<int>.Success(42);
+		Assert.True(result.IsSuccess);
+		var x = result.Value;
+	}
+}
+";
+		await RunAnalyzerTest(test);
+	}
+
+	[Fact]
+	public async Task NoWarning_WhenPrecededByXunitAssertFalseIsFailure()
+	{
+		var test = @"
+using Xunit;
+using Voyager.Common.Results;
+" + AssertStubs + ResultStubsNoUsing + @"
+class C
+{
+	void Test()
+	{
+		var result = Result<int>.Success(42);
+		Assert.False(result.IsFailure);
+		var x = result.Value;
+	}
+}
+";
+		await RunAnalyzerTest(test);
+	}
+
+	[Fact]
+	public async Task NoWarning_WhenPrecededByNunitAssertThat()
+	{
+		var test = @"
+using NUnit.Framework;
+using Voyager.Common.Results;
+" + AssertStubs + ResultStubsNoUsing + @"
+class C
+{
+	void Test()
+	{
+		var result = Result<int>.Success(42);
+		Assert.That(result.IsSuccess, Is.True);
+		var x = result.Value;
+	}
+}
+";
+		await RunAnalyzerTest(test);
+	}
+
+	[Fact]
+	public async Task NoWarning_WhenPrecededByNunitAssertIsTrue()
+	{
+		var test = @"
+using NUnit.Framework;
+using Voyager.Common.Results;
+" + AssertStubs + ResultStubsNoUsing + @"
+class C
+{
+	void Test()
+	{
+		var result = Result<int>.Success(42);
+		Assert.IsTrue(result.IsSuccess);
+		var x = result.Value;
+	}
+}
+";
+		await RunAnalyzerTest(test);
+	}
+
+	[Fact]
+	public async Task NoWarning_WhenPrecededByFluentAssertionsBeTrue()
+	{
+		var test = @"
+using FluentAssertions;
+using Voyager.Common.Results;
+" + AssertStubs + ResultStubsNoUsing + @"
+class C
+{
+	void Test()
+	{
+		var result = Result<int>.Success(42);
+		result.IsSuccess.Should().BeTrue();
+		var x = result.Value;
+	}
+}
+";
+		await RunAnalyzerTest(test);
+	}
+
+	[Fact]
+	public async Task NoWarning_WhenPrecededByFluentAssertionsBeFalseOnIsFailure()
+	{
+		var test = @"
+using FluentAssertions;
+using Voyager.Common.Results;
+" + AssertStubs + ResultStubsNoUsing + @"
+class C
+{
+	void Test()
+	{
+		var result = Result<int>.Success(42);
+		result.IsFailure.Should().BeFalse();
+		var x = result.Value;
+	}
+}
+";
+		await RunAnalyzerTest(test);
+	}
+
+	[Fact]
+	public async Task ReportsWarning_WhenAssertChecksDifferentVariable()
+	{
+		var test = @"
+using Xunit;
+using Voyager.Common.Results;
+" + AssertStubs + ResultStubsNoUsing + @"
+class C
+{
+	void Test()
+	{
+		var result1 = Result<int>.Success(42);
+		var result2 = Result<int>.Success(99);
+		Assert.True(result1.IsSuccess);
+		var x = {|#0:result2.Value|};
+	}
+}
+";
+		await RunAnalyzerTest(test, Expect("result2"));
+	}
+
+	[Fact]
+	public async Task ReportsWarning_WhenAssertFalseOnIsSuccess()
+	{
+		var test = @"
+using Xunit;
+using Voyager.Common.Results;
+" + AssertStubs + ResultStubsNoUsing + @"
+class C
+{
+	void Test()
+	{
+		var result = Result<int>.Success(42);
+		Assert.False(result.IsSuccess);
+		var x = {|#0:result.Value|};
+	}
+}
+";
+		await RunAnalyzerTest(test, Expect("result"));
+	}
+
+	#endregion
+
 	#region Code fix tests
 
 	[Fact]
