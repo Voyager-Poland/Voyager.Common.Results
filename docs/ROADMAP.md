@@ -8,12 +8,12 @@ Plan rozwoju komponentu. Priorytety mogą się zmieniać w zależności od potrz
 
 **Cel:** Zamknięcie luk w analyzerach z ADR-0010.
 
-- [ ] **VCR0040 CodeFix** — `GetValueOrThrow()` → `Match(onSuccess, onFailure)` refactoring
-- [ ] **VCR0050 CodeFix** — `Failure(Error.None)` → `Failure(Error.UnexpectedError(...))` / usunięcie `Error.None`
-- [ ] **VCR0060 CodeFix** — `if (result.IsSuccess) { ... } else { ... }` → `result.Match(...)` / `result.Switch(...)`
-- [ ] **VCR0010 — inteligentna supresja w testach** — nie zgłaszaj warningów dla `.Tap()` / `.Switch()` w projektach testowych (heurystyka: xUnit/NUnit/MSTest attributes w scope)
-- [ ] **VCR0020 — rozpoznawanie Assert jako guard** — `Assert.That(result.IsSuccess, Is.True)` powinien wyciszać VCR0020 (xUnit `Assert.True`, NUnit `Assert.That`, FluentAssertions `result.IsSuccess.Should().BeTrue()`)
-- [ ] **HelpLinkUri + strony dokumentacji** — dodanie `helpLinkUri` do wszystkich 6 `DiagnosticDescriptor` (VCR0010-VCR0060) tak aby kliknięcie na identyfikator w VS/Rider otwierało stronę z opisem reguły, przykładami i sugerowanymi poprawkami (GitHub Pages lub `docs/analyzers/VCR00xx.md` w repo)
+- [x] **VCR0050 CodeFix** — `Failure(Error.None)` → `Failure(Error.UnexpectedError("TODO: provide error message"))`
+- [x] **VCR0020 — rozpoznawanie Assert jako guard** — xUnit `Assert.True/False`, NUnit `Assert.That/IsTrue/IsFalse`, MSTest `Assert.IsTrue/IsFalse`, FluentAssertions `.Should().BeTrue/BeFalse()`
+- [x] **VCR0010 — Switch nie triggeruje** — `.Switch()` zwraca void, więc naturalnie nie triggeruje VCR0010; `.Tap()` poprawnie ostrzega (zwraca Result)
+- [x] **HelpLinkUri + strony dokumentacji** — `helpLinkUri` na wszystkich 6 `DiagnosticDescriptor` (VCR0010-VCR0060) + `docs/analyzers/VCR00xx.md` z opisami reguł
+- [ ] **VCR0040 CodeFix** — `GetValueOrThrow()` → `Match(onSuccess, onFailure)` refactoring (odłożone — transformacja zbyt kontekstowa)
+- [ ] **VCR0060 CodeFix** — `if/else` → `Match/Switch` (odłożone — rekonstrukcja lambd zbyt złożona)
 
 ## v2.0.0 — .NET 9 + usunięcie .NET 6
 
