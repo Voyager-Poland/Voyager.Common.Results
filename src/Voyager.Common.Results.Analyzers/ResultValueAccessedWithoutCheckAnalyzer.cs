@@ -329,17 +329,17 @@ namespace Voyager.Common.Results.Analyzers
 			}
 
 			// result.IsSuccess.Should().BeTrue() — FluentAssertions
-			if (methodName == "BeTrue" && IsFluentAssertionOnIsSuccessCheck(invocation, receiverSymbol))
+			if (methodName == "BeTrue" && IsFluentAssertionsOnIsSuccessCheck(invocation, receiverSymbol))
 				return true;
 
 			// result.IsFailure.Should().BeFalse() — FluentAssertions
-			if (methodName == "BeFalse" && IsFluentAssertionOnIsFailureCheck(invocation, receiverSymbol))
+			if (methodName == "BeFalse" && IsFluentAssertionsOnIsFailureCheck(invocation, receiverSymbol))
 				return true;
 
 			return false;
 		}
 
-		private static bool IsFluentAssertionOnIsSuccessCheck(
+		private static bool IsFluentAssertionsOnIsSuccessCheck(
 			IInvocationOperation beTrueCall, ISymbol receiverSymbol)
 		{
 			// BeTrue() is called on the result of Should()
@@ -366,7 +366,7 @@ namespace Voyager.Common.Results.Analyzers
 			return false;
 		}
 
-		private static bool IsFluentAssertionOnIsFailureCheck(
+		private static bool IsFluentAssertionsOnIsFailureCheck(
 			IInvocationOperation beFalseCall, ISymbol receiverSymbol)
 		{
 			if (beFalseCall.Instance is not IInvocationOperation shouldCall)

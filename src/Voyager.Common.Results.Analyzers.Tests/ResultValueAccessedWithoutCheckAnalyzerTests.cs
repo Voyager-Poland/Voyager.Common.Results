@@ -452,7 +452,7 @@ namespace NUnit.Framework
 }
 namespace FluentAssertions
 {
-	public static class AssertionExtensions
+	public static class AssertionsExtensions
 	{
 		public static BooleanAssertions Should(this bool value) => new();
 	}
