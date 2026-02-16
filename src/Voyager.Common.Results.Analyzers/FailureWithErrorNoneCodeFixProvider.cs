@@ -54,12 +54,19 @@ namespace Voyager.Common.Results.Analyzers
 			if (root == null)
 				return document;
 
-			// Build: Error.UnexpectedError("TODO: provide error message")
+			// Extract the qualifier from the original Error.None argument
+			// (preserves fully-qualified names like Voyager.Common.Results.Error)
+			ExpressionSyntax errorTypeSyntax = SyntaxFactory.IdentifierName("Error");
+			if (invocation.ArgumentList.Arguments.Count > 0 &&
+				invocation.ArgumentList.Arguments[0].Expression is MemberAccessExpressionSyntax memberAccess)
+				errorTypeSyntax = memberAccess.Expression;
+
+			// Build: <qualifier>.UnexpectedError("TODO: provide error message")
 			var newArgument = SyntaxFactory.Argument(
 				SyntaxFactory.InvocationExpression(
 					SyntaxFactory.MemberAccessExpression(
 						SyntaxKind.SimpleMemberAccessExpression,
-						SyntaxFactory.IdentifierName("Error"),
+						errorTypeSyntax,
 						SyntaxFactory.IdentifierName("UnexpectedError")))
 				.WithArgumentList(
 					SyntaxFactory.ArgumentList(
