@@ -11,11 +11,12 @@ using Voyager.Common.Results;
 
 namespace Voyager.Common.Results
 {
-	public enum ErrorType { None, Validation }
+	public enum ErrorType { None, Validation, Unexpected }
 	public sealed record Error(ErrorType Type, string Code, string Message)
 	{
 		public static readonly Error None = new(ErrorType.None, string.Empty, string.Empty);
 		public static Error ValidationError(string message) => new(ErrorType.Validation, """", message);
+		public static Error UnexpectedError(string message) => new(ErrorType.Unexpected, """", message);
 	}
 	public class Result
 	{
@@ -120,6 +121,64 @@ class C
 
 	#endregion
 
+	#region Code fix tests
+
+	[Fact]
+	public async Task CodeFix_ReplacesErrorNoneWithUnexpectedError()
+	{
+		var test = ResultStubs + @"
+class C
+{
+	void Test()
+	{
+		var result = {|#0:Result.Failure(Error.None)|};
+	}
+}
+";
+		var fixedSource = ResultStubs + @"
+class C
+{
+	void Test()
+	{
+		var result = Result.Failure(Error.UnexpectedError(""TODO: provide error message""));
+	}
+}
+";
+		await RunCodeFixTest(test, fixedSource,
+			new DiagnosticResult(FailureWithErrorNoneAnalyzer.DiagnosticId,
+					Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
+				.WithLocation(0));
+	}
+
+	[Fact]
+	public async Task CodeFix_ReplacesErrorNoneInGenericResult()
+	{
+		var test = ResultStubs + @"
+class C
+{
+	void Test()
+	{
+		var result = {|#0:Result<int>.Failure(Error.None)|};
+	}
+}
+";
+		var fixedSource = ResultStubs + @"
+class C
+{
+	void Test()
+	{
+		var result = Result<int>.Failure(Error.UnexpectedError(""TODO: provide error message""));
+	}
+}
+";
+		await RunCodeFixTest(test, fixedSource,
+			new DiagnosticResult(FailureWithErrorNoneAnalyzer.DiagnosticId,
+					Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
+				.WithLocation(0));
+	}
+
+	#endregion
+
 	#region Helpers
 
 	private static async Task RunAnalyzerTest(string source, params DiagnosticResult[] expected)
@@ -130,6 +189,19 @@ class C
 			ReferenceAssemblies = ReferenceAssemblies.Net.Net80,
 		};
 		test.ExpectedDiagnostics.AddRange(expected);
+		await test.RunAsync();
+	}
+
+	private static async Task RunCodeFixTest(
+		string source, string fixedSource, DiagnosticResult expected)
+	{
+		var test = new CSharpCodeFixTest<FailureWithErrorNoneAnalyzer, FailureWithErrorNoneCodeFixProvider, DefaultVerifier>
+		{
+			TestCode = source,
+			FixedCode = fixedSource,
+			ReferenceAssemblies = ReferenceAssemblies.Net.Net80,
+		};
+		test.ExpectedDiagnostics.Add(expected);
 		await test.RunAsync();
 	}
 

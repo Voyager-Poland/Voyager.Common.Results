@@ -20,7 +20,8 @@ namespace Voyager.Common.Results.Analyzers
 			description:
 				"Accessing Result<T>.Value without first checking IsSuccess may lead to " +
 				"using a default/null value when the operation failed. " +
-				"Use Match, Switch, or check IsSuccess before accessing Value.");
+				"Use Match, Switch, or check IsSuccess before accessing Value.",
+			helpLinkUri: ResultTypeHelper.HelpLinkBase + "VCR0020.md");
 
 		public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
 			ImmutableArray.Create(Rule);
@@ -196,9 +197,10 @@ namespace Voyager.Common.Results.Analyzers
 
 				if (statementIndex > 0)
 				{
-					// Scan backwards for guard: if (result.IsFailure) return/throw/reassign;
+					// Scan backwards for guard or assert
 					for (int i = statementIndex - 1; i >= 0; i--)
 					{
+						// Guard pattern: if (result.IsFailure) return/throw/reassign;
 						if (block.Operations[i] is IConditionalOperation guard &&
 							guard.WhenFalse == null &&
 							GuardEnsuresSuccess(guard.WhenTrue, receiverSymbol) &&
@@ -206,6 +208,10 @@ namespace Voyager.Common.Results.Analyzers
 						{
 							return true;
 						}
+
+						// Assert pattern: Assert.True(result.IsSuccess) etc.
+						if (IsAssertSuccessGuard(block.Operations[i], receiverSymbol))
+							return true;
 					}
 				}
 
@@ -271,6 +277,98 @@ namespace Voyager.Common.Results.Analyzers
 
 		private static bool IsExitStatement(IOperation operation) =>
 			operation is IReturnOperation or IThrowOperation or IBranchOperation;
+
+		/// <summary>
+		/// Checks if the statement is a test assertion that verifies IsSuccess on the given symbol.
+		/// Recognized patterns:
+		///   Assert.True(result.IsSuccess)           — xUnit
+		///   Assert.IsTrue(result.IsSuccess)         — NUnit / MSTest
+		///   Assert.That(result.IsSuccess, ...)      — NUnit
+		///   Assert.False(result.IsFailure)          — xUnit
+		///   Assert.IsFalse(result.IsFailure)        — NUnit / MSTest
+		///   result.IsSuccess.Should().BeTrue()      — FluentAssertions
+		///   result.IsFailure.Should().BeFalse()     — FluentAssertions
+		/// </summary>
+		private static bool IsAssertSuccessGuard(IOperation operation, ISymbol receiverSymbol)
+		{
+			if (operation is not IExpressionStatementOperation exprStmt)
+				return false;
+
+			var invocation = exprStmt.Operation as IInvocationOperation;
+			if (invocation == null)
+				return false;
+
+			var methodName = invocation.TargetMethod.Name;
+			var containingTypeName = invocation.TargetMethod.ContainingType?.Name ?? "";
+
+			// Assert.True(result.IsSuccess) or Assert.IsTrue(result.IsSuccess)
+			if ((methodName == "True" || methodName == "IsTrue") && containingTypeName == "Assert")
+			{
+				if (invocation.Arguments.Length >= 1 &&
+					IsSuccessCheckOnSymbol(invocation.Arguments[0].Value, receiverSymbol,
+						out var checks) && checks)
+					return true;
+			}
+
+			// Assert.False(result.IsFailure) or Assert.IsFalse(result.IsFailure)
+			if ((methodName == "False" || methodName == "IsFalse") && containingTypeName == "Assert")
+			{
+				if (invocation.Arguments.Length >= 1 &&
+					IsSuccessCheckOnSymbol(invocation.Arguments[0].Value, receiverSymbol,
+						out var checks) && !checks)
+					return true;
+			}
+
+			// Assert.That(result.IsSuccess, ...) — NUnit constraint-based
+			if (methodName == "That" && containingTypeName == "Assert")
+			{
+				if (invocation.Arguments.Length >= 1 &&
+					IsSuccessCheckOnSymbol(invocation.Arguments[0].Value, receiverSymbol,
+						out var checks) && checks)
+					return true;
+			}
+
+			// result.IsSuccess.Should().BeTrue() — FluentAssertions
+			if (methodName == "BeTrue" &&
+				IsFluentAssertionsShouldCheck(invocation, receiverSymbol, out var fChecks) && fChecks)
+				return true;
+
+			// result.IsFailure.Should().BeFalse() — FluentAssertions
+			if (methodName == "BeFalse" &&
+				IsFluentAssertionsShouldCheck(invocation, receiverSymbol, out var fChecks2) && !fChecks2)
+				return true;
+
+			return false;
+		}
+
+		/// <summary>
+		/// Extracts the IsSuccess/IsFailure check from a FluentAssertions Should() chain.
+		/// Returns true if the subject of Should() is an IsSuccess/IsFailure check on the symbol.
+		/// </summary>
+		private static bool IsFluentAssertionsShouldCheck(
+			IInvocationOperation call, ISymbol receiverSymbol, out bool checksForSuccess)
+		{
+			checksForSuccess = false;
+
+			// BeTrue()/BeFalse() is called on the result of Should()
+			if (call.Instance is not IInvocationOperation shouldCall)
+				return false;
+
+			if (shouldCall.TargetMethod.Name != "Should")
+				return false;
+
+			// Should() is an extension method — subject is the first argument
+			if (shouldCall.Arguments.Length >= 1)
+				return IsSuccessCheckOnSymbol(shouldCall.Arguments[0].Value, receiverSymbol,
+					out checksForSuccess);
+
+			// Should() as instance method — subject is the receiver
+			if (shouldCall.Instance != null)
+				return IsSuccessCheckOnSymbol(shouldCall.Instance, receiverSymbol,
+					out checksForSuccess);
+
+			return false;
+		}
 
 		/// <summary>
 		/// Checks if the operation is an assignment of the form:

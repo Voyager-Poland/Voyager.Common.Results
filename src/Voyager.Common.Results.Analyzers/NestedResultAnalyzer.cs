@@ -19,7 +19,8 @@ namespace Voyager.Common.Results.Analyzers
 			isEnabledByDefault: true,
 			description:
 				"Using Map with a function that returns Result produces a nested Result<Result<T>>. " +
-				"Use Bind (or BindAsync) instead to flatten the result.");
+				"Use Bind (or BindAsync) instead to flatten the result.",
+			helpLinkUri: ResultTypeHelper.HelpLinkBase + "VCR0030.md");
 
 		public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
 			ImmutableArray.Create(Rule);
