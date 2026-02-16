@@ -8,6 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **VCR0050 CodeFix**: Replaces `Error.None` with `Error.UnexpectedError("TODO: provide error message")`
+- **VCR0020 — Assert guard recognition**: Test assertions now recognized as valid guards before `.Value` access, eliminating false positives in test code
+  - xUnit: `Assert.True(result.IsSuccess)`, `Assert.False(result.IsFailure)`
+  - NUnit: `Assert.That(result.IsSuccess, ...)`, `Assert.IsTrue(...)`, `Assert.IsFalse(...)`
+  - MSTest: `Assert.IsTrue(result.IsSuccess)`, `Assert.IsFalse(result.IsFailure)`
+  - FluentAssertions: `result.IsSuccess.Should().BeTrue()`, `result.IsFailure.Should().BeFalse()`
+  - Pattern matching is name-based — no framework references required in analyzer
+- **HelpLinkUri for all analyzers (VCR0010–VCR0060)**: Clicking the diagnostic ID in Visual Studio or Rider opens the corresponding documentation page
+  - Documentation: [`docs/analyzers/VCR0010.md`](docs/analyzers/VCR0010.md) through [`docs/analyzers/VCR0060.md`](docs/analyzers/VCR0060.md)
+  - Each page includes: rule description, code examples (violation + fix), `.editorconfig` configuration
+
+### Changed
+- **`ResultTypeHelper`**: Added `HelpLinkBase` constant for shared documentation URL prefix
+
+## [1.7.2] - 2026-02-16
+
+### Added
 - **Roslyn Analyzer VCR0010 — Result must be consumed**: Warns when `Result`/`Result<T>` return values are silently discarded
   - Detects unconsumed results from method calls, factory methods, and awaited `Task<Result>`
   - Two code fixes: "Discard result" (`_ = ...`) and "Assign to variable" (`var result = ...`)
@@ -22,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Roslyn Analyzer VCR0040 — `GetValueOrThrow` defeats Result pattern**: Info-level hint to use `Match`/`Bind`/`Map` instead
 - **Roslyn Analyzer VCR0050 — `Failure(Error.None)`**: Error-level diagnostic for creating failure without an error
 - **Roslyn Analyzer VCR0060 — Prefer Match/Switch**: Disabled-by-default suggestion to use `Match`/`Switch` over `if/else` branching on `IsSuccess`
+- **Voyager package icon**: Added to both Voyager.Common.Results and Voyager.Common.Resilience NuGet packages
 
 ### Changed
 - **Analyzer internals — extract `ResultTypeHelper`**: Consolidated duplicated `IsResultType`, `IsResultMethod`, `UnwrapTaskType`, and `ResultNamespace` from all 6 analyzers into a shared `internal static class ResultTypeHelper`
@@ -34,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **`.editorconfig` naming rules**: `private const` and `private static readonly` fields now correctly require PascalCase instead of `_camelCase`
 - **Analyzer .csproj cleanup**: Removed duplicate `TargetFramework`/`TargetFrameworks` in `Voyager.Common.Results.Analyzers.csproj`, removed empty `<TargetFrameworks>` in test project, added comments explaining `Directory.Build.props` override
+- **NU5046**: Include package icon in Resilience NuGet package
+- **VCR0020 CodeFix line endings**: Detect EOL from syntax trivia instead of hardcoding `\r\n` (fixes CI on Linux)
 
 ## [1.7.1] - 2026-02-03
 
@@ -486,7 +506,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - .NET Framework 4.8
 - .NET 8.0
 
-[Unreleased]: https://github.com/Voyager-Poland/Voyager.Common.Results/compare/v1.7.1...HEAD
+[Unreleased]: https://github.com/Voyager-Poland/Voyager.Common.Results/compare/v1.7.2...HEAD
+[1.7.2]: https://github.com/Voyager-Poland/Voyager.Common.Results/compare/v1.7.1...v1.7.2
 [1.7.1]: https://github.com/Voyager-Poland/Voyager.Common.Results/releases/tag/v1.7.1
 [1.6.0]: https://github.com/Voyager-Poland/Voyager.Common.Results/releases/tag/v1.6.0
 [1.5.0]: https://github.com/Voyager-Poland/Voyager.Common.Results/releases/tag/v1.5.0

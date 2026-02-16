@@ -52,14 +52,16 @@ src/
       ErrorTypeExtensions.cs           # IsTransient(), ToHttpStatusCode(), ShouldRetry()
 
   Voyager.Common.Results.Analyzers/    # Roslyn analyzers (netstandard2.0)
-    ResultTypeHelper.cs                        # Shared: IsResultType, IsResultMethod, UnwrapTaskType
+    ResultTypeHelper.cs                        # Shared: IsResultType, IsResultMethod, UnwrapTaskType, HelpLinkBase
     ResultMustBeConsumedAnalyzer.cs             # VCR0010: unconsumed Result
     ResultMustBeConsumedCodeFixProvider.cs      # VCR0010 CodeFix: `_ = ` or `var result = `
-    ResultValueAccessedWithoutCheckAnalyzer.cs  # VCR0020: .Value without IsSuccess guard
+    ResultValueAccessedWithoutCheckAnalyzer.cs  # VCR0020: .Value without IsSuccess guard (+ Assert guards)
     ResultValueAccessedWithoutCheckCodeFixProvider.cs  # VCR0020 CodeFix: .Value → .GetValueOrThrow()
     NestedResultAnalyzer.cs                     # VCR0030: Result<Result<T>> (use Bind not Map)
+    NestedResultCodeFixProvider.cs              # VCR0030 CodeFix: Map → Bind
     GetValueOrThrowAnalyzer.cs                  # VCR0040: GetValueOrThrow in railway chain
     FailureWithErrorNoneAnalyzer.cs             # VCR0050: Failure(Error.None) — always a bug
+    FailureWithErrorNoneCodeFixProvider.cs      # VCR0050 CodeFix: Error.None → Error.UnexpectedError(...)
     PreferMatchSwitchAnalyzer.cs                # VCR0060: prefer Match/Switch (disabled by default)
 
   Voyager.Common.Resilience/           # Separate package — stateful resilience patterns
@@ -108,7 +110,8 @@ build/                                 # Modular MSBuild (imported via Directory
 | VCR0010 | `_ = ...` or `var result = ...` | Discard or assign unconsumed Result |
 | VCR0020 | `.GetValueOrThrow()` / `if (IsSuccess)` guard | Replace unchecked Value or wrap in guard |
 | VCR0030 | `Map` → `Bind` | Replace Map with Bind to flatten nested Result |
-| VCR0040–VCR0060 | — | No CodeFix providers yet |
+| VCR0050 | `Error.None` → `Error.UnexpectedError(...)` | Replace contradictory Error.None in Failure |
+| VCR0040, VCR0060 | — | No CodeFix providers (transformations too contextual) |
 
 ## VCR0020 Analyzer — Guard Pattern Recognition
 
@@ -116,8 +119,11 @@ The analyzer recognizes `IsFailure` early-return guards (not just `IsSuccess`), 
 - Guard in the same block: `if (result.IsFailure) return; ... result.Value`
 - Guard in parent block: guard in outer scope protects `.Value` inside nested `if {}`
 - Guard with reassignment: `if (result.IsFailure) { result = Result<T>.Success(...); }` as last statement
-
-**Not recognized:** Test assertion patterns like `Assert.That(result.IsSuccess, Is.True)` — suppress VCR0020 in test `.editorconfig` if needed.
+- **Assert guards** (name-based, no framework references needed):
+  - xUnit: `Assert.True(result.IsSuccess)`, `Assert.False(result.IsFailure)`
+  - NUnit: `Assert.That(result.IsSuccess, ...)`, `Assert.IsTrue(...)`, `Assert.IsFalse(...)`
+  - MSTest: `Assert.IsTrue(result.IsSuccess)`, `Assert.IsFalse(result.IsFailure)`
+  - FluentAssertions: `result.IsSuccess.Should().BeTrue()`, `result.IsFailure.Should().BeFalse()`
 
 ## Roslyn Analyzer Development Constraints
 
