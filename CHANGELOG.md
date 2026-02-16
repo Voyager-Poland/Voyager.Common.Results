@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-02-16
+
 ### Added
 - **VCR0050 CodeFix**: Replaces `Error.None` with `Error.UnexpectedError("TODO: provide error message")`
 - **VCR0020 — Assert guard recognition**: Test assertions now recognized as valid guards before `.Value` access, eliminating false positives in test code
@@ -506,7 +508,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - .NET Framework 4.8
 - .NET 8.0
 
-[Unreleased]: https://github.com/Voyager-Poland/Voyager.Common.Results/compare/v1.7.2...HEAD
+[Unreleased]: https://github.com/Voyager-Poland/Voyager.Common.Results/compare/v1.8.0...HEAD
+[1.8.0]: https://github.com/Voyager-Poland/Voyager.Common.Results/compare/v1.7.2...v1.8.0
 [1.7.2]: https://github.com/Voyager-Poland/Voyager.Common.Results/compare/v1.7.1...v1.7.2
 [1.7.1]: https://github.com/Voyager-Poland/Voyager.Common.Results/releases/tag/v1.7.1
 [1.6.0]: https://github.com/Voyager-Poland/Voyager.Common.Results/releases/tag/v1.6.0
