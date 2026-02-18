@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-02-18
+
+### Added
+- **`TraverseAsync`** — sequentially applies an async Result-returning function to each collection element (fail-fast on first error)
+  - `IEnumerable<T>.TraverseAsync(Func<T, Task<Result<TOut>>>)` → `Task<Result<List<TOut>>>` — generic variant
+  - `IEnumerable<T>.TraverseAsync(Func<T, Task<Result>>)` → `Task<Result>` — non-generic variant
+  - Replaces manual `foreach + break + Combine()` pattern
+  - Example:
+    ```csharp
+    var result = await operations.TraverseAsync(
+        x => OperationUpdateResultAsync(ctx, x.Op, x.Data));
+    ```
+- **`TraverseAllAsync`** — like `TraverseAsync`, but collects ALL errors instead of stopping on the first one
+  - `IEnumerable<T>.TraverseAllAsync(Func<T, Task<Result<TOut>>>)` → `Task<Result<List<TOut>>>` — generic variant
+  - `IEnumerable<T>.TraverseAllAsync(Func<T, Task<Result>>)` → `Task<Result>` — non-generic variant
+  - Errors aggregated via `InnerError` chain: first error → second error → ...
+  - Example:
+    ```csharp
+    var result = await items.TraverseAllAsync(
+        x => ValidateAndProcessAsync(x));
+    // result.Error.InnerError contains subsequent errors
+    ```
+- **`CombineAsync`** — async version of existing `Combine`, awaits all tasks then combines results
+  - `IEnumerable<Task<Result<TValue>>>.CombineAsync()` → `Task<Result<List<TValue>>>` — generic variant
+  - `IEnumerable<Task<Result>>.CombineAsync()` → `Task<Result>` — non-generic variant
+  - Uses `Task.WhenAll` for parallel awaiting, then fail-fast on first error
+- **`PartitionAsync`** — async version of existing `Partition`, awaits all tasks then separates successes and failures
+  - `IEnumerable<Task<Result<TValue>>>.PartitionAsync()` → `Task<(List<TValue>, List<Error>)>`
+- **`Combine` tuple variants** — combine 2-4 `Result<T>` instances into a single `Result` containing a tuple
+  - `Result<T1>.Combine(Result<T2>)` → `Result<(T1, T2)>`
+  - `Result<T1>.Combine(Result<T2>, Result<T3>)` → `Result<(T1, T2, T3)>`
+  - `Result<T1>.Combine(Result<T2>, Result<T3>, Result<T4>)` → `Result<(T1, T2, T3, T4)>`
+  - Returns first error if any Result is a failure
+- 34 new unit tests covering all new methods: happy path, fail-fast, empty collection, single element, order preservation, error aggregation chain verification
+
 ## [1.8.0] - 2026-02-16
 
 ### Added
@@ -508,7 +543,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - .NET Framework 4.8
 - .NET 8.0
 
-[Unreleased]: https://github.com/Voyager-Poland/Voyager.Common.Results/compare/v1.8.0...HEAD
+[Unreleased]: https://github.com/Voyager-Poland/Voyager.Common.Results/compare/v1.9.0...HEAD
+[1.9.0]: https://github.com/Voyager-Poland/Voyager.Common.Results/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/Voyager-Poland/Voyager.Common.Results/compare/v1.7.2...v1.8.0
 [1.7.2]: https://github.com/Voyager-Poland/Voyager.Common.Results/compare/v1.7.1...v1.7.2
 [1.7.1]: https://github.com/Voyager-Poland/Voyager.Common.Results/releases/tag/v1.7.1

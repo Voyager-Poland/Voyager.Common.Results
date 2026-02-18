@@ -15,6 +15,17 @@ Plan rozwoju komponentu. Priorytety mogą się zmieniać w zależności od potrz
 - [ ] **VCR0040 CodeFix** — `GetValueOrThrow()` → `Match(onSuccess, onFailure)` refactoring (odłożone — transformacja zbyt kontekstowa)
 - [ ] **VCR0060 CodeFix** — `if/else` → `Match/Switch` (odłożone — rekonstrukcja lambd zbyt złożona)
 
+## v1.9.0 — Result<T> dla kolekcji i batch operations
+
+**Cel:** Lepsze wsparcie dla operacji na kolekcjach w architekturze railway (przeniesione z planowanego v2.1.0).
+
+- [x] **`TraverseAsync`** — `IEnumerable<T>` → `Result<List<TOut>>` z operacją Result-returning per element (fail-fast); wariant generyczny i non-generic
+- [x] **`TraverseAllAsync`** — jak wyżej, ale zbiera WSZYSTKIE błędy (nie fail-fast); agregacja przez InnerError chain
+- [x] **`PartitionAsync`** — async wersja `Partition`
+- [x] **`CombineAsync`** — async wersja `Combine` (generyczny i non-generic)
+- [x] **`Result<T>.Combine(Result<T2>)`** — łączenie dwóch Result w tuple `Result<(T1, T2)>`
+- [x] Rozszerzenie `Combine` o warianty 3-4 argumentów: `Result<(T1, T2, T3)>`, `Result<(T1, T2, T3, T4)>`
+
 ## v2.0.0 — .NET 9 + usunięcie .NET 6
 
 **Cel:** Modernizacja target frameworks, breaking change w wersji major.
@@ -26,18 +37,11 @@ Plan rozwoju komponentu. Priorytety mogą się zmieniać w zależności od potrz
 - [ ] Aktualizacja CI matrixa (ubuntu + windows)
 - [ ] Aktualizacja zależności: xUnit, Microsoft.CodeAnalysis, coverlet
 
-## v2.1.0 — Result<T> dla kolekcji i batch operations
+## ~~v2.1.0~~ — ~~Result<T> dla kolekcji i batch operations~~
 
-**Cel:** Lepsze wsparcie dla operacji na kolekcjach w architekturze railway.
+> Przeniesione do **v1.9.0** (zrealizowane wcześniej niż planowano).
 
-- [ ] **`TraverseAsync`** — `IEnumerable<T>` → `Result<List<TOut>>` z operacją Result-returning per element (fail-fast)
-- [ ] **`TraverseAllAsync`** — jak wyżej, ale zbiera WSZYSTKIE błędy (nie fail-fast)
-- [ ] **`PartitionAsync`** — async wersja `Partition`
-- [ ] **`CombineAsync`** — async wersja `Combine`
-- [ ] **`Result<T>.Combine(Result<T2>)`** — łączenie dwóch Result w tuple `Result<(T1, T2)>`
-- [ ] Rozszerzenie `Combine` o warianty 3-4 argumentów: `Result<(T1, T2, T3)>`
-
-## v2.2.0 — Resilience v2: Timeout + Bulkhead
+## v2.1.0 — Resilience v2: Timeout + Bulkhead
 
 **Cel:** Rozszerzenie `Voyager.Common.Resilience` o nowe wzorce.
 
@@ -46,7 +50,7 @@ Plan rozwoju komponentu. Priorytety mogą się zmieniać w zależności od potrz
 - [ ] **PolicyWrap** — łączenie policies: `Retry + CircuitBreaker + Timeout` w pipeline
 - [ ] **Circuit Breaker sliding window** — zamiast consecutive failures, okno czasowe z progiem procentowym
 
-## v2.3.0 — Diagnostyka i obserwowalność
+## v2.2.0 — Diagnostyka i obserwowalność
 
 **Cel:** Integracja z ekosystemem .NET observability.
 

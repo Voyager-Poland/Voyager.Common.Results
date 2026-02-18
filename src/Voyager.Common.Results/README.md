@@ -276,6 +276,30 @@ var (successes, failures) = results.Partition();
 
 // Pobierz tylko wartości sukcesu
 var values = results.GetSuccessValues();
+
+// Combine tuple — łączenie dwóch Result w krotkę
+var name = Result<string>.Success("Alice");
+var age = Result<int>.Success(30);
+Result<(string, int)> pair = name.Combine(age);
+```
+
+### Async operacje na kolekcjach (v1.9.0)
+
+```csharp
+// TraverseAsync — sekwencyjne przetwarzanie, zatrzymuje się na pierwszym błędzie
+var result = await operations.TraverseAsync(
+    x => OperationUpdateResultAsync(ctx, x.op, x.data));
+
+// TraverseAllAsync — sekwencyjne przetwarzanie, zbiera WSZYSTKIE błędy
+var result = await items.TraverseAllAsync(
+    x => ValidateAndProcessAsync(x));
+
+// CombineAsync — oczekuje wszystkie taski, łączy wyniki
+var tasks = items.Select(x => ProcessAsync(x));
+var result = await tasks.CombineAsync();
+
+// PartitionAsync — oczekuje wszystkie taski, rozdziela na sukcesy i błędy
+var (successes, failures) = await tasks.PartitionAsync();
 ```
 
 ## 🎨 Typy błędów

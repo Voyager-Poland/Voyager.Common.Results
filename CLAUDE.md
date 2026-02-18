@@ -46,7 +46,7 @@ src/
     ErrorType.cs                       # 15-value enum (Validation, NotFound, Timeout, CircuitBreakerOpen...)
     Extensions/
       TaskResultExtensions.cs          # Async: MapAsync, BindAsync, TapAsync, TryAsync, BindWithRetryAsync
-      ResultCollectionExtensions.cs    # Combine, Partition, GetSuccessValues
+      ResultCollectionExtensions.cs    # Combine, Partition, GetSuccessValues, TraverseAsync, CombineAsync, PartitionAsync
       ResultErrorChainExtensions.cs    # WithInner, AddErrorContext, WrapError
       ResultRetryExtensions.cs         # BindWithRetryAsync with configurable policies
       ErrorTypeExtensions.cs           # IsTransient(), ToHttpStatusCode(), ShouldRetry()
