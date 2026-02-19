@@ -370,10 +370,10 @@ combined.Switch(
 
 **Real-world example — combining independent service calls:**
 ```csharp
-public Result<OrderSummary> GetOrderSummary(int orderId)
+public Result<OrderSummary> GetOrderSummary(int orderId, int customerId)
 {
     var order = _orderRepo.GetById(orderId);
-    var customer = _customerRepo.GetById(order.Value?.CustomerId ?? 0);
+    var customer = _customerRepo.GetById(customerId);
     var payment = _paymentRepo.GetByOrderId(orderId);
 
     return order.Combine(customer, payment)

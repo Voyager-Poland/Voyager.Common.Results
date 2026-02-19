@@ -42,6 +42,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Returns first error if any Result is a failure
 - 34 new unit tests covering all new methods: happy path, fail-fast, empty collection, single element, order preservation, error aggregation chain verification
 
+### Fixed
+- **Documentation**: Fixed `Combine` tuple example in `docs/collection-operations.md` — customer lookup incorrectly depended on `order.Value` (violating ROP), changed to truly independent service calls
+
 ## [1.8.0] - 2026-02-16
 
 ### Added
