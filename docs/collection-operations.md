@@ -342,38 +342,179 @@ Result<Order> CreateOrderFromDto(CreateOrderDto dto)
 }
 ```
 
-## Collection Extensions with Async
+## Combine Tuple Variants (v1.9.0)
 
-### Combine Async Results
+Combine 2-4 `Result<T>` instances into a single `Result` containing a tuple. Returns the first error if any Result is a failure.
 
+**Signatures:**
+```csharp
+Result<(T1, T2)> Combine<T1, T2>(this Result<T1> first, Result<T2> second)
+Result<(T1, T2, T3)> Combine<T1, T2, T3>(this Result<T1> first, Result<T2> second, Result<T3> third)
+Result<(T1, T2, T3, T4)> Combine<T1, T2, T3, T4>(...)
+```
+
+**Example:**
+```csharp
+var name = Result<string>.Success("Alice");
+var age = Result<int>.Success(30);
+var email = Result<string>.Success("alice@example.com");
+
+var combined = name.Combine(age, email);
+// Result<(string, int, string)> with ("Alice", 30, "alice@example.com")
+
+combined.Switch(
+    onSuccess: tuple => Console.WriteLine($"{tuple.Item1}, {tuple.Item2}, {tuple.Item3}"),
+    onFailure: error => Console.WriteLine($"Error: {error.Message}")
+);
+```
+
+**Real-world example — combining independent service calls:**
+```csharp
+public Result<OrderSummary> GetOrderSummary(int orderId, int customerId)
+{
+    var order = _orderRepo.GetById(orderId);
+    var customer = _customerRepo.GetById(customerId);
+    var payment = _paymentRepo.GetByOrderId(orderId);
+
+    return order.Combine(customer, payment)
+        .Map(tuple => new OrderSummary
+        {
+            Order = tuple.Item1,
+            Customer = tuple.Item2,
+            Payment = tuple.Item3
+        });
+}
+```
+
+## Async Collection Operations (v1.9.0)
+
+### TraverseAsync — Sequential Async with Fail-Fast
+
+`TraverseAsync` sequentially applies an async Result-returning function to each element. Stops on the first failure.
+
+**Signatures:**
+```csharp
+Task<Result<List<TOut>>> TraverseAsync<T, TOut>(this IEnumerable<T> source, Func<T, Task<Result<TOut>>> func)
+Task<Result> TraverseAsync<T>(this IEnumerable<T> source, Func<T, Task<Result>> func)
+```
+
+**Example:**
+```csharp
+var items = new[] { "order1", "order2", "order3" };
+
+var result = await items.TraverseAsync(
+    id => ProcessOrderAsync(id));
+// Result<List<ProcessedOrder>> — all values if all succeeded, or first error
+```
+
+**Real-world example — replaces `foreach + break + Combine()` pattern:**
+```csharp
+// BEFORE (v1.8.0):
+var results = new List<Result>();
+foreach (var (op, data) in operations)
+{
+    var result = await OperationUpdateResultAsync(ctx, op, data);
+    results.Add(result);
+    if (result.IsFailure) break;
+}
+return results.Combine();
+
+// AFTER (v1.9.0):
+return await operations.TraverseAsync(
+    x => OperationUpdateResultAsync(ctx, x.op, x.data));
+```
+
+### TraverseAllAsync — Sequential Async, Collect All Errors
+
+`TraverseAllAsync` is like `TraverseAsync`, but continues on failure and collects ALL errors. Errors are aggregated using the `InnerError` chain: first error → second error → ...
+
+**Signatures:**
+```csharp
+Task<Result<List<TOut>>> TraverseAllAsync<T, TOut>(this IEnumerable<T> source, Func<T, Task<Result<TOut>>> func)
+Task<Result> TraverseAllAsync<T>(this IEnumerable<T> source, Func<T, Task<Result>> func)
+```
+
+**Example:**
+```csharp
+var result = await items.TraverseAllAsync(
+    x => ValidateAndProcessAsync(x));
+
+if (result.IsFailure)
+{
+    // result.Error — first error
+    // result.Error.InnerError — second error
+    // result.Error.InnerError.InnerError — third error, etc.
+    var rootCause = result.Error.GetRootCause(); // last error in chain
+}
+```
+
+**Real-world example — batch validation with all errors:**
+```csharp
+public async Task<Result<List<ProcessedFee>>> ProcessFeesAsync(List<FeeDto> fees)
+{
+    var result = await fees.TraverseAllAsync(async fee =>
+    {
+        var validated = ValidateFee(fee);
+        if (validated.IsFailure) return validated;
+        return await _paymentService.ChargeFeeAsync(validated.Value);
+    });
+
+    // On failure: Error contains InnerError chain with all fee processing errors
+    // On success: Result<List<ProcessedFee>> with all results
+    return result;
+}
+```
+
+### CombineAsync — Async Combine
+
+`CombineAsync` awaits all tasks (using `Task.WhenAll`) and combines their results. Fail-fast on the first error.
+
+**Signatures:**
+```csharp
+Task<Result<List<TValue>>> CombineAsync<TValue>(this IEnumerable<Task<Result<TValue>>> tasks)
+Task<Result> CombineAsync(this IEnumerable<Task<Result>> tasks)
+```
+
+**Example:**
+```csharp
+var tasks = userIds.Select(id => GetUserAsync(id));
+var result = await tasks.CombineAsync();
+// Result<List<User>> — all users if all found, or first error
+```
+
+**Real-world example:**
 ```csharp
 public async Task<Result<List<User>>> GetMultipleUsersAsync(int[] userIds)
 {
     var tasks = userIds.Select(id => GetUserAsync(id));
-    var results = await Task.WhenAll(tasks);
-    
-    return results.Combine();
-    // If all found: Result<List<User>>
-    // If any not found: Result<List<User>> - FAILURE
+    return await tasks.CombineAsync();
+    // Cleaner than: await Task.WhenAll(tasks) then .Combine()
 }
 ```
 
-### Partition Async Results
+### PartitionAsync — Async Partition
 
+`PartitionAsync` awaits all tasks and partitions the results into successes and failures.
+
+**Signature:**
+```csharp
+Task<(List<TValue> Successes, List<Error> Failures)> PartitionAsync<TValue>(
+    this IEnumerable<Task<Result<TValue>>> tasks)
+```
+
+**Example:**
 ```csharp
 public async Task<ProcessingReport> ProcessItemsAsync(List<Item> items)
 {
     var tasks = items.Select(item => ProcessItemAsync(item));
-    var results = await Task.WhenAll(tasks);
-    
-    var (successes, failures) = results.Partition();
-    
+    var (successes, failures) = await tasks.PartitionAsync();
+
     return new ProcessingReport
     {
         ProcessedItems = successes,
-        FailedItems = failures.Select(e => new FailedItem 
-        { 
-            Error = e.Message 
+        FailedItems = failures.Select(e => new FailedItem
+        {
+            Error = e.Message
         }).ToList()
     };
 }
@@ -438,44 +579,31 @@ public async Task<Result<ProcessedOrder>> ProcessOrderPipelineAsync(OrderDto dto
 }
 ```
 
-### Example 3: Dependent Service Calls
+### Example 3: Dependent Service Calls (with Combine tuple)
 
 ```csharp
 public async Task<Result<DashboardData>> LoadDashboardAsync(int userId)
 {
-    // First, verify user exists
     var userResult = await GetUserAsync(userId);
     if (userResult.IsFailure)
         return userResult.Error;
-    
+
     var user = userResult.Value;
-    
-    // Load multiple independent data in parallel
-    var ordersTask = GetUserOrdersAsync(user.Id);
-    var paymentsTask = GetUserPaymentsAsync(user.Id);
-    var notificationsTask = GetUserNotificationsAsync(user.Id);
-    
-    await Task.WhenAll(ordersTask, paymentsTask, notificationsTask);
-    
-    // Check if all succeeded
-    var results = new[]
-    {
-        (await ordersTask).Map(o => (object)o),
-        (await paymentsTask).Map(p => (object)p),
-        (await notificationsTask).Map(n => (object)n)
-    };
-    
-    var combined = results.Combine();
-    if (combined.IsFailure)
-        return combined.Error;
-    
-    return new DashboardData
-    {
-        User = user,
-        Orders = (List<Order>)combined.Value[0],
-        Payments = (List<Payment>)combined.Value[1],
-        Notifications = (List<Notification>)combined.Value[2]
-    };
+
+    // Load independent data in parallel
+    var orders = await GetUserOrdersAsync(user.Id);
+    var payments = await GetUserPaymentsAsync(user.Id);
+    var notifications = await GetUserNotificationsAsync(user.Id);
+
+    // Combine with type-safe tuples (v1.9.0)
+    return orders.Combine(payments, notifications)
+        .Map(tuple => new DashboardData
+        {
+            User = user,
+            Orders = tuple.Item1,
+            Payments = tuple.Item2,
+            Notifications = tuple.Item3
+        });
 }
 ```
 
@@ -495,6 +623,15 @@ ProcessSuccesses(successes);
 
 // Use GetSuccessValues when failures are acceptable
 var validItems = results.GetSuccessValues();  // ✅ Ignores failures
+
+// Use TraverseAsync for sequential async with fail-fast (v1.9.0)
+var result = await items.TraverseAsync(x => ProcessAsync(x));  // ✅
+
+// Use TraverseAllAsync when you need all errors (v1.9.0)
+var result = await items.TraverseAllAsync(x => ValidateAsync(x));  // ✅
+
+// Use Combine tuple for type-safe combining of different Results (v1.9.0)
+var combined = name.Combine(age, email);  // ✅ Result<(string, int, string)>
 ```
 
 ### ❌ DON'T
@@ -509,6 +646,16 @@ foreach (var result in results)  // ❌ Use Combine/Partition instead
         failures.Add(result.Error);
 }
 
+// Don't use foreach+break for async fail-fast — use TraverseAsync
+var results = new List<Result>();
+foreach (var item in items)  // ❌ Use TraverseAsync instead
+{
+    var result = await ProcessAsync(item);
+    results.Add(result);
+    if (result.IsFailure) break;
+}
+return results.Combine();
+
 // Don't ignore failures silently
 var values = results
     .Where(r => r.IsSuccess)  // ❌ Failures lost
@@ -517,7 +664,7 @@ var values = results
 
 // Don't combine if you need all errors
 var combined = results.Combine();  // ❌ Only returns first error
-// Use Partition() to get all errors
+// Use Partition() or TraverseAllAsync() to get all errors
 ```
 
 ## See Also

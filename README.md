@@ -616,7 +616,33 @@ var (successes, failures) = results.Partition();
 
 // Get only successful values
 List<int> values = results.GetSuccessValues();
+
+// Combine two Results into a tuple
+var name = Result<string>.Success("Alice");
+var age = Result<int>.Success(30);
+Result<(string, int)> pair = name.Combine(age);
 ```
+
+### Async Collection Operations (v1.9.0)
+
+```csharp
+// TraverseAsync — sequential async, fail-fast
+var result = await operations.TraverseAsync(
+    x => OperationUpdateResultAsync(ctx, x.op, x.data));
+
+// TraverseAllAsync — sequential async, collect ALL errors
+var result = await items.TraverseAllAsync(
+    x => ValidateAndProcessAsync(x));
+
+// CombineAsync — await all tasks, then combine
+var tasks = items.Select(x => ProcessAsync(x));
+var result = await tasks.CombineAsync();
+
+// PartitionAsync — await all tasks, then partition
+var (successes, failures) = await tasks.PartitionAsync();
+```
+
+See [Collection Operations](docs/collection-operations.md) for detailed documentation.
 
 ### Analyzer - Result Must Be Consumed (VCR0010)
 
