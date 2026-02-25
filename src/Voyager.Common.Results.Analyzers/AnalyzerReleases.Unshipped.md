@@ -8,3 +8,4 @@ VCR0030 | Usage | Warning | NestedResultAnalyzer
 VCR0040 | Usage | Info | GetValueOrThrowAnalyzer
 VCR0050 | Usage | Error | FailureWithErrorNoneAnalyzer
 VCR0060 | Style | Disabled | PreferMatchSwitchAnalyzer
+VCR0070 | Usage | Warning | NullableSuccessAnalyzer, [ADR-0011](../../docs/adr/ADR-0011-nullable-success-analyzer.md)
