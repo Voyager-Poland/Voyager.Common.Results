@@ -678,6 +678,7 @@ The package includes a full suite of Roslyn analyzers that catch common Result p
 | VCR0040 | Info | `GetValueOrThrow` defeats Result pattern — prefer `Match`/`Bind`/`Map` |
 | VCR0050 | Error | `Failure(Error.None)` — failure without error is always a bug |
 | VCR0060 | Disabled | Prefer `Match`/`Switch` over `if (IsSuccess)` branching (opt-in style rule) |
+| VCR0070 | Warning | `Success(null)` — successful result must carry a value, not null |
 
 ```csharp
 var result = GetUser(id);
@@ -688,6 +689,8 @@ result.Map(x => GetOrder(x.Id));       // ⚠️ VCR0030: Nested Result<Result<O
 GetUser(id).GetValueOrThrow();         // ℹ️ VCR0040: Consider Match/Bind instead
 
 Result.Failure(Error.None);            // ❌ VCR0050: Failure with Error.None is a bug
+
+Result<Order?>.Success(null);          // ⚠️ VCR0070: Success(null) defeats Result pattern
 ```
 
 All analyzers are configurable via `.editorconfig`:

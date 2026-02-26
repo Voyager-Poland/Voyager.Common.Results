@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-Railway Oriented Programming library for .NET — functional error handling via `Result<T>` and `Result` types. Includes Roslyn analyzers (VCR0010-VCR0060) bundled in the NuGet package and a separate `Voyager.Common.Resilience` package (Circuit Breaker).
+Railway Oriented Programming library for .NET — functional error handling via `Result<T>` and `Result` types. Includes Roslyn analyzers (VCR0010-VCR0070) bundled in the NuGet package and a separate `Voyager.Common.Resilience` package (Circuit Breaker).
 
 ## Build & Test Commands
 
@@ -63,6 +63,8 @@ src/
     FailureWithErrorNoneAnalyzer.cs             # VCR0050: Failure(Error.None) — always a bug
     FailureWithErrorNoneCodeFixProvider.cs      # VCR0050 CodeFix: Error.None → Error.UnexpectedError(...)
     PreferMatchSwitchAnalyzer.cs                # VCR0060: prefer Match/Switch (disabled by default)
+    NullableSuccessAnalyzer.cs                  # VCR0070: Success(null) — success must carry a value
+    NullableSuccessCodeFixProvider.cs            # VCR0070 CodeFix: Success(null) → Failure(Error.NotFoundError(...))
 
   Voyager.Common.Resilience/           # Separate package — stateful resilience patterns
     CircuitBreakerPolicy.cs            # 3-state (Closed→Open→HalfOpen), thread-safe via SemaphoreSlim
@@ -111,6 +113,7 @@ build/                                 # Modular MSBuild (imported via Directory
 | VCR0020 | `.GetValueOrThrow()` / `if (IsSuccess)` guard | Replace unchecked Value or wrap in guard |
 | VCR0030 | `Map` → `Bind` | Replace Map with Bind to flatten nested Result |
 | VCR0050 | `Error.None` → `Error.UnexpectedError(...)` | Replace contradictory Error.None in Failure |
+| VCR0070 | `Success(null)` → `Failure(Error.NotFoundError(...))` | Replace null success with failure |
 | VCR0040, VCR0060 | — | No CodeFix providers (transformations too contextual) |
 
 ## VCR0020 Analyzer — Guard Pattern Recognition
@@ -152,4 +155,4 @@ The analyzer recognizes `IsFailure` early-return guards (not just `IsSuccess`), 
 
 ## ADRs (docs/adr/)
 
-Key decisions: ConfigureAwait(false) always (001), ImplicitUsings disabled (002), retry extensions (003), circuit breaker separate package (004), error classification (005), error chaining (006), exception details preservation (007), circuit breaker callbacks (008), retry callbacks (009), Roslyn analyzers (010).
+Key decisions: ConfigureAwait(false) always (001), ImplicitUsings disabled (002), retry extensions (003), circuit breaker separate package (004), error classification (005), error chaining (006), exception details preservation (007), circuit breaker callbacks (008), retry callbacks (009), Roslyn analyzers (010), nullable success analyzer (011).
