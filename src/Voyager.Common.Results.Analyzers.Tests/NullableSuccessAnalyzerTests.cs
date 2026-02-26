@@ -164,6 +164,22 @@ class C
 				.WithLocation(0));
 	}
 
+	[Fact]
+	public async Task ReportsWarning_WhenImplicitConversionFromDefaultInExpressionBody()
+	{
+		var test = ResultStubs + @"
+class Order { }
+class C
+{
+	Result<Order?> GetOrder() => {|#0:(Order?)null|};
+}
+";
+		await RunAnalyzerTest(test,
+			new DiagnosticResult(NullableSuccessAnalyzer.DiagnosticId,
+					Microsoft.CodeAnalysis.DiagnosticSeverity.Warning)
+				.WithLocation(0));
+	}
+
 	#endregion
 
 	#region No-warning cases
@@ -330,6 +346,33 @@ class C
 	void Test()
 	{
 		var result = Result<string?>.Failure(Error.NotFoundError(""TODO: provide meaningful error""));
+	}
+}
+";
+		await RunCodeFixTest(test, fixedSource,
+			new DiagnosticResult(NullableSuccessAnalyzer.DiagnosticId,
+					Microsoft.CodeAnalysis.DiagnosticSeverity.Warning)
+				.WithLocation(0));
+	}
+
+	[Fact]
+	public async Task CodeFix_ReplacesSuccessNullForgivingWithFailure()
+	{
+		var test = ResultStubs + @"
+class C
+{
+	void Test()
+	{
+		var result = {|#0:Result<string>.Success(null!)|};
+	}
+}
+";
+		var fixedSource = ResultStubs + @"
+class C
+{
+	void Test()
+	{
+		var result = Result<string>.Failure(Error.NotFoundError(""TODO: provide meaningful error""));
 	}
 }
 ";

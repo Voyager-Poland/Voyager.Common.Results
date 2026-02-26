@@ -1,6 +1,6 @@
 # ADR-0011: Analyzer wykrywający `Result<T>.Success(null)` — VCR0070
 
-**Status:** Propozycja
+**Status:** Zaakceptowane
 **Data:** 2026-02-25
 **Kontekst:** Voyager.Common.Results.Analyzers
 
@@ -82,113 +82,22 @@ Result<int?>.Success(42);                // nullable T, ale wartość nie jest n
 Result<string?>.Success("hello");        // nullable T, ale wartość nie jest null
 ```
 
-#### Implementacja analyzera (szkic)
+#### Implementacja
 
-```csharp
-[DiagnosticAnalyzer(LanguageNames.CSharp)]
-public sealed class NullableSuccessAnalyzer : DiagnosticAnalyzer
-{
-    public const string DiagnosticId = "VCR0070";
+Analyzer rejestruje dwa callbacki:
+- `OperationKind.Invocation` — wykrywa `Success(null)`, `Success(default)`, `Success(null!)`
+- `OperationKind.Conversion` — wykrywa implicit conversion `T → Result<T>` z null (np. `return (Order?)null;`)
 
-    private static readonly DiagnosticDescriptor Rule = new(
-        id: DiagnosticId,
-        title: "Success should not receive null",
-        messageFormat: "Result<{0}>.Success() should not receive null. "
-                     + "A successful result must carry a value. "
-                     + "Use Result<{0}>.Failure() or remove nullable from the type parameter.",
-        category: "Usage",
-        defaultSeverity: DiagnosticSeverity.Warning,
-        isEnabledByDefault: true,
-        helpLinkUri: ResultTypeHelper.HelpLinkBase + DiagnosticId);
+Kluczowe decyzje implementacyjne:
+- `IsNullOrDefault()` — rekurencyjnie unwrapuje `IConversionOperation` (obsługuje cast, null-forgiving, implicit conversions) i sprawdza `ConstantValue`
+- `AnalyzeConversion()` — filtruje po `conversion.OperatorMethod` aby uniknąć false positives na konwersjach referencyjnych (`Result<T> r = null`) i konwersjach `Error → Result<T>`
+- Nie wykrywa zmiennych, które są `null` w runtime (Wariant 4) — analiza flow jest poza scope
 
-    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
-        ImmutableArray.Create(Rule);
-
-    public override void Initialize(AnalysisContext context)
-    {
-        context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
-        context.EnableConcurrentExecution();
-        context.RegisterOperationAction(AnalyzeInvocation, OperationKind.Invocation);
-        context.RegisterOperationAction(AnalyzeConversion, OperationKind.Conversion);
-    }
-
-    private static void AnalyzeInvocation(OperationAnalysisContext context)
-    {
-        var invocation = (IInvocationOperation)context.Operation;
-        var method = invocation.TargetMethod;
-
-        // Sprawdź czy to Result<T>.Success(value)
-        if (!ResultTypeHelper.IsResultMethod(method, "Success"))
-            return;
-        if (invocation.Arguments.Length != 1)
-            return;
-
-        var argument = invocation.Arguments[0].Value;
-
-        // Sprawdź literał null, default lub null-forgiving (null!)
-        if (!IsNullOrDefault(argument))
-            return;
-
-        var typeArg = method.ContainingType is INamedTypeSymbol { IsGenericType: true } named
-            ? named.TypeArguments[0].ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat)
-            : "T";
-
-        context.ReportDiagnostic(
-            Diagnostic.Create(Rule, invocation.Syntax.GetLocation(), typeArg));
-    }
-
-    private static void AnalyzeConversion(OperationAnalysisContext context)
-    {
-        // Wykryj: Result<T?> result = (T?)null;
-        // Implicit conversion operator wywołuje Success(null)
-        var conversion = (IConversionOperation)context.Operation;
-        if (!conversion.IsImplicit)
-            return;
-        if (!ResultTypeHelper.IsResultType(conversion.Type))
-            return;
-        if (!IsNullOrDefault(conversion.Operand))
-            return;
-
-        var typeArg = conversion.Type is INamedTypeSymbol { IsGenericType: true } named
-            ? named.TypeArguments[0].ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat)
-            : "T";
-
-        context.ReportDiagnostic(
-            Diagnostic.Create(Rule, conversion.Syntax.GetLocation(), typeArg));
-    }
-
-    private static bool IsNullOrDefault(IOperation operation)
-    {
-        // Rozpakuj SuppressNullableWarning (null!)
-        if (operation is ISuppressNullableWarningOperation suppress)
-            operation = suppress.Operand;
-
-        // Rozpakuj konwersję (np. (Order?)null)
-        if (operation is IConversionOperation conv)
-            operation = conv.Operand;
-
-        return operation.ConstantValue.HasValue && operation.ConstantValue.Value is null;
-    }
-}
-```
+**Pliki:** `NullableSuccessAnalyzer.cs`, `NullableSuccessCodeFixProvider.cs`
 
 #### Code Fix Provider
 
-```csharp
-[ExportCodeFixProvider(LanguageNames.CSharp)]
-public sealed class NullableSuccessCodeFixProvider : CodeFixProvider
-{
-    // Oferuje dwie opcje naprawy:
-
-    // 1. "Replace with Failure" — zamienia Success(null) na Failure(Error.NotFoundError(...))
-    //    Result<Order?>.Success(null)
-    //    → Result<Order>.Failure(Error.NotFoundError("Order", "Order not found"))
-
-    // 2. "Remove nullable from type parameter" — gdy cały return type jest Result<T?>
-    //    Result<Order?>.Success(null)
-    //    → Result<Order>.Success(???)  — wymaga dalszej edycji przez programistę
-}
-```
+Zamienia `Success(null)` na `Failure(Error.NotFoundError("TODO: provide meaningful error"))`. Obsługuje tylko `InvocationExpressionSyntax` (jawne wywołanie `Success()`). Nie obsługuje implicit conversion — transformacja implicit conversion w jawne `Failure()` wymaga zmiany struktury kodu i jest zbyt kontekstowa dla automatycznego fix-a.
 
 ### Faza 2 — VCR0071: `Result<T?>` jako typ (Info, domyślnie wyłączony)
 
@@ -355,13 +264,12 @@ public class NullableResultTypeAnalyzerTests
 
 ## Implementacja
 
-- [ ] VCR0070: `NullableSuccessAnalyzer` — wykrywanie `Success(null)` / `Success(default)`
-- [ ] VCR0070: `NullableSuccessCodeFixProvider` — zamiana na `Failure(Error.NotFoundError(...))`
-- [ ] Testy VCR0070 z `CSharpAnalyzerTest` + inline `ResultStubs`
-- [ ] VCR0071: `NullableResultTypeAnalyzer` — flagowanie `Result<T?>` (Info, domyślnie wyłączony)
-- [ ] Testy VCR0071
-- [ ] Aktualizacja CLAUDE.md — dodanie VCR0070/VCR0071 do tabeli analizatorów
-- [ ] Aktualizacja ROADMAP (jeśli istnieje)
+- [x] VCR0070: `NullableSuccessAnalyzer` — wykrywanie `Success(null)` / `Success(default)`
+- [x] VCR0070: `NullableSuccessCodeFixProvider` — zamiana na `Failure(Error.NotFoundError(...))`
+- [x] Testy VCR0070 z `CSharpAnalyzerTest` + inline `ResultStubs`
+- [x] VCR0071: `NullableResultTypeAnalyzer` — flagowanie `Result<T?>` (Info, domyślnie wyłączony)
+- [x] Testy VCR0071
+- [x] Aktualizacja CLAUDE.md — dodanie VCR0070/VCR0071 do tabeli analizatorów
 - [ ] Wydanie jako część kolejnej wersji
 
 ## Konfiguracja
