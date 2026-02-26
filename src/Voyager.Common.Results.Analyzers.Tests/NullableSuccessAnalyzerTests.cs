@@ -29,6 +29,8 @@ namespace Voyager.Common.Results
 	{
 		public static new Result<T> Failure(Error error) => new();
 		public static Result<T> Success(T value) => new();
+		public static implicit operator Result<T>(T value) => Success(value);
+		public static implicit operator Result<T>(Error error) => Failure(error);
 	}
 }
 ";
@@ -117,6 +119,24 @@ class C
 	void Test()
 	{
 		var result = {|#0:Result<Order?>.Success(default)|};
+	}
+}
+";
+		await RunAnalyzerTest(test,
+			new DiagnosticResult(NullableSuccessAnalyzer.DiagnosticId,
+					Microsoft.CodeAnalysis.DiagnosticSeverity.Warning)
+				.WithLocation(0));
+	}
+
+	[Fact]
+	public async Task ReportsWarning_WhenImplicitConversionFromCastNull()
+	{
+		var test = ResultStubs + @"
+class C
+{
+	Result<string?> Test()
+	{
+		return {|#0:(string?)null|};
 	}
 }
 ";

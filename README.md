@@ -679,6 +679,7 @@ The package includes a full suite of Roslyn analyzers that catch common Result p
 | VCR0050 | Error | `Failure(Error.None)` — failure without error is always a bug |
 | VCR0060 | Disabled | Prefer `Match`/`Switch` over `if (IsSuccess)` branching (opt-in style rule) |
 | VCR0070 | Warning | `Success(null)` — successful result must carry a value, not null |
+| VCR0071 | Disabled | `Result<T?>` — nullable type parameter suggests missing Failure modeling (opt-in) |
 
 ```csharp
 var result = GetUser(id);

@@ -65,6 +65,7 @@ src/
     PreferMatchSwitchAnalyzer.cs                # VCR0060: prefer Match/Switch (disabled by default)
     NullableSuccessAnalyzer.cs                  # VCR0070: Success(null) — success must carry a value
     NullableSuccessCodeFixProvider.cs            # VCR0070 CodeFix: Success(null) → Failure(Error.NotFoundError(...))
+    NullableResultTypeAnalyzer.cs                # VCR0071: Result<T?> nullable type parameter (disabled by default)
 
   Voyager.Common.Resilience/           # Separate package — stateful resilience patterns
     CircuitBreakerPolicy.cs            # 3-state (Closed→Open→HalfOpen), thread-safe via SemaphoreSlim
@@ -114,7 +115,7 @@ build/                                 # Modular MSBuild (imported via Directory
 | VCR0030 | `Map` → `Bind` | Replace Map with Bind to flatten nested Result |
 | VCR0050 | `Error.None` → `Error.UnexpectedError(...)` | Replace contradictory Error.None in Failure |
 | VCR0070 | `Success(null)` → `Failure(Error.NotFoundError(...))` | Replace null success with failure |
-| VCR0040, VCR0060 | — | No CodeFix providers (transformations too contextual) |
+| VCR0040, VCR0060, VCR0071 | — | No CodeFix providers (transformations too contextual) |
 
 ## VCR0020 Analyzer — Guard Pattern Recognition
 

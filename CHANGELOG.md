@@ -10,10 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Roslyn Analyzer VCR0070 — `Success(null)` anti-pattern**: Warns when `null` or `default` literal is passed to `Result<T>.Success()`
   - Detects: `Result<T?>.Success(null)`, `Result<T?>.Success(default)`, `Result<T?>.Success((T?)null)`
+  - Detects implicit conversion from null: `Result<T?> r = (T?)null;`
   - Unwraps conversions and casts to find null at any depth
   - Code fix: replaces `Success(null)` with `Failure(Error.NotFoundError("TODO: provide meaningful error"))`
   - Documentation: [`docs/analyzers/VCR0070.md`](docs/analyzers/VCR0070.md)
   - See [ADR-0011](docs/adr/ADR-0011-nullable-success-analyzer.md) for design rationale
+- **Roslyn Analyzer VCR0071 — `Result<T?>` nullable type parameter** (disabled by default): Flags usage of nullable type parameter in `Result<T?>`
+  - Detects: method return types, properties, fields typed as `Result<T?>` or `Task<Result<T?>>`
+  - Opt-in via `.editorconfig`: `dotnet_diagnostic.VCR0071.severity = warning`
+  - Documentation: [`docs/analyzers/VCR0071.md`](docs/analyzers/VCR0071.md)
 
 ## [1.9.0] - 2026-02-18
 

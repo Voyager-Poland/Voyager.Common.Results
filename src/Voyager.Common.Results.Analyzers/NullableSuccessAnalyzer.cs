@@ -31,6 +31,7 @@ namespace Voyager.Common.Results.Analyzers
 			context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
 			context.EnableConcurrentExecution();
 			context.RegisterOperationAction(AnalyzeInvocation, OperationKind.Invocation);
+			context.RegisterOperationAction(AnalyzeConversion, OperationKind.Conversion);
 		}
 
 		private static void AnalyzeInvocation(OperationAnalysisContext context)
@@ -61,6 +62,32 @@ namespace Voyager.Common.Results.Analyzers
 
 			context.ReportDiagnostic(
 				Diagnostic.Create(Rule, invocation.Syntax.GetLocation(), typeArg));
+		}
+
+		private static void AnalyzeConversion(OperationAnalysisContext context)
+		{
+			var conversion = (IConversionOperation)context.Operation;
+
+			// Only implicit user-defined conversions (implicit operator Result<T>(T value))
+			if (!conversion.IsImplicit)
+				return;
+
+			// Target must be Result<T>
+			if (conversion.Type is not INamedTypeSymbol { IsGenericType: true } resultType)
+				return;
+
+			if (!ResultTypeHelper.IsResultType(resultType))
+				return;
+
+			// Operand must be null/default
+			if (!IsNullOrDefault(conversion.Operand))
+				return;
+
+			var typeArg = resultType.TypeArguments[0]
+				.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
+
+			context.ReportDiagnostic(
+				Diagnostic.Create(Rule, conversion.Syntax.GetLocation(), typeArg));
 		}
 
 		private static bool IsNullOrDefault(IOperation operation)
