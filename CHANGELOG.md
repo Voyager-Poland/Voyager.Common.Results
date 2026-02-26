@@ -5,7 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.10.0] - 2026-02-26
+
+### Added
+- **Roslyn Analyzer VCR0070 — `Success(null)` anti-pattern**: Warns when `null` or `default` literal is passed to `Result<T>.Success()`
+  - Detects: `Result<T?>.Success(null)`, `Result<T?>.Success(default)`, `Result<T?>.Success((T?)null)`
+  - Detects implicit conversion from null: `Result<T?> r = (T?)null;`
+  - Unwraps conversions and casts to find null at any depth
+  - Code fix: replaces `Success(null)` with `Failure(Error.NotFoundError("TODO: provide meaningful error"))`
+  - Documentation: [`docs/analyzers/VCR0070.md`](docs/analyzers/VCR0070.md)
+  - See [ADR-0011](docs/adr/ADR-0011-nullable-success-analyzer.md) for design rationale
+- **Roslyn Analyzer VCR0071 — `Result<T?>` nullable type parameter** (disabled by default): Flags usage of nullable type parameter in `Result<T?>`
+  - Detects: method return types, properties, fields typed as `Result<T?>` or `Task<Result<T?>>`
+  - Opt-in via `.editorconfig`: `dotnet_diagnostic.VCR0071.severity = warning`
+  - Documentation: [`docs/analyzers/VCR0071.md`](docs/analyzers/VCR0071.md)
 
 ## [1.9.0] - 2026-02-18
 
@@ -546,7 +559,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - .NET Framework 4.8
 - .NET 8.0
 
-[Unreleased]: https://github.com/Voyager-Poland/Voyager.Common.Results/compare/v1.9.0...HEAD
+[1.10.0]: https://github.com/Voyager-Poland/Voyager.Common.Results/compare/v1.9.0...v1.10.0
 [1.9.0]: https://github.com/Voyager-Poland/Voyager.Common.Results/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/Voyager-Poland/Voyager.Common.Results/compare/v1.7.2...v1.8.0
 [1.7.2]: https://github.com/Voyager-Poland/Voyager.Common.Results/compare/v1.7.1...v1.7.2
