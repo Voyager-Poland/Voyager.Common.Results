@@ -72,6 +72,22 @@ namespace Voyager.Common.Results.Analyzers
 			if (!conversion.IsImplicit)
 				return;
 
+			// Must be a user-defined conversion with an operator method (T -> Result<T>)
+			if (conversion.OperatorMethod == null)
+				return;
+
+			// The operator parameter must be the T type (not Error -> Result<T>)
+			if (conversion.OperatorMethod.Parameters.Length != 1)
+				return;
+
+			var paramType = conversion.OperatorMethod.Parameters[0].Type;
+			if (ResultTypeHelper.IsResultType(paramType as INamedTypeSymbol))
+				return;
+
+			// Check that param is not Error type
+			if (paramType.Name == "Error")
+				return;
+
 			// Target must be Result<T>
 			if (conversion.Type is not INamedTypeSymbol { IsGenericType: true } resultType)
 				return;
@@ -92,7 +108,7 @@ namespace Voyager.Common.Results.Analyzers
 
 		private static bool IsNullOrDefault(IOperation operation)
 		{
-			// Unwrap conversions (e.g. (Order?)null, implicit casts)
+			// Unwrap conversions (e.g. (Order?)null, implicit casts, null! forgiving operator)
 			while (operation is IConversionOperation conversion)
 				operation = conversion.Operand;
 

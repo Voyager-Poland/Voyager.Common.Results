@@ -146,6 +146,24 @@ class C
 				.WithLocation(0));
 	}
 
+	[Fact]
+	public async Task ReportsWarning_WhenSuccessWithNullForgiving()
+	{
+		var test = ResultStubs + @"
+class C
+{
+	void Test()
+	{
+		var result = {|#0:Result<string>.Success(null!)|};
+	}
+}
+";
+		await RunAnalyzerTest(test,
+			new DiagnosticResult(NullableSuccessAnalyzer.DiagnosticId,
+					Microsoft.CodeAnalysis.DiagnosticSeverity.Warning)
+				.WithLocation(0));
+	}
+
 	#endregion
 
 	#region No-warning cases
@@ -254,6 +272,36 @@ class C
 	void Test()
 	{
 		var result = Result<int?>.Success(42);
+	}
+}
+";
+		await RunAnalyzerTest(test);
+	}
+
+	[Fact]
+	public async Task NoWarning_WhenAssigningNullDirectlyToResult()
+	{
+		var test = ResultStubs + @"
+class C
+{
+	void Test()
+	{
+		Result<string?> result = null;
+	}
+}
+";
+		await RunAnalyzerTest(test);
+	}
+
+	[Fact]
+	public async Task NoWarning_WhenImplicitConversionFromErrorNull()
+	{
+		var test = ResultStubs + @"
+class C
+{
+	Result<string> Test()
+	{
+		return (Error)null;
 	}
 }
 ";

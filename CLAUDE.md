@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-Railway Oriented Programming library for .NET — functional error handling via `Result<T>` and `Result` types. Includes Roslyn analyzers (VCR0010-VCR0070) bundled in the NuGet package and a separate `Voyager.Common.Resilience` package (Circuit Breaker).
+Railway Oriented Programming library for .NET — functional error handling via `Result<T>` and `Result` types. Includes Roslyn analyzers (VCR0010–VCR0071) bundled in the NuGet package and a separate `Voyager.Common.Resilience` package (Circuit Breaker).
 
 ## Build & Test Commands
 
