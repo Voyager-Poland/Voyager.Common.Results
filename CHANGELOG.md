@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`NullToResult`** — ergonomic bridge from `T?` (nullable) to `Result<T>` for repository pattern integration
+  - `T?.NullToResult(string message)` → `Result<T>` with `NotFoundError` if null (most common case)
+  - `T?.NullToResult(Error error)` → `Result<T>` with custom error if null
+  - `T?.NullToResult(Func<Error> errorFactory)` → `Result<T>` with lazy error if null
+  - All three overloads available for both reference types (`where T : class`) and value types (`where T : struct`)
+  - Example:
+    ```csharp
+    Result<Invoice> CreateInvoice(string orderNumber) =>
+        _repo.FindByNumber(orderNumber)
+            .NullToResult($"Order {orderNumber} not found")
+            .Bind(order => _invoiceService.Generate(order));
+    ```
+- **`IsNotFound`** — helper to check if a Result failed with `ErrorType.NotFound`
+  - `Result.IsNotFound()` → `bool`
+  - `Result<T>.IsNotFound()` → `bool`
+  - Example:
+    ```csharp
+    var result = _repo.Find(id).NullToResult($"User {id}");
+    if (result.IsNotFound())
+        return NotFound();
+    ```
+- See [ADR-0012](docs/adr/ADR-0012-repository-pattern-null-and-notfound.md) for design rationale
+
 ## [1.9.0] - 2026-02-18
 
 ### Added

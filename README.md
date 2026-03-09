@@ -38,23 +38,16 @@ dotnet add package Voyager.Common.Resilience
 
 ```csharp
 using Voyager.Common.Results;
+using Voyager.Common.Results.Extensions;
 
 // Define operations that can fail (assumes repository doesn't throw exceptions)
-public Result<User> GetUser(int id)
-{
-    var user = _repository.Find(id);
-    return user is not null 
-        ? user  // Implicit conversion: User → Result<User>
-        : Error.NotFoundError($"User {id} not found");
-}
+public Result<User> GetUser(int id) =>
+    _repository.Find(id)  // returns User?
+        .NullToResult($"User {id} not found");
 
-public Result<Order> GetLatestOrder(User user)
-{
-    var order = _repository.GetLatestOrder(user.Id);
-    return order is not null
-        ? order 
-        : Error.NotFoundError("No orders found");
-}
+public Result<Order> GetLatestOrder(User user) =>
+    _repository.GetLatestOrder(user.Id)  // returns Order?
+        .NullToResult("No orders found");
 
 // Chain operations with Railway Oriented Programming
 var result = GetUser(123)
@@ -229,6 +222,10 @@ public Result<User> GetUser(int id)
     return Result<User>.Try(() => _repository.Find(id))
         .Ensure(user => user is not null, Error.NotFoundError($"User {id} not found"));
 }
+
+// Simpler alternative with NullToResult (when repo doesn't throw):
+public Result<User> GetUser(int id) =>
+    _repository.Find(id).NullToResult($"User {id} not found");
 ```
 
 **When to use Try:**
@@ -236,6 +233,57 @@ public Result<User> GetUser(int id)
 - ✅ File I/O, parsing, network calls
 - ✅ Converting legacy exception-based code to Result pattern
 - ✅ Custom exception-to-error mapping
+
+### NullToResult - Repository Pattern Bridge
+
+Convert nullable values from repositories into `Result<T>` — the ergonomic entry point to Railway:
+
+```csharp
+using Voyager.Common.Results.Extensions;
+
+// Simple: string message → NotFoundError (90% of use cases)
+Result<User> user = _repo.Find(id).NullToResult($"User {id} not found");
+
+// Custom error type (when NotFound is not appropriate)
+Result<Config> config = _provider.Get(key)
+    .NullToResult(Error.ValidationError($"Required config '{key}' is missing"));
+
+// Lazy error creation
+Result<User> user = _repo.Find(id)
+    .NullToResult(() => Error.NotFoundError($"User {id} not found"));
+
+// Chain into Railway
+Result<Invoice> CreateInvoice(string orderNumber) =>
+    _repo.FindByNumber(orderNumber)
+        .NullToResult($"Order {orderNumber} not found")
+        .Bind(order => _invoiceService.Generate(order))
+        .Tap(invoice => _repo.Save(invoice));
+
+// Cache → Database fallback
+Result<User> GetUser(int id) =>
+    _cache.Find(id)
+        .NullToResult($"User {id} not in cache")
+        .OrElse(() => _db.Find(id)
+            .NullToResult($"User {id} not found"));
+
+// Works with value types too (DateTime?, int?, etc.)
+Result<DateTime> lastLogin = _repo.GetLastLoginDate(userId)
+    .NullToResult($"No login record for user {userId}");
+
+// Check result with IsNotFound helper
+var result = _repo.Find(id).NullToResult($"User {id}");
+if (result.IsNotFound())
+    return NotFound();
+```
+
+**When to use NullToResult:**
+- ✅ Repository methods returning `T?` (nullable) — the most common entry point
+- ✅ Cache lookups that may return null
+- ✅ Any nullable value that needs to enter a Railway chain
+- ❌ Don't use when null is a normal/expected state (e.g. checking email availability)
+- ❌ Don't use inside a Railway chain — use `Bind` + `NullToResult` instead of `Map`
+
+See [ADR-0012](docs/adr/ADR-0012-repository-pattern-null-and-notfound.md) for design rationale.
 
 ### TryAsync - Async Exception Handling
 
