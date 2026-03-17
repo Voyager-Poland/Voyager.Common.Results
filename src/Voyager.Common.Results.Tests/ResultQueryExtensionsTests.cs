@@ -24,6 +24,7 @@ public class ResultQueryExtensionsTests
 		var result = Result<string>.Failure(Error.ValidationError("invalid"));
 
 		// Act & Assert
+		Assert.True(result.IsFailure);
 		Assert.False(result.IsNotFound());
 	}
 
@@ -34,6 +35,7 @@ public class ResultQueryExtensionsTests
 		var result = Result<string>.Success("hello");
 
 		// Act & Assert
+		Assert.True(result.IsSuccess);
 		Assert.False(result.IsNotFound());
 	}
 
@@ -56,6 +58,7 @@ public class ResultQueryExtensionsTests
 		var result = Result.Failure(Error.DatabaseError("db error"));
 
 		// Act & Assert
+		Assert.True(result.IsFailure);
 		Assert.False(result.IsNotFound());
 	}
 
@@ -66,6 +69,7 @@ public class ResultQueryExtensionsTests
 		var result = Result.Success();
 
 		// Act & Assert
+		Assert.True(result.IsSuccess);
 		Assert.False(result.IsNotFound());
 	}
 
@@ -119,6 +123,7 @@ public class ResultQueryExtensionsTests
 		var result = value.NullToResult(Error.ValidationError("required"));
 
 		// Assert
+		Assert.True(result.IsFailure);
 		Assert.False(result.IsNotFound());
 	}
 }
