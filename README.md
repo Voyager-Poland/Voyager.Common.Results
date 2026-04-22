@@ -72,7 +72,7 @@ The library includes a comprehensive test suite ensuring correctness across mult
 - **Composition** - Operator chaining and combination behavior in complex scenarios
 - **Unit Tests** - Core functionality, extension methods, edge cases, and cancellation
 
-All tests validate behavior on **.NET Framework 4.8**, **.NET 6.0**, **.NET 8.0**, and **.NET 10.0** to ensure cross-platform compatibility.
+Runtime/library tests validate behavior on **.NET Framework 4.8**, **.NET 6.0**, **.NET 8.0**, and **.NET 10.0** to ensure cross-platform compatibility. Roslyn analyzer tests run on **.NET 8.0** only (Microsoft.CodeAnalysis.Testing requirement).
 
 ## 📖 Documentation
 
