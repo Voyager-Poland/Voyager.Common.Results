@@ -10,16 +10,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.12.0] - 2026-04-22
 
 ### Added
-- **.NET 10 (LTS) target framework** — library now multi-targets `net48`, `net6.0`, `net8.0`, and `net10.0` (BZPB-430)
+- **.NET 10 (LTS) target framework** — library now multi-targets `net48`, `net6.0`, `net8.0`, and `net10.0` (BZPB-430, [ADR-0013](docs/adr/ADR-0013-net10-lts-target-framework.md))
   - Added `net10.0` to `TargetFrameworks` in `Directory.Build.props` with `LangVersion=latest`
-  - Extended `ImplicitUsings=enable` to net10.0 in `Voyager.Common.Results.csproj`
   - Package now ships with `lib/net10.0/` folder alongside existing TFMs
+- **ADR-0013** documenting rationale: .NET 6 EOL since 2024-11-12, ecosystem migration to net10, perf improvements in Result monad hot path, and groundwork for follow-up drop of net6
 
 ### Changed
 - **CI build matrix** — now tests on `.NET 6.0.x`, `.NET 8.0.x`, and `.NET 10.0.x` on Ubuntu, `.NET Framework 4.8` on Windows
-- **NuGet packing moved to .NET 10 SDK (LTS)** — previously packed on .NET 8
+- **NuGet packing moved to .NET 10 SDK (LTS)** — previously packed on .NET 8 (LTS horizon extended to 2028-11-14)
 - **`Microsoft.NET.Test.Sdk` bumped to 17.12.0** in `Voyager.Common.Results.Tests` (was 17.10.0) for .NET 10 support
 - **Package metadata** — `<Description>` and `<PackageTags>` updated to mention all supported TFMs (net48, net6, net8, net10)
+
+### Fixed
+- **Restored consistency with [ADR-0002](docs/adr/ADR-0002-net6-and-implicit-usings.md)** — removed undocumented `ImplicitUsings=enable` override for net8.0/net10.0 in `Voyager.Common.Results.csproj`. Global usings now come exclusively from explicit `GlobalUsings.cs` across all TFMs, restoring the deterministic namespace surface mandated by ADR-0002
 
 ## [1.10.0] - 2026-02-26
 
