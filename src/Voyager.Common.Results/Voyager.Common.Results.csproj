@@ -5,20 +5,17 @@
 		<Authors>Andrzej Świstowski</Authors>
 		<IsPackable>true</IsPackable>
 		<Description>A lightweight, functional Result type for .NET implementing Railway Oriented
-			Programming pattern. Supports both .NET Framework 4.8 and .NET 8. Provides error ang
-			without exceptions, method chaining, async operations, and collection utilities.</Description>
+			Programming pattern. Supports .NET Framework 4.8, .NET 6, .NET 8, and .NET 10 (LTS).
+			Provides error handling without exceptions, method chaining, async operations, and
+			collection utilities.</Description>
 		<PackageTags>
-			result-pattern;railway-oriented-programming;functional;error-handling;either;option;monad;csharp;dotnet;net48;net8</PackageTags>
+			result-pattern;railway-oriented-programming;functional;error-handling;either;option;monad;csharp;dotnet;net48;net6;net8;net10</PackageTags>
 		<PackageProjectUrl>https://github.com/Voyager-Poland/Voyager.Common.Results</PackageProjectUrl>
 		<RepositoryUrl>https://github.com/Voyager-Poland/Voyager.Common.Results</RepositoryUrl>
 		<PackageReleaseNotes>
 			See CHANGELOG.md for release history
 		</PackageReleaseNotes>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
-	</PropertyGroup>
-
-	<PropertyGroup Condition="'$(TargetFramework)' == 'net8.0'">
-		<ImplicitUsings>enable</ImplicitUsings>
 	</PropertyGroup>
 
 	<ItemGroup Condition="'$(TargetFramework)' == 'net48'">
