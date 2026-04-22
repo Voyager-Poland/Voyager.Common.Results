@@ -7,13 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-04-22
+
 ### Added
 - **.NET 10 (LTS) target framework** — library now multi-targets `net48`, `net6.0`, `net8.0`, and `net10.0` (BZPB-430)
-  - Updated `Directory.Build.props` with `net10.0` in `TargetFrameworks` and `LangVersion=latest`
+  - Added `net10.0` to `TargetFrameworks` in `Directory.Build.props` with `LangVersion=latest`
   - Extended `ImplicitUsings=enable` to net10.0 in `Voyager.Common.Results.csproj`
-  - Updated CI matrix to test on `.NET 6.0.x`, `.NET 8.0.x`, and `.NET 10.0.x`
-  - Moved `dotnet pack`/publish steps from .NET 8 to .NET 10 (LTS) in CI workflow
-  - Bumped `Microsoft.NET.Test.Sdk` to 17.12.0 in `Voyager.Common.Results.Tests` for .NET 10 support
+  - Package now ships with `lib/net10.0/` folder alongside existing TFMs
+
+### Changed
+- **CI build matrix** — now tests on `.NET 6.0.x`, `.NET 8.0.x`, and `.NET 10.0.x` on Ubuntu, `.NET Framework 4.8` on Windows
+- **NuGet packing moved to .NET 10 SDK (LTS)** — previously packed on .NET 8
+- **`Microsoft.NET.Test.Sdk` bumped to 17.12.0** in `Voyager.Common.Results.Tests` (was 17.10.0) for .NET 10 support
+- **Package metadata** — `<Description>` and `<PackageTags>` updated to mention all supported TFMs (net48, net6, net8, net10)
 
 ## [1.10.0] - 2026-02-26
 
