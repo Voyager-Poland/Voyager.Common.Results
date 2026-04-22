@@ -7,7 +7,7 @@
 
 Biblioteka implementująca **Result Pattern** (Railway Oriented Programming) dla projektów .NET.
 
-Wspiera **.NET Framework 4.8** i **.NET 8** 🎯
+Wspiera **.NET Framework 4.8**, **.NET 6**, **.NET 8** i **.NET 10 (LTS)** 🎯
 
 ## 🧪 Testy
 
@@ -19,7 +19,7 @@ Biblioteka zawiera **464 kompleksowe testy** zapewniające poprawność:
 - **Composition** (60 testów) - Zachowanie łańcuchowania i kombinacji operatorów
 - **Unit Tests** (309 testów) - Podstawowa funkcjonalność, extensions, edge cases
 
-Wszystkie testy przechodzą na **.NET 8.0** i **.NET Framework 4.8**.
+Wszystkie testy przechodzą na **.NET Framework 4.8**, **.NET 6.0**, **.NET 8.0** i **.NET 10.0**.
 
 ## 📦 Instalacja
 

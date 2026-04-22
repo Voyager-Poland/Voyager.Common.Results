@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **.NET 10 (LTS) target framework** — library now multi-targets `net48`, `net6.0`, `net8.0`, and `net10.0` (BZPB-430)
+  - Updated `Directory.Build.props` with `net10.0` in `TargetFrameworks` and `LangVersion=latest`
+  - Extended `ImplicitUsings=enable` to net10.0 in `Voyager.Common.Results.csproj`
+  - Updated CI matrix to test on `.NET 6.0.x`, `.NET 8.0.x`, and `.NET 10.0.x`
+  - Moved `dotnet pack`/publish steps from .NET 8 to .NET 10 (LTS) in CI workflow
+  - Bumped `Microsoft.NET.Test.Sdk` to 17.12.0 in `Voyager.Common.Results.Tests` for .NET 10 support
+
 ## [1.10.0] - 2026-02-26
 
 ### Added

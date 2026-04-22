@@ -7,7 +7,7 @@
 
 A lightweight, functional **Result Pattern** implementation for .NET that enables **Railway Oriented Programming**. Replace exceptions with explicit error handling, making your code more predictable and easier to test.
 
-**Supports .NET Framework 4.8 and .NET 8** 🚀
+**Supports .NET Framework 4.8, .NET 6, .NET 8, and .NET 10 (LTS)** 🚀
 
 ## ✨ Features
 
@@ -72,7 +72,7 @@ The library includes a comprehensive test suite ensuring correctness across mult
 - **Composition** - Operator chaining and combination behavior in complex scenarios
 - **Unit Tests** - Core functionality, extension methods, edge cases, and cancellation
 
-All tests validate behavior on both **.NET 8.0** and **.NET Framework 4.8** to ensure cross-platform compatibility.
+All tests validate behavior on **.NET Framework 4.8**, **.NET 6.0**, **.NET 8.0**, and **.NET 10.0** to ensure cross-platform compatibility.
 
 ## 📖 Documentation
 
@@ -782,7 +782,7 @@ dotnet pack src/Voyager.Common.Results/Voyager.Common.Results.csproj -c Release
 
 Simply push to `main` branch - GitHub Actions will:
 1. ✅ Automatically bump version
-2. ✅ Build for both .NET 8.0 and .NET Framework 4.8
+2. ✅ Build for .NET Framework 4.8, .NET 6.0, .NET 8.0, and .NET 10.0
 3. ✅ Run all tests
 4. ✅ Publish to GitHub Packages
 5. ✅ Publish to NuGet.org (if configured)

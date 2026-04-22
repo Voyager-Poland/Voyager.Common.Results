@@ -8,7 +8,7 @@
 
 Prevent cascading failures and improve system reliability with the **Circuit Breaker pattern** integrated into the Result monad.
 
-**Supports .NET Framework 4.8, .NET 6.0, and .NET 8.0** 🚀
+**Supports .NET Framework 4.8, .NET 6.0, .NET 8.0, and .NET 10.0 (LTS)** 🚀
 
 ## ✨ Features
 
