@@ -1,8 +1,3 @@
-#if NET48
-using System;
-using System.Threading.Tasks;
-#endif
-
 namespace Voyager.Common.Results.Extensions
 {
 	/// <summary>

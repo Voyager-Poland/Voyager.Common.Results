@@ -7,7 +7,7 @@
 
 A lightweight, functional **Result Pattern** implementation for .NET that enables **Railway Oriented Programming**. Replace exceptions with explicit error handling, making your code more predictable and easier to test.
 
-**Supports .NET Framework 4.8, .NET 6, .NET 8, and .NET 10 (LTS)** 🚀
+**Targets `netstandard2.0` and `net10.0` (LTS)** — runs on .NET Framework 4.6.1+, .NET Core 2.0+, .NET 5/6/7/8/9, and .NET 10 (LTS, AOT-ready). Also Mono, Xamarin, and Unity. 🚀
 
 ## ✨ Features
 
@@ -72,7 +72,7 @@ The library includes a comprehensive test suite ensuring correctness across mult
 - **Composition** - Operator chaining and combination behavior in complex scenarios
 - **Unit Tests** - Core functionality, extension methods, edge cases, and cancellation
 
-Runtime/library tests validate behavior on **.NET Framework 4.8**, **.NET 6.0**, **.NET 8.0**, and **.NET 10.0** to ensure cross-platform compatibility. Roslyn analyzer tests run on **.NET 8.0** only (Microsoft.CodeAnalysis.Testing requirement).
+Runtime/library tests validate behavior on **.NET Framework 4.8**, **.NET 8.0**, and **.NET 10.0** — the library binary (`netstandard2.0`) is exercised on each declared runtime. Roslyn analyzer tests run on **.NET 8.0** only (Microsoft.CodeAnalysis.Testing requirement).
 
 ## 📖 Documentation
 
@@ -780,18 +780,23 @@ dotnet pack src/Voyager.Common.Results/Voyager.Common.Results.csproj -c Release
 
 ### Automatic Publishing
 
-Simply push to `main` branch - GitHub Actions will:
-1. ✅ Automatically bump version
-2. ✅ Build for .NET Framework 4.8, .NET 6.0, .NET 8.0, and .NET 10.0
-3. ✅ Run all tests
-4. ✅ Publish to GitHub Packages
-5. ✅ Publish to NuGet.org (if configured)
+Per [ADR-0014](docs/adr/ADR-0014-netstandard20-and-tfm-consolidation.md), publishing is gated on **tag push** (`refs/tags/v*`). Branch pushes run CI (build + tests on `netstandard2.0` + `net10.0`, plus net48 binary verification on Windows) but do not publish.
+
+To publish a release:
 
 ```bash
-git add .
-git commit -m "Add new feature"
-git push origin main
+# After PR is merged to master
+git checkout master && git pull
+git tag v2.0.0
+git push origin v2.0.0
 ```
+
+GitHub Actions will then:
+1. ✅ Build & test on .NET 8.0 / .NET 10.0 (Ubuntu) and .NET Framework 4.8 (Windows)
+2. ✅ Pack `Voyager.Common.Results` and `Voyager.Common.Resilience` on .NET 10 SDK
+3. ✅ Publish to GitHub Packages
+4. ✅ Publish to NuGet.org (if visibility permits)
+5. ✅ Create a GitHub Release with auto-generated notes
 
 ## 🧪 Running Tests
 
@@ -809,7 +814,7 @@ reportgenerator -reports:**/coverage.cobertura.xml -targetdir:coverage-report -r
 
 ### Development Workflow
 
-- Push to `main` triggers automatic version bump and publishing
+- Push tag `v*` to `master` triggers package publishing (per ADR-0014)
 - All tests must pass before merging
 - Follow existing code style and conventions
 - Add tests for new features

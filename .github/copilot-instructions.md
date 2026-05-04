@@ -24,30 +24,24 @@ build/                 # Modular MSBuild configuration (imported by Directory.Bu
 
 **Build system pattern:** All `.props` files are imported automatically via `Directory.Build.props` - modify modular files, NOT individual `.csproj` files.
 
-## Multi-Framework: .NET 8.0 + .NET 6.0 + .NET 4.8
+## Multi-Framework: `netstandard2.0` + `net10.0` (per ADR-0014)
 
-**CRITICAL: ImplicitUsings is DISABLED for all targets** - always add explicit `using` statements or use `#if NET48` conditionals.
+**CRITICAL: ImplicitUsings is DISABLED for all targets** — always add explicit `using` statements. Global usings are provided by `GlobalUsings.cs` per project (unconditional, applies to both TFMs).
 
-**Required conditional imports for .NET 4.8 compatibility:**
-```csharp
-#if NET48
-using System;
-using System.Threading;
-using System.Threading.Tasks;
-#endif
-```
+**No `#if NET48` / `#if NETSTANDARD` directives in source files** — the library compiles identically for both TFMs. If you need TFM-specific code in the future, prefer `#if NET10_0_OR_GREATER` for opt-in modern API usage and document why.
 
-**Key differences:**
+**Key TFM matrix:**
 
-| Framework | Targets | ImplicitUsings | LangVersion | Notes |
-|-----------|---------|---------------|-------------|-------|
-| .NET 8.0  | net8.0  | **disabled**  | latest      | Modern, but no implicit usings - explicit imports required |
-| .NET 6.0  | net6.0  | disabled      | 10.0        | Source Link enabled, no polyfills needed |
-| .NET 4.8  | net48   | disabled      | 10.0        | Requires `IsExternalInit` polyfill, strict type inference |
+| TFM             | LangVersion | ImplicitUsings | Notes |
+|-----------------|-------------|----------------|-------|
+| `netstandard2.0` | 10.0        | disabled (SDK does not support it) | Covers .NET Framework 4.6.1+, .NET Core 2.0+, .NET 5/6/7/8/9, Mono, Xamarin, Unity. Requires `IsExternalInit` polyfill (record/init properties) |
+| `net10.0`       | latest      | disabled       | TFM-specific assembly for .NET 10 LTS — AOT-readiness, BCL nullable annotations, forward-compat for ValueTask/IAsyncEnumerable overloads |
+
+**Test projects override the global TFM matrix** — they multi-target `net48;net8.0;net10.0` to verify the netstandard2.0 binary on each declared runtime (net48 .NET Framework, net8.0 LTS, net10.0).
 
 **Per-target file location:** Check [Directory.Build.props](../Directory.Build.props) for framework-specific settings.
 
-**Always verify all targets:** `dotnet build -c Release && dotnet test -c Release --no-build`
+**Always verify both TFMs:** `dotnet build -c Release && dotnet test -c Release --no-build`
 
 ## Critical Operator Selection
 
@@ -180,7 +174,7 @@ public void Map_Failure_PropagatesError() { }
 - **TaskResultExtensionsTests.cs** - Async operators, cancellation token handling
 - **ResultCollectionExtensionsTests.cs** - Combine, Partition, collection operations
 
-**Always test all targets:** `dotnet test -c Release` validates net8.0, net6.0, AND net48
+**Always test all targets:** `dotnet test -c Release` validates the netstandard2.0 binary on net8.0 + net10.0 (Linux) and net48 (Windows job)
 
 **Coverage requirement:** Run `dotnet test --collect:"XPlat Code Coverage"` - no significant decreases allowed
 

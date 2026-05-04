@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-05-04
+
+### Changed (BREAKING)
+- **TFM matrix consolidated to `netstandard2.0;net10.0`** ([ADR-0014](docs/adr/ADR-0014-netstandard20-and-tfm-consolidation.md))
+  - **Dropped `net48` as separate TFM** — `netstandard2.0` is binary-compatible with .NET Framework 4.6.1+, including .NET Framework 4.8. Consumers on net48 now resolve `lib/netstandard2.0/` (functionally identical).
+  - **Dropped `net6.0`** — runtime EOL since 2024-11-12. Consumers on net6 resolve `lib/netstandard2.0/`.
+  - **Dropped `net8.0` as separate TFM** — covered by `netstandard2.0`. Consumers on net8 resolve `lib/netstandard2.0/`. No functional regression (library uses zero net8-specific APIs).
+  - **`net10.0` retained** as second TFM — for AOT-readiness (`[IsAotCompatible]` requires net8+ TFM), nullable annotations on referenced BCL, and forward compatibility for future `ValueTask`/`IAsyncEnumerable<T>` overloads.
+  - **Reach widened** — `netstandard2.0` additionally covers .NET Framework 4.6.1+, .NET Core 2.x, Mono, Xamarin, and Unity (previously unsupported).
+- **`IsExternalInit` polyfill condition** moved from `'$(TargetFramework)' == 'net48'` to `'$(TargetFramework)' == 'netstandard2.0'` — needed for `record`/`init` properties on netstandard2.0 (and on any .NET Framework consumer). Marked `internal` by the polyfill package, so no conflict on .NET 5+ runtimes.
+
+### Removed
+- **`#if NET48` directives** removed from 8 source files (`Result.cs`, `ResultT.cs`, `Error.cs`, `Extensions/TaskResultExtensions.cs`, `Extensions/ResultRetryExtensions.cs`, `Extensions/ResultErrorChainExtensions.cs`, `Extensions/NullableResultExtensions.cs`, `Resilience/CircuitBreakerPolicy.cs`, `Resilience/ResultCircuitBreakerExtensions.cs`) — `using` declarations are now unconditional, served by `GlobalUsings.cs` for all TFMs (netstandard2.0 SDK structurally has no ImplicitUsings, so explicit usings are uniformly required — strengthens ADR-0002).
+- **`#if NET6_0_OR_GREATER` guard removed from `GlobalUsings.cs`** — global usings now apply unconditionally to both TFMs.
+
+### CI/CD
+- **Publishing now triggers ONLY on tag push (`refs/tags/v*`)** — branch pushes to master/main no longer publish to NuGet feeds. `dotnet pack` and artifact upload are also gated on tag push (resource savings on regular CI runs).
+- **Build matrix reduced** from 4 TFMs (net48/net6/net8/net10) to 2 (net8/net10) on ubuntu-latest. Dedicated `test-net48` job on windows-latest retained — verifies that the `netstandard2.0` library binary works on .NET Framework 4.8 runtime.
+- **Mono installation step removed** from main build job (was only needed for net48 testing on Linux, which we never actually performed — net48 testing happens on the windows-latest job).
+
+### API
+- **No public API changes.** The library surface is identical between v1.12.0 and v2.0.0 — all Result/Error/Extensions APIs unchanged. The MAJOR bump signals breaking-by-convention TFM matrix change, not API breakage.
+
 ## [1.12.0] - 2026-04-22
 
 ### Added
@@ -602,6 +625,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - .NET Framework 4.8
 - .NET 8.0
 
+[Unreleased]: https://github.com/Voyager-Poland/Voyager.Common.Results/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/Voyager-Poland/Voyager.Common.Results/compare/v1.12.0...v2.0.0
+[1.12.0]: https://github.com/Voyager-Poland/Voyager.Common.Results/compare/v1.10.0...v1.12.0
 [1.10.0]: https://github.com/Voyager-Poland/Voyager.Common.Results/compare/v1.9.0...v1.10.0
 [1.9.0]: https://github.com/Voyager-Poland/Voyager.Common.Results/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/Voyager-Poland/Voyager.Common.Results/compare/v1.7.2...v1.8.0

@@ -1,14 +1,3 @@
-#if NET48
-using System;
-using System.Threading;
-using System.Threading.Tasks;
-#endif
-
-#if NET6_0_OR_GREATER
-using System;
-using System.Threading.Tasks;
-#endif
-
 namespace Voyager.Common.Resilience.Tests
 {
 	/// <summary>

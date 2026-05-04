@@ -5,11 +5,11 @@
 		<Authors>Andrzej Świstowski</Authors>
 		<IsPackable>true</IsPackable>
 		<Description>A lightweight, functional Result type for .NET implementing Railway Oriented
-			Programming pattern. Supports .NET Framework 4.8, .NET 6, .NET 8, and .NET 10 (LTS).
-			Provides error handling without exceptions, method chaining, async operations, and
-			collection utilities.</Description>
+			Programming pattern. Targets .NET Standard 2.0 (compatible with .NET Framework 4.6.1+,
+			.NET Core 2.0+, .NET 5/6/7/8/9) and .NET 10 (LTS, AOT-ready). Provides error handling
+			without exceptions, method chaining, async operations, and collection utilities.</Description>
 		<PackageTags>
-			result-pattern;railway-oriented-programming;functional;error-handling;either;option;monad;csharp;dotnet;net48;net6;net8;net10</PackageTags>
+			result-pattern;railway-oriented-programming;functional;error-handling;either;option;monad;csharp;dotnet;netstandard2.0;net10</PackageTags>
 		<PackageProjectUrl>https://github.com/Voyager-Poland/Voyager.Common.Results</PackageProjectUrl>
 		<RepositoryUrl>https://github.com/Voyager-Poland/Voyager.Common.Results</RepositoryUrl>
 		<PackageReleaseNotes>
@@ -18,7 +18,8 @@
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 	</PropertyGroup>
 
-	<ItemGroup Condition="'$(TargetFramework)' == 'net48'">
+	<!-- IsExternalInit polyfill needed for record/init properties on netstandard2.0 (and any .NET Framework consumer) -->
+	<ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
 		<PackageReference Include="IsExternalInit" Version="1.0.3">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

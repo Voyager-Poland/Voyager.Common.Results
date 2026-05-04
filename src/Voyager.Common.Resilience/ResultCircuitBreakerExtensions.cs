@@ -1,9 +1,3 @@
-#if NET48
-using System;
-using System.Threading;
-using System.Threading.Tasks;
-#endif
-
 using Voyager.Common.Results;
 
 namespace Voyager.Common.Resilience
