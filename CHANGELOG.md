@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`IsExternalInit` polyfill condition** moved from `'$(TargetFramework)' == 'net48'` to `'$(TargetFramework)' == 'netstandard2.0'` — needed for `record`/`init` properties on netstandard2.0 (and on any .NET Framework consumer). Marked `internal` by the polyfill package, so no conflict on .NET 5+ runtimes.
 
 ### Removed
-- **`#if NET48` directives** removed from 8 source files (`Result.cs`, `ResultT.cs`, `Error.cs`, `Extensions/TaskResultExtensions.cs`, `Extensions/ResultRetryExtensions.cs`, `Extensions/ResultErrorChainExtensions.cs`, `Extensions/NullableResultExtensions.cs`, `Resilience/CircuitBreakerPolicy.cs`, `Resilience/ResultCircuitBreakerExtensions.cs`) — `using` declarations are now unconditional, served by `GlobalUsings.cs` for all TFMs (netstandard2.0 SDK structurally has no ImplicitUsings, so explicit usings are uniformly required — strengthens ADR-0002).
+- **`#if NET48` directives** removed from 10 source files (`Result.cs`, `ResultT.cs`, `Error.cs`, `Extensions/TaskResultExtensions.cs`, `Extensions/ResultRetryExtensions.cs`, `Extensions/ResultErrorChainExtensions.cs`, `Extensions/NullableResultExtensions.cs`, `Resilience/CircuitBreakerPolicy.cs`, `Resilience/ResultCircuitBreakerExtensions.cs`, `Resilience/GlobalUsings.cs`) — `using` declarations are now unconditional, served by `GlobalUsings.cs` for all TFMs (netstandard2.0 SDK structurally has no ImplicitUsings, so explicit usings are uniformly required — strengthens ADR-0002).
 - **`#if NET6_0_OR_GREATER` guard removed from `GlobalUsings.cs`** — global usings now apply unconditionally to both TFMs.
 
 ### CI/CD

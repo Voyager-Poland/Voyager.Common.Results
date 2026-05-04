@@ -26,10 +26,16 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: Setup .NET ${{ matrix.dotnet-version }}
+    # Install both .NET 10 SDK (always required — library and test projects include net10.0
+    # in their <TargetFrameworks>, so restore needs the net10 targeting pack regardless of the
+    # matrix entry) and the matrix-specific SDK (needed to actually run net8.0 tests).
+    # setup-dotnet@v4 layers SDKs without removing existing ones.
+    - name: Setup .NET SDKs (10 LTS + matrix runtime)
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: ${{ matrix.dotnet-version }}
+        dotnet-version: |
+          10.0.x
+          ${{ matrix.dotnet-version }}
 
     - name: Add Voyager Source
       run: dotnet nuget add source "https://nuget.pkg.github.com/Voyager-Poland/index.json" -n Voyager-Poland -u ${{secrets.VOY_ACTIONLOGIN}} -p ${{secrets.VOY_ACTIONLOGINPASS}} --store-password-in-clear-text
@@ -37,17 +43,30 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore
 
-    - name: Build
-      run: dotnet build --no-restore -c Release
+    # Build only the test projects for the current matrix TFM (library projects build transitively
+    # via project references, picking the compatible TFM: netstandard2.0 for net8.0 consumer,
+    # net10.0 for net10.0 consumer). This avoids attempting to compile net48 on Linux — net48
+    # binary verification runs on the dedicated test-net48 job below.
+    - name: Build (matrix target only)
+      env:
+        TARGET_FRAMEWORK: ${{ matrix.target-framework }}
+      run: |
+        dotnet build --no-restore -c Release -f $TARGET_FRAMEWORK src/Voyager.Common.Results.Tests/Voyager.Common.Results.Tests.csproj
+        dotnet build --no-restore -c Release -f $TARGET_FRAMEWORK src/Voyager.Common.Resilience.Tests/Voyager.Common.Resilience.Tests.csproj
+        # Analyzer tests are net8.0-only (Microsoft.CodeAnalysis.Testing pinned to net8.0)
+        if [ "$TARGET_FRAMEWORK" = "net8.0" ]; then
+          dotnet build --no-restore -c Release -f net8.0 src/Voyager.Common.Results.Analyzers.Tests/Voyager.Common.Results.Analyzers.Tests.csproj
+        fi
+        # Build the main library projects too — needed for `dotnet pack` in the tag-gated step below
+        dotnet build --no-restore -c Release src/Voyager.Common.Results/Voyager.Common.Results.csproj
+        dotnet build --no-restore -c Release src/Voyager.Common.Resilience/Voyager.Common.Resilience.csproj
 
     - name: Test (matrix target only)
       env:
         TARGET_FRAMEWORK: ${{ matrix.target-framework }}
       run: |
-        # Test projects multi-target net48;net8.0;net10.0 — verifies the netstandard2.0 library binary on each declared runtime (net48 runs on the dedicated test-net48 job below)
         dotnet test --no-build --verbosity normal -c Release -f $TARGET_FRAMEWORK --collect:"XPlat Code Coverage" src/Voyager.Common.Results.Tests/Voyager.Common.Results.Tests.csproj
         dotnet test --no-build --verbosity normal -c Release -f $TARGET_FRAMEWORK --collect:"XPlat Code Coverage" src/Voyager.Common.Resilience.Tests/Voyager.Common.Resilience.Tests.csproj
-        # Analyzer tests (net8.0 only — Microsoft.CodeAnalysis.Testing pinned to net8.0)
         if [ "$TARGET_FRAMEWORK" = "net8.0" ]; then
           dotnet test --no-build --verbosity normal -c Release -f net8.0 --collect:"XPlat Code Coverage" src/Voyager.Common.Results.Analyzers.Tests/Voyager.Common.Results.Analyzers.Tests.csproj
         fi
