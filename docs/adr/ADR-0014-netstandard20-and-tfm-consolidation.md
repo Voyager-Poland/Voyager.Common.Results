@@ -2,9 +2,23 @@
 
 **Status:** Zaakceptowane (wdrożone — branch `master`, planowany tag `v2.0.0`)
 **Data:** 2026-05-04
+**Autor:** Andrzej Świstowski
 **Kontekst:** Voyager.Common.Results — strategia wielo-targetowania i dystrybucja paczki NuGet
-**JIRA:** TBD
+**JIRA:** [ROZ-201](https://jira.voyager-poland.com/browse/ROZ-201)
 **Supersedes:** ADR-0002 (matryca TFM); rozszerza ADR-0013 (drop net6 zapowiedziany w punkcie 6 planu wdrożenia)
+
+## Cele biznesowe
+
+> "Skoro dropujemy net6 dla v2.0.0, czy potrzebujemy nadal 3 osobnych TFM-ów dla biblioteki tej klasy?" — pytanie reviewera na PR #14 (ADR-0013), które zapoczątkowało ROZ-201.
+
+Konsolidacja matrycy TFM w v2.0.0 ma realizować cztery cele biznesowe:
+
+1. **Redukcja kosztu utrzymania CI (~50%)** — matryca 4 TFM → 2 TFM oznacza o połowę krótszy czas pipeline'u, mniej minut Actions na każdy push (zwłaszcza na windows-latest, który jest 2× droższy od ubuntu-latest), proporcjonalne oszczędności na CI quotzie organizacji Voyager-Poland.
+2. **Eliminacja ryzyka audytowego z EOL net6.0** — runtime poza wsparciem MSFT od 2024-11-12 (~18 miesięcy temu). Skanery SCA (Snyk, Dependabot) flagują biblioteki targetujące EOL runtime jako compliance risk; dla bibliotek dystrybuowanych klientom (zwłaszcza w sektorze publicznym, gdzie Voyager operuje) to konkretne ryzyko sprzedażowe.
+3. **Spójność z ekosystemem Voyagera (net10 LTS)** — kolejne biblioteki Voyagera migrują na `net10.0`, klienci coraz częściej budują na net10. Trzymanie `net8.0` jako TFM-u opóźnia tę migrację i zmusza do utrzymywania dwóch zestawów assemblies dla nakładających się runtime'ów.
+4. **Rozszerzenie zasięgu dystrybucji** — `netstandard2.0` dodatkowo obejmuje runtime'y nie wspierane dotąd: net46.1-net47, .NET Core 2.x, Mono, Xamarin, Unity. Biblioteka staje się dostępna dla szerszego grona konsumentów *bez dodatkowej pracy*.
+
+Cele te uzasadniają breaking change (MAJOR bump v2.0.0 wymusza świadomą aktualizację konsumentów). Decyzja techniczna (Opcja B) realizuje wszystkie cztery cele równocześnie — patrz "Decyzja" niżej.
 
 ## Problem
 
@@ -24,7 +38,7 @@ Kontekst techniczny biblioteki:
 
 Matryca: `net48;net8.0;net10.0`. Minimalne odchylenie od ADR-0013.
 
-**Odrzucona** — nie wykorzystuje faktu, że biblioteka jest perfect-fit dla netstandard2.0. Nadal trzymamy `#if NET48` w 8 plikach źródłowych (Result.cs, ResultT.cs, Error.cs, 5× extensions, GlobalUsings.cs) tylko po to, żeby zaadresować różnicę między `ImplicitUsings` SDK net48 (brak) a SDK net8/net10 (są). To duplikacja konfiguracji bez funkcjonalnego zysku.
+**Odrzucona** — nie wykorzystuje faktu, że biblioteka jest perfect-fit dla netstandard2.0. Nadal trzymamy `#if NET48` w 10 plikach źródłowych (Result.cs, ResultT.cs, Error.cs, 4× extensions, 2× Resilience source, Resilience/GlobalUsings.cs) tylko po to, żeby zaadresować różnicę między `ImplicitUsings` SDK net48 (brak) a SDK net8/net10 (są). To duplikacja konfiguracji bez funkcjonalnego zysku.
 
 ### Opcja B — `netstandard2.0;net10.0` (rekomendowana) ✅
 
@@ -54,11 +68,39 @@ Hybryda zachowująca net8 jako "fallback LTS" (LTS do 2026-11-10).
 3. **Pełny drop `net6.0`** zgodnie z zapowiedzią ADR-0013. Runtime EOL od 2024-11-12 (~18 miesięcy temu). Konsumenci na net6 dostają `lib/netstandard2.0/`.
 4. **Pełny drop `net8.0`** jako odrębny TFM. Konsumenci na net8 dostają `lib/netstandard2.0/`.
 5. **`IsExternalInit` PackageReference rozszerzony na netstandard2.0** (`Condition="'$(TargetFramework)' == 'netstandard2.0'"`).
-6. **Usunięcie `#if NET48` z 8 plików** — konsolidacja `using` deklaracji jako bezwarunkowe (LangVersion=10.0 dla netstandard2.0 nie ma ImplicitUsings, więc explicit `using` są wymagane uniwersalnie). Spójne z duchem ADR-0002 (eksplicytne usings).
+6. **Usunięcie `#if NET48` z 10 plików** — konsolidacja `using` deklaracji jako bezwarunkowe (LangVersion=10.0 dla netstandard2.0 nie ma ImplicitUsings, więc explicit `using` są wymagane uniwersalnie). Spójne z duchem ADR-0002 (eksplicytne usings).
 7. **`GlobalUsings.cs` — usunąć warunek `#if NET6_0_OR_GREATER`** lub zlikwidować plik na rzecz jednolitych `using` per-plik. Decyzja ergonomiczna do follow-up commit; ten ADR ich nie wymusza.
 8. **Test projects: `net48;net8.0;net10.0`** — testujemy assembly netstandard2.0 na każdym runtime, który deklarujemy jako wspierany (net48 weryfikuje zgodność z .NET Framework, net8.0 weryfikuje współczesny LTS, net10.0 weryfikuje TFM-specific assembly). net6.0 z testów wypada — zgodnie z drop-em.
 9. **CI matrix**: `net8.0;net10.0` na ubuntu-latest + osobny job `test-net48` na windows-latest. Drop joba dla net6. Job pack/publish nadal na net10 SDK (per ADR-0013).
 10. **Bump MAJOR → v2.0.0** zgodnie z zapowiedzią ADR-0013. Zmiana matrycy TFM jest breaking-by-convention nawet jeśli powierzchnia API jest niezmieniona.
+
+## Decyzja powiązana — tag-gated publishing
+
+Niniejszy ADR formalnie obejmuje **wyłącznie** matrycę TFM. Razem z ROZ-201 zmieniamy jednak również moment publikacji paczek NuGet — to decyzja **technicznie niezależna od TFM**, ale dołączona do tego PR/ADR z trzech powodów:
+
+1. **Ten sam plik konfiguracyjny** (`.github/workflows/ci.yml`) — zmiana matrycy TFM i tak wymaga przepisania workflow, więc wprowadzanie tag-gated publish w tym samym kroku oszczędza drugą iterację review CI.
+2. **Ta sama wersja release** — v2.0.0 i tak jest pierwszym tagiem po wdrożeniu nowych reguł, naturalne miejsce na zmianę procesu publikacji.
+3. **Synergia oszczędności CI** — drop net6 (ADR-0014) + tag-gated pack (poniżej) razem dają największe oszczędności na CI quotzie.
+
+### Decyzja
+
+Przed v2.0.0: każdy push na `master`/`main`/`develop` triggerował `dotnet pack` + `nuget push` z preview-wersją (`0.X.0-preview.N`) na GitHub Packages i opcjonalnie NuGet.org.
+
+Po v2.0.0: **publikacja wyłącznie na tag push** (`refs/tags/v*`):
+
+- `dotnet pack` i `Upload artifacts` zgated na `if: startsWith(github.ref, 'refs/tags/v')`.
+- `deploy` job (push na NuGet feeds) zgated identycznie.
+- `release` job (GitHub Release z auto-generated notes) bez zmian (już był na tagach).
+- Branch pushes nadal odpalają build + testy (verifikacja CI), ale nie produkują artefaktów ani publikacji.
+
+### Uzasadnienie
+
+- **Eliminacja preview-wersji śmiecących feedem** — preview-y na GitHub Packages były rzadko konsumowane (zwykle developerzy pobierają wersje stabilne lokalnym dotnet pack); produkowały hałas w UI feedu Voyager-Poland i sztucznie inflowały rozmiar feedu.
+- **Mniejsze koszty CI** — `dotnet pack` (zwłaszcza dla 4-TFM matrycy) zajmował ~30s na każdy push; przy ~50 pushach/miesiąc to ~25 minut Actions/m-c bez wartości biznesowej.
+- **Klarowniejszy kontrakt release** — tag = release, push do gałęzi = WIP. To zgodne z modelem MinVer (ADR-001) — pakiet wersjonowany przez tag jest *prawdziwym* releasem.
+- **Decyzja możliwa do separacji** — gdyby pojawiła się potrzeba revertu samej zmiany publikacji bez ruszania matrycy TFM, wystarczy revert sekcji `if: startsWith(github.ref, 'refs/tags/v')` w `ci.yml` — bez wpływu na resztę ADR-0014.
+
+Jeżeli w trakcie review pojawi się głos, że tag-gated publish powinien dostać własny ADR (np. ADR-0015), jest to operacja zerokosztowa: powyższy tekst można wyciąć do osobnego dokumentu, a tu zostawić tylko cross-reference. Nie robimy tego prewencyjnie, bo dwie zmiany wprowadzane są atomowo w tym samym PR/release.
 
 ## Uzasadnienie
 
@@ -89,7 +131,7 @@ Po dropie net48 jako TFM, dyrektywa `#if NET48` traci sens (netstandard2.0 nie d
 
 - **Matryca: 4 → 2 TFM** (-50% wymiarów paczki). Paczka zawiera `lib/netstandard2.0/` + `lib/net10.0/` zamiast czterech katalogów. CI build/test ~50% szybszy.
 - **Eliminacja jobu `test-net48`** na osobnym Windows runner-ze nie jest możliwa (testy net48 nadal weryfikują binary compatibility netstandard2.0 → net48), ale CI matrix dla ubuntu-latest spada z 3 do 2 TFM.
-- **Eliminacja `#if NET48` w 8 plikach** — czystszy kod, mniej do utrzymania.
+- **Eliminacja `#if NET48` w 10 plikach** — czystszy kod, mniej do utrzymania.
 - **Wydłużone wsparcie dla legacy** — netstandard2.0 obejmuje również runtime'y, których obecnie nie wspieramy: net461-net47, .NET Core 2.x, Mono, Xamarin, Unity. Biblioteka staje się dostępna dla szerszej puli konsumentów bez dodatkowej pracy.
 - **Spójność z ADR-0002** — explicit usings everywhere, bez warunków per-TFM.
 - **Spójność z ADR-0013** — strategia "net10 jako modern target" zachowana, plan drop-net6 wykonany, AOT readiness pozostaje otwarty.
@@ -118,7 +160,7 @@ Po dropie net48 jako TFM, dyrektywa `#if NET48` traci sens (netstandard2.0 nie d
 1. ✅ Ten ADR (review).
 2. ✅ `Directory.Build.props` — `<TargetFrameworks>netstandard2.0;net10.0</TargetFrameworks>` + LangVersion per-TFM (`10.0` dla netstandard2.0, `latest` dla net10.0).
 3. ✅ `Voyager.Common.Results.csproj` — rozszerzono condition `IsExternalInit` PackageReference na `netstandard2.0`. Description i PackageTags zaktualizowane.
-4. ✅ Usunięto `#if NET48` z 8 plików (`Error.cs`, `Result.cs`, `ResultT.cs`, 4× `Extensions/*.cs`, `Resilience/CircuitBreakerPolicy.cs`, `Resilience/ResultCircuitBreakerExtensions.cs`); `using` skonsolidowane jako bezwarunkowe.
+4. ✅ Usunięto `#if NET48` z 10 plików (`Error.cs`, `Result.cs`, `ResultT.cs`, 4× `Extensions/*.cs`, `Resilience/CircuitBreakerPolicy.cs`, `Resilience/ResultCircuitBreakerExtensions.cs`, `Resilience/GlobalUsings.cs`); `using` skonsolidowane jako bezwarunkowe.
 5. ✅ `GlobalUsings.cs` — usunięto warunek `#if NET6_0_OR_GREATER` w bibliotece i w obu test-projektach.
 6. ✅ Test projects — TFM zmieniony na `net48;net8.0;net10.0` (override globalnego `netstandard2.0;net10.0`). Testują assembly netstandard2.0 na każdym wspieranym runtime + assembly net10.0 na net10.
 7. ✅ CI workflow — usunięto matrix entry dla net6.0; `test-net48` na windows-latest pozostawiony; **publish/deploy zgated na tag push** (`startsWith(github.ref, 'refs/tags/v')`); pack+upload artefaktów też gated na tag.
