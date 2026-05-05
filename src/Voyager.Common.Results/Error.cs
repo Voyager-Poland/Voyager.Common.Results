@@ -1,8 +1,4 @@
-﻿#if NET48
-using System;
-using System.Collections.Generic;
-#endif
-using System.Text;
+﻿using System.Text;
 
 namespace Voyager.Common.Results
 {

@@ -7,7 +7,7 @@
 
 Biblioteka implementująca **Result Pattern** (Railway Oriented Programming) dla projektów .NET.
 
-Wspiera **.NET Framework 4.8**, **.NET 6**, **.NET 8** i **.NET 10 (LTS)** 🎯
+Targetuje **`netstandard2.0`** i **`net10.0` (LTS)** — działa na .NET Framework 4.6.1+, .NET Core 2.0+, .NET 5/6/7/8/9 oraz .NET 10. Per [ADR-0014](../../docs/adr/ADR-0014-netstandard20-and-tfm-consolidation.md). 🎯
 
 ## 🧪 Testy
 
@@ -19,7 +19,7 @@ Biblioteka zawiera **464 kompleksowe testy** zapewniające poprawność:
 - **Composition** (60 testów) - Zachowanie łańcuchowania i kombinacji operatorów
 - **Unit Tests** (309 testów) - Podstawowa funkcjonalność, extensions, edge cases
 
-Testy biblioteki przechodzą na **.NET Framework 4.8**, **.NET 6.0**, **.NET 8.0** i **.NET 10.0**. Testy analizatorów Roslyn uruchamiane są tylko na **.NET 8.0** (wymóg Microsoft.CodeAnalysis.Testing).
+Testy biblioteki przechodzą na **.NET Framework 4.8**, **.NET 8.0** i **.NET 10.0** — binarka biblioteki (`netstandard2.0`) jest weryfikowana na każdym z tych runtime'ów (per [ADR-0014](../../docs/adr/ADR-0014-netstandard20-and-tfm-consolidation.md)). Testy analizatorów Roslyn uruchamiane są tylko na **.NET 8.0** (wymóg Microsoft.CodeAnalysis.Testing).
 
 ## 📦 Instalacja
 

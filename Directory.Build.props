@@ -10,28 +10,22 @@
 	<Import Project="build/Build.NuGet.props" />
 	<Import Project="build/Build.Signing.props" />
 	<PropertyGroup>
-		<!-- Target Frameworks - Multi-target for .NET 6, .NET 8, .NET 10 (LTS) and .NET Framework 4.8 -->
-		<TargetFrameworks>net48;net6.0;net8.0;net10.0</TargetFrameworks>
+		<!-- Target Frameworks - per ADR-0014: netstandard2.0 covers net48/net6/net8/net9, net10.0 for AOT-readiness and BCL nullable annotations.
+		     Test projects override this to multi-target net48;net8.0;net10.0 (verify netstandard2.0 binary on each declared runtime). -->
+		<TargetFrameworks>netstandard2.0;net10.0</TargetFrameworks>
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>disable</ImplicitUsings>
+
+		<!-- Default LangVersion 10.0 — supports records, init properties, file-scoped namespaces, etc.
+		     Required by Nullable=enable (which needs C# 8+) on net48 and netstandard2.0 (where SDK default would be lower).
+		     Modern TFMs (net8.0, net10.0) override below to 'latest' for opt-in to newest C# features. -->
+		<LangVersion>10.0</LangVersion>
 
 		<Company>Sindbad IT Sp. z o.o.</Company>
 		<Copyright>Copyright © Sindbad IT sp. z o.o. $([System.DateTime]::Now.Year)</Copyright>
 	</PropertyGroup>
 
-	<PropertyGroup Condition="'$(TargetFramework)' == 'net10.0'">
+	<PropertyGroup Condition="'$(TargetFramework)' == 'net10.0' or '$(TargetFramework)' == 'net8.0'">
 		<LangVersion>latest</LangVersion>
-	</PropertyGroup>
-
-	<PropertyGroup Condition="'$(TargetFramework)' == 'net8.0'">
-		<LangVersion>latest</LangVersion>
-	</PropertyGroup>
-
-	<PropertyGroup Condition="'$(TargetFramework)' == 'net6.0'">
-		<LangVersion>10.0</LangVersion>
-	</PropertyGroup>
-
-	<PropertyGroup Condition="'$(TargetFramework)' == 'net48'">
-		<LangVersion>10.0</LangVersion>
 	</PropertyGroup>
 </Project>

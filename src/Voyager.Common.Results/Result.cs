@@ -1,8 +1,4 @@
-﻿#if NET48
-using System;
-#endif
-
-namespace Voyager.Common.Results
+﻿namespace Voyager.Common.Results
 {
     /// <summary>
     /// Result pattern - represents the outcome of an operation that does not return a value (void operations)

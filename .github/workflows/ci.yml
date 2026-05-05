@@ -13,8 +13,6 @@ jobs:
     strategy:
       matrix:
         include:
-          - dotnet-version: '6.0.x'
-            target-framework: 'net6.0'
           - dotnet-version: '8.0.x'
             target-framework: 'net8.0'
           - dotnet-version: '10.0.x'
@@ -26,18 +24,18 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
-        fetch-depth: 0  
+        fetch-depth: 0
 
-    - name: Setup .NET ${{ matrix.dotnet-version }}
+    # Install both .NET 10 SDK (always required — library and test projects include net10.0
+    # in their <TargetFrameworks>, so restore needs the net10 targeting pack regardless of the
+    # matrix entry) and the matrix-specific SDK (needed to actually run net8.0 tests).
+    # setup-dotnet@v4 layers SDKs without removing existing ones.
+    - name: Setup .NET SDKs (10 LTS + matrix runtime)
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: ${{ matrix.dotnet-version }}
-
-    - name: Install Mono for .NET Framework 4.8 tests
-      run: |
-        sudo apt-get update -qq
-        sudo apt-get install -y -qq mono-complete mono-devel
-        mono --version
+        dotnet-version: |
+          10.0.x
+          ${{ matrix.dotnet-version }}
 
     - name: Add Voyager Source
       run: dotnet nuget add source "https://nuget.pkg.github.com/Voyager-Poland/index.json" -n Voyager-Poland -u ${{secrets.VOY_ACTIONLOGIN}} -p ${{secrets.VOY_ACTIONLOGINPASS}} --store-password-in-clear-text
@@ -45,17 +43,30 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore
 
-    - name: Build
-      run: dotnet build --no-restore -c Release
+    # Build only the test projects for the current matrix TFM (library projects build transitively
+    # via project references, picking the compatible TFM: netstandard2.0 for net8.0 consumer,
+    # net10.0 for net10.0 consumer). This avoids attempting to compile net48 on Linux — net48
+    # binary verification runs on the dedicated test-net48 job below.
+    - name: Build (matrix target only)
+      env:
+        TARGET_FRAMEWORK: ${{ matrix.target-framework }}
+      run: |
+        dotnet build --no-restore -c Release -f $TARGET_FRAMEWORK src/Voyager.Common.Results.Tests/Voyager.Common.Results.Tests.csproj
+        dotnet build --no-restore -c Release -f $TARGET_FRAMEWORK src/Voyager.Common.Resilience.Tests/Voyager.Common.Resilience.Tests.csproj
+        # Analyzer tests are net8.0-only (Microsoft.CodeAnalysis.Testing pinned to net8.0)
+        if [ "$TARGET_FRAMEWORK" = "net8.0" ]; then
+          dotnet build --no-restore -c Release -f net8.0 src/Voyager.Common.Results.Analyzers.Tests/Voyager.Common.Results.Analyzers.Tests.csproj
+        fi
+        # Build the main library projects too — needed for `dotnet pack` in the tag-gated step below
+        dotnet build --no-restore -c Release src/Voyager.Common.Results/Voyager.Common.Results.csproj
+        dotnet build --no-restore -c Release src/Voyager.Common.Resilience/Voyager.Common.Resilience.csproj
 
     - name: Test (matrix target only)
       env:
         TARGET_FRAMEWORK: ${{ matrix.target-framework }}
       run: |
-        # Core library tests (multi-target: net48, net6.0, net8.0, net10.0)
         dotnet test --no-build --verbosity normal -c Release -f $TARGET_FRAMEWORK --collect:"XPlat Code Coverage" src/Voyager.Common.Results.Tests/Voyager.Common.Results.Tests.csproj
         dotnet test --no-build --verbosity normal -c Release -f $TARGET_FRAMEWORK --collect:"XPlat Code Coverage" src/Voyager.Common.Resilience.Tests/Voyager.Common.Resilience.Tests.csproj
-        # Analyzer tests (net8.0 only — Microsoft.CodeAnalysis.Testing pinned to net8.0)
         if [ "$TARGET_FRAMEWORK" = "net8.0" ]; then
           dotnet test --no-build --verbosity normal -c Release -f net8.0 --collect:"XPlat Code Coverage" src/Voyager.Common.Results.Analyzers.Tests/Voyager.Common.Results.Analyzers.Tests.csproj
         fi
@@ -68,14 +79,14 @@ jobs:
         slug: Voyager-Poland/Voyager.Common.Results
         fail_ci_if_error: false
 
-    - name: Pack (only on dotnet 10 LTS)
-      if: matrix.target-framework == 'net10.0'
+    - name: Pack (only on dotnet 10 LTS, only on tag)
+      if: matrix.target-framework == 'net10.0' && startsWith(github.ref, 'refs/tags/v')
       run: |
         dotnet pack --no-restore --no-build -c Release src/Voyager.Common.Results/Voyager.Common.Results.csproj
         dotnet pack --no-restore --no-build -c Release src/Voyager.Common.Resilience/Voyager.Common.Resilience.csproj
 
-    - name: Upload artifacts (only on dotnet 10 LTS)
-      if: matrix.target-framework == 'net10.0'
+    - name: Upload artifacts (only on dotnet 10 LTS, only on tag)
+      if: matrix.target-framework == 'net10.0' && startsWith(github.ref, 'refs/tags/v')
       uses: actions/upload-artifact@v4
       with:
         name: packages
@@ -105,11 +116,11 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore
 
-    - name: Build net48 (exclude analyzer projects — they target netstandard2.0/net8.0)
+    - name: Build net48 (test-only — main library targets netstandard2.0;net10.0; this job verifies binary compatibility on .NET Framework 4.8)
       run: |
-        dotnet build --no-restore -c Release -f net48 src/Voyager.Common.Results/Voyager.Common.Results.csproj
+        dotnet build --no-restore -c Release -f netstandard2.0 src/Voyager.Common.Results/Voyager.Common.Results.csproj
+        dotnet build --no-restore -c Release -f netstandard2.0 src/Voyager.Common.Resilience/Voyager.Common.Resilience.csproj
         dotnet build --no-restore -c Release -f net48 src/Voyager.Common.Results.Tests/Voyager.Common.Results.Tests.csproj
-        dotnet build --no-restore -c Release -f net48 src/Voyager.Common.Resilience/Voyager.Common.Resilience.csproj
         dotnet build --no-restore -c Release -f net48 src/Voyager.Common.Resilience.Tests/Voyager.Common.Resilience.Tests.csproj
 
     - name: Test net48 (no coverage)
@@ -120,8 +131,8 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: [build, test-net48]
-    # Only deploy on push to main/master (not on PR)
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
+    # Only deploy on tag push (per ADR-0014 — branch pushes no longer trigger publishing)
+    if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       packages: write
       contents: read

@@ -1,10 +1,4 @@
-﻿#if NET48
-using System;
-using System.Threading;
-using System.Threading.Tasks;
-#endif
-
-namespace Voyager.Common.Results
+﻿namespace Voyager.Common.Results
 {
 	/// <summary>
 	/// Result pattern - represents the outcome of an operation that may succeed or fail

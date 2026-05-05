@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <!-- Tests verify the netstandard2.0 library binary on each declared runtime: net48, net8.0 (LTS), net10.0 (TFM-specific) -->
+    <TargetFrameworks>net48;net8.0;net10.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
 
     <IsPackable>false</IsPackable>

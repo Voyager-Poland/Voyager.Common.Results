@@ -1,7 +1,3 @@
-#if NET48
-using System;
-#endif
-
 namespace Voyager.Common.Results.Extensions
 {
 	/// <summary>

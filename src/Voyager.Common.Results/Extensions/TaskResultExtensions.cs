@@ -1,10 +1,4 @@
-﻿#if NET48
-using System;
-using System.Threading;
-using System.Threading.Tasks;
-#endif
-
-namespace Voyager.Common.Results.Extensions
+﻿namespace Voyager.Common.Results.Extensions
 {
 	/// <summary>
 	/// Extension methods for async Result operations

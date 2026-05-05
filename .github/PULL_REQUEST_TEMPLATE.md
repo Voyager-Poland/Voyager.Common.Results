@@ -9,7 +9,7 @@
 - [ ] Code refactoring
 
 ## Mandatory Checklist (CI will verify)
-- [ ] Code compiles without warnings for both net8.0 and net48
+- [ ] Code compiles without warnings for both netstandard2.0 and net10.0
 - [ ] All tests pass
 - [ ] Code coverage maintained or improved
 - [ ] `.editorconfig` style rules followed
