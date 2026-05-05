@@ -19,14 +19,17 @@
 		<None Include="$(MSBuildThisFileDirectory)..\..\img\voyager-nugets-ikona-128x128.png" Pack="true" PackagePath="\" />
 	</ItemGroup>
 
-	<ItemGroup>
-		<!-- Use ProjectReference during development/compilation for debugging and faster builds -->
-		<!-- PrivateAssets="All" prevents project reference from flowing to consuming packages -->
-		<ProjectReference Include="..\Voyager.Common.Results\Voyager.Common.Results.csproj"
-			PrivateAssets="All" />
+	<!-- Default to ProjectReference for local development; CI sets UseProjectReferences=false when packing -->
+	<PropertyGroup>
+		<UseProjectReferences Condition="'$(UseProjectReferences)' == ''">true</UseProjectReferences>
+	</PropertyGroup>
 
-		<!-- Explicitly add PackageReference for published NuGet package -->
-		<!-- This ensures consumers get the NuGet package dependency, not a project reference -->
-		<PackageReference Include="Voyager.Common.Results" Version="*" />
+	<ItemGroup Condition="'$(UseProjectReferences)' == 'true'">
+		<ProjectReference Include="..\Voyager.Common.Results\Voyager.Common.Results.csproj" />
+	</ItemGroup>
+
+	<ItemGroup Condition="'$(UseProjectReferences)' != 'true'">
+		<!-- When packing for NuGet, reference the published package with the same MinVer version -->
+		<PackageReference Include="Voyager.Common.Results" Version="$(Version)" />
 	</ItemGroup>
 </Project>
